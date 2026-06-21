@@ -1,17 +1,21 @@
 using FxLink.Core.Abstractions;
+using FxLink.Core.Delegates;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Core.PipelineBehaviors;
 
-internal class ConsumerPipelineBehaviorOrchestrator<TMessage>(
-    IEnumerable<IConsumerPipelineBehavior<TMessage>> pipelineBehaviors,
-    IServer<TMessage> server) where TMessage : class
+internal class ConsumerPipelineBehaviorOrchestrator<TMessage>(IServiceProvider serviceProvider) where TMessage : class
 {
-    internal async Task ConsumeAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
+    // Just lazy load pipeline behaviors and server because sometimes we want to defer services loaded on pipelines and server
+    internal async Task ExecuteAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
     {
+        var server = serviceProvider.GetRequiredService<IServer<TMessage>>();
+        var pipelineBehaviors = serviceProvider
+            .GetServices<IConsumerPipelineBehavior<TMessage>>();
         var func = pipelineBehaviors
             .Reverse()
-            .Aggregate(() => server.ConsumeAsync(context, token),
-                (acc, next) => () => next.ConsumeAsync(context, acc, token));
-        await func.Invoke();
+            .Aggregate((ConsumerHandlerDelegate)(ct => server.ConsumeAsync(context, ct)),
+                (acc, next) => ct => next.ConsumeAsync(context, acc, ct));
+        await func.Invoke(token);
     }
 }

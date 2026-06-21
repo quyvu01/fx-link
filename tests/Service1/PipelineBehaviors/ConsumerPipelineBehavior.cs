@@ -1,4 +1,5 @@
 using FxLink.Core.Abstractions;
+using FxLink.Core.Delegates;
 using Service1.Dtos;
 
 namespace Service1.PipelineBehaviors;
@@ -6,10 +7,10 @@ namespace Service1.PipelineBehaviors;
 public sealed class ConsumerPipelineBehavior(ILogger<ConsumerPipelineBehavior> logger) :
     IConsumerPipelineBehavior<OrderPlaced>
 {
-    public async Task ConsumeAsync(IConsumerContext<OrderPlaced> context, Func<Task> next,
+    public async Task ConsumeAsync(IConsumerContext<OrderPlaced> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
         logger.LogInformation("Consumer Pipeline behavior for Order Placed : {@Message}", context.Message);
-        await next.Invoke();
+        await next.Invoke(token);
     }
 }

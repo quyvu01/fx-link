@@ -14,7 +14,7 @@ internal sealed class InMemoryBus<TMessage>(IServiceProvider serviceProvider) :
         using var scope = serviceProvider.CreateScope();
         var consumerPipelineBehavior = scope.ServiceProvider
             .GetRequiredService<ConsumerPipelineBehaviorOrchestrator<TMessage>>();
-        await consumerPipelineBehavior.ConsumeAsync(new ConsumerContext<TMessage>(message, context.CorrelationId,
+        await consumerPipelineBehavior.ExecuteAsync(new ConsumerContext<TMessage>(message, context.CorrelationId,
             context.Headers), token);
     }
 

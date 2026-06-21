@@ -9,14 +9,13 @@ public sealed class OrderConsumers(ILogger<OrderConsumers> logger) :
 {
     public Task ConsumeAsync(IConsumerContext<OrderPlaced> context, CancellationToken token = default)
     {
-        logger.LogInformation("Order placed : {OrderId} - {Time}", context.Message.OrderId, context.Message.OrderTime);
+        logger.LogInformation("Order placed : {@Order}", context.Message);
         return Task.CompletedTask;
     }
 
     public Task ConsumeAsync(IConsumerContext<OrderCancelled> context, CancellationToken token = default)
     {
-        logger.LogInformation("Order cancelled : {OrderId} - {Time}", context.Message.OrderId,
-            context.Message.CancelledTime);
+        logger.LogInformation("Order cancelled : {@Order}", context.Message);
         return Task.CompletedTask;
     }
 }

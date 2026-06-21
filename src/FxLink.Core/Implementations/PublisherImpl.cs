@@ -13,7 +13,7 @@ internal sealed class PublisherImpl(IServiceProvider serviceProvider) : IPublish
     {
         var publisherOrchestrator = serviceProvider
             .GetRequiredService<PublisherPipelineBehaviorOrchestrator<TMessage>>();
-        await publisherOrchestrator.PublishAsync(message, context, token);
+        await publisherOrchestrator.ExecuteAsync(message, context, token);
     }
 
     public Task PublishAsync<TMessage>(TMessage message, CancellationToken token = default) where TMessage : class =>
