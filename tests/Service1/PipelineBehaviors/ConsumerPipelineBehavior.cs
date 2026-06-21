@@ -1,0 +1,15 @@
+using FxLink.Core.Abstractions;
+using Service1.Dtos;
+
+namespace Service1.PipelineBehaviors;
+
+public sealed class ConsumerPipelineBehavior(ILogger<ConsumerPipelineBehavior> logger) :
+    IConsumerPipelineBehavior<OrderPlaced>
+{
+    public async Task ConsumeAsync(IConsumerContext<OrderPlaced> context, Func<Task> next,
+        CancellationToken token = default)
+    {
+        logger.LogInformation("Consumer Pipeline behavior for Order Placed : {@Message}", context.Message);
+        await next.Invoke();
+    }
+}

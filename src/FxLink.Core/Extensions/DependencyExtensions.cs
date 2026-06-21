@@ -7,12 +7,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Core.Extensions;
 
-public static class FxLinkExtensions
+public static class DependencyExtensions
 {
     public static FxLinkRegistryWrapper AddFxLink(this IServiceCollection serviceCollection,
-        Action<IFxLinkConfigurator> options)
+        Action<IConfigurator> options)
     {
-        var configurator = new FxLinkConfigurator(serviceCollection);
+        var configurator = new Configurator(serviceCollection);
         options?.Invoke(configurator);
         serviceCollection.AddTransient<IPublisher, PublisherImpl>();
         serviceCollection.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));

@@ -7,8 +7,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FxLink.Core.Registries;
 
-public class FxLinkConfigurator(IServiceCollection serviceCollection) : IFxLinkConfigurator
+public class Configurator(IServiceCollection serviceCollection) : IConfigurator
 {
+    public IServiceCollection Services { get; } = serviceCollection;
     public void AddConsumer<TConsumer>() where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
     public void AddConsumersFromAssemblies(Assembly assembly)
@@ -27,14 +28,14 @@ public class FxLinkConfigurator(IServiceCollection serviceCollection) : IFxLinkC
     // Not use in production
     public void UseInMemory()
     {
-        serviceCollection.AddSingleton(typeof(IServer<>), typeof(InMemoryBus<>));
-        serviceCollection.AddSingleton(typeof(IClient<>), typeof(InMemoryBus<>));
+        Services.AddSingleton(typeof(IServer<>), typeof(InMemoryBus<>));
+        Services.AddSingleton(typeof(IClient<>), typeof(InMemoryBus<>));
     }
 
     // Need to check if we have edge cases here!
     private void AddConsumer(Type consumerType) => consumerType
         .GetInterfaces()
         .Where(a => a.IsGenericType && a.GetGenericTypeDefinition() == typeof(IConsumer<>))
-        .ForEach(serviceType => serviceCollection
+        .ForEach(serviceType => Services
             .TryAddEnumerable(new ServiceDescriptor(serviceType, consumerType, ServiceLifetime.Scoped)));
 }
