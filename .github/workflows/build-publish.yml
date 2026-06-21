@@ -48,7 +48,7 @@ jobs:
     name: Build and Publish NuGets
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && success()
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') && success()
     needs:
       - calc-version
     permissions:
