@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/FxLink.Core/FxLink.Core.csproj" />
+  <Project Path="tests/Service1/Service1.csproj" />
+</Solution>
