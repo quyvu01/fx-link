@@ -1,5 +1,3 @@
-using System.Reflection;
-
 namespace FxLink.Core.Extensions;
 
 /// <summary>

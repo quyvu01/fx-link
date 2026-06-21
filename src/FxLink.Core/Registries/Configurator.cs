@@ -28,8 +28,9 @@ public class Configurator(IServiceCollection serviceCollection) : IConfigurator
     // Not use in production
     public void UseInMemory()
     {
-        Services.AddSingleton(typeof(IServer<>), typeof(InMemoryBus<>));
-        Services.AddSingleton(typeof(IClient<>), typeof(InMemoryBus<>));
+        Services.TryAddSingleton(typeof(IServer<>), typeof(InMemoryBus<>));
+        Services.TryAddSingleton(typeof(IClient<>), typeof(InMemoryBus<>));
+        Services.TryAddSingleton(typeof(IMessageProcessor<>), typeof(InMemoryMessage<>));
     }
 
     // Need to check if we have edge cases here!
