@@ -2,7 +2,6 @@ using FxLink.Core.Abstractions;
 using FxLink.Core.Extensions;
 using Serilog;
 using Service1.Dtos;
-using Service1.PipelineBehaviors;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +52,14 @@ app.MapPost("/cancelOrder", async (IPublisher publisher) =>
     {
         await publisher.PublishAsync(new OrderCancelled { OrderId = Guid.NewGuid(), CancelledTime = DateTime.UtcNow });
         return "Order cancelled";
+    })
+    .WithOpenApi();
+
+app.MapGet("/getOrder", async (IRequest<OrderResult> request, CancellationToken token) =>
+    {
+        var id = Guid.Parse("c5143803-5477-47b4-8d4f-236cb4b09af9");
+        var result = await request.RequestAsync<OrderResultResponse>(new OrderResult { OrderId = id }, token);
+        return result;
     })
     .WithOpenApi();
 

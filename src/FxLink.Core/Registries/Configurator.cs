@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using FxLink.Core.Abstractions;
 using FxLink.Core.Extensions;
+using FxLink.Core.Implementations;
 using FxLink.Core.InMemory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -12,10 +13,10 @@ public class Configurator(IServiceCollection serviceCollection) : IConfigurator
 {
     public IServiceCollection Services { get; } = serviceCollection;
 
-    public IReadOnlyDictionary<Type, Type[]> MessageMapConsumers =>
+    public IReadOnlyDictionary<Type, string[]> MessageMapConsumers =>
         _messageMapConsumers.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
 
-    private readonly ConcurrentDictionary<Type, List<Type>> _messageMapConsumers = [];
+    private readonly ConcurrentDictionary<Type, List<string>> _messageMapConsumers = [];
     public void AddConsumer<TConsumer>() where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
     public void AddConsumersFromAssemblies(Assembly assembly)
@@ -34,8 +35,6 @@ public class Configurator(IServiceCollection serviceCollection) : IConfigurator
     // Not use in production
     public void UseInMemory()
     {
-        Services.TryAddSingleton(typeof(IServer<>), typeof(InMemoryBus<>));
-        Services.TryAddSingleton(typeof(IClient<>), typeof(InMemoryBus<>));
         Services.TryAddSingleton(typeof(IMessageProcessor<>), typeof(InMemoryMessage<>));
     }
 
@@ -47,8 +46,9 @@ public class Configurator(IServiceCollection serviceCollection) : IConfigurator
         {
             var messageType = serviceType.GetGenericArguments()[0];
             var consumers = _messageMapConsumers.GetOrAdd(messageType, _ => []);
-            consumers.Add(consumerType);
-            Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey: consumerType,
-                implementationType: consumerType, ServiceLifetime.Scoped));
+            var serviceKey = consumerType.FullName;
+            consumers.Add(serviceKey);
+            Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey, consumerType,
+                ServiceLifetime.Scoped));
         });
 }
