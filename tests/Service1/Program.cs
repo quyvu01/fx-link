@@ -24,11 +24,11 @@ builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
     opts.UseInMemory();
-    opts.AddPublisherPipelineBehaviors(c => c
-        .Of(typeof(PublishPipelineBehavior<>))
-    );
-    opts.AddConsumerPipelineBehaviors(c => c
-        .Of<ConsumerPipelineBehavior>());
+    // opts.AddPublisherPipelineBehaviors(c => c
+    //     .Of(typeof(PublishPipelineBehavior<>))
+    // );
+    // opts.AddConsumerPipelineBehaviors(c => c
+    //     .Of<ConsumerPipelineBehavior>());
 });
 
 var app = builder.Build();

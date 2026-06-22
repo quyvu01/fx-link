@@ -14,6 +14,8 @@ public static class DependencyExtensions
     {
         var configurator = new Configurator(serviceCollection);
         options?.Invoke(configurator);
+        var messageMapConsumers = configurator.MessageMapConsumers;
+        serviceCollection.AddSingleton(new MessageMapConsumers(messageMapConsumers));
         serviceCollection.AddTransient<IPublisher, PublisherImpl>();
         serviceCollection.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
         serviceCollection.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));

@@ -16,13 +16,18 @@ internal sealed class InMemoryBus<TMessage> :
     {
         _serviceProvider = serviceProvider;
         _messageProcessor = messageProcessor;
-        messageProcessor.OnMessageProcessing(async (message, context, token) =>
+        _ = Task.Run(async () =>
         {
-            using var scope = _serviceProvider.CreateScope();
-            var consumerPipelineBehavior = scope.ServiceProvider
-                .GetRequiredService<ConsumerPipelineBehaviorOrchestrator<TMessage>>();
-            await consumerPipelineBehavior.ExecuteAsync(new ConsumerContext<TMessage>(message, context.CorrelationId,
-                context.Headers), token);
+            await foreach (var message in messageProcessor.MessagesProcessingAsync())
+            {
+                _ = Task.Run(async () =>
+                {
+                    using var scope = _serviceProvider.CreateScope();
+                    var server = scope.ServiceProvider.GetRequiredService<IServer<TMessage>>();
+                    await server.ConsumeAsync(new ConsumerContext<TMessage>(message.Message,
+                        message.Context.CorrelationId, message.Context.Headers), message.Token);
+                });
+            }
         });
     }
 
@@ -34,7 +39,8 @@ internal sealed class InMemoryBus<TMessage> :
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, CancellationToken token)
     {
         using var scope = _serviceProvider.CreateScope();
-        var consumer = scope.ServiceProvider.GetRequiredService<IConsumer<TMessage>>();
-        await consumer.ConsumeAsync(context, token);
+        var consumerPipelineBehavior = scope.ServiceProvider
+            .GetRequiredService<ConsumerPipelineBehaviorOrchestrator<TMessage>>();
+        await consumerPipelineBehavior.ExecuteAsync(context, token);
     }
 }

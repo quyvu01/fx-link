@@ -1,10 +1,8 @@
 using System.Collections.Concurrent;
 using FxLink.Core.Abstractions;
+using FxLink.Core.Entities;
 
 namespace FxLink.Core.InMemory;
-
-internal sealed record MessageData<TMessage>(TMessage Message, IContext Context, CancellationToken Token)
-    where TMessage : class;
 
 internal sealed record DeadLetterMessage<TMessage>(TMessage Message, IContext Context);
 
@@ -13,7 +11,8 @@ internal class InMemoryMessage<TMessage> : IMessageProcessor<TMessage> where TMe
     private readonly ConcurrentQueue<MessageData<TMessage>> _inboundMessages = [];
     private readonly ConcurrentQueue<MessageData<TMessage>> _processingMessages = [];
     private readonly ConcurrentQueue<DeadLetterMessage<TMessage>> _deadLetterMessages = [];
-    private Func<TMessage, IContext, CancellationToken, Task> _onMessageProcessing;
+    private readonly SemaphoreSlim _processingRing = new(0, 1);
+    private readonly SemaphoreSlim _inboundRing = new(0, 1);
 
     public InMemoryMessage()
     {
@@ -21,41 +20,10 @@ internal class InMemoryMessage<TMessage> : IMessageProcessor<TMessage> where TMe
         {
             while (true)
             {
-                if (_inboundMessages.TryDequeue(out var messageData))
-                    _processingMessages.Enqueue(messageData);
-                await Task.Delay(TimeSpan.FromMilliseconds(1));
-            }
-        });
-        _ = Task.Run(async () =>
-        {
-            while (true)
-            {
-                if (_processingMessages.TryDequeue(out var messageData))
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        // Temp move to dead letter after 3 failed times
-                        var isProcessed = false;
-                        var attempt = 0;
-                        while (!isProcessed && attempt++ < 3)
-                        {
-                            try
-                            {
-                                if (_onMessageProcessing is not null)
-                                    await _onMessageProcessing.Invoke(messageData.Message, messageData.Context,
-                                        messageData.Token);
-                                isProcessed = true;
-                            }
-                            catch (Exception)
-                            {
-                                if (attempt == 3)
-                                    await MoveToDeadLetterAsync(messageData.Message, messageData.Context);
-                            }
-                        }
-                    });
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(1));
+                await _inboundRing.WaitAsync();
+                if (!_inboundMessages.TryDequeue(out var messageData)) continue;
+                _processingMessages.Enqueue(messageData);
+                _processingRing.Release();
             }
         });
     }
@@ -63,15 +31,31 @@ internal class InMemoryMessage<TMessage> : IMessageProcessor<TMessage> where TMe
     public Task PushMessageAsync(TMessage message, IContext context, CancellationToken token = default)
     {
         _inboundMessages.Enqueue(new MessageData<TMessage>(message, context, token));
+        _inboundRing.Release();
         return Task.CompletedTask;
     }
 
-    private Task MoveToDeadLetterAsync(TMessage message, IContext context)
+    public Task MoveToDeadLetterAsync(TMessage message, IContext context, CancellationToken token = default)
     {
         _deadLetterMessages.Enqueue(new DeadLetterMessage<TMessage>(message, context));
         return Task.CompletedTask;
     }
 
-    public void OnMessageProcessing(Func<TMessage, IContext, CancellationToken, Task> onMessageProcessAsync) =>
-        _onMessageProcessing = onMessageProcessAsync;
+    public async Task<IReadOnlyCollection<DeadLetterMessage<TMessage>>> GetDeadLetterMessagesAsync(
+        CancellationToken token = default)
+    {
+        await Task.Yield();
+        return [.._deadLetterMessages];
+    }
+
+    public async IAsyncEnumerable<MessageData<TMessage>> MessagesProcessingAsync()
+    {
+        while (true)
+        {
+            await _processingRing.WaitAsync();
+            if (_processingMessages.TryDequeue(out var messageData))
+                yield return messageData;
+        }
+        // ReSharper disable once IteratorNeverReturns
+    }
 }

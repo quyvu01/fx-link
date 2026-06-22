@@ -9,7 +9,8 @@ public sealed class OrderConsumers(ILogger<OrderConsumers> logger) :
 {
     public Task ConsumeAsync(IConsumerContext<OrderPlaced> context, CancellationToken token = default)
     {
-        logger.LogInformation("Order placed : {@Order}", context.Message);
+        logger.LogInformation("Order placed : {@Order} with CorrelationId: {@CorrelationId}", context.Message,
+            context.CorrelationId);
         return Task.CompletedTask;
     }
 
