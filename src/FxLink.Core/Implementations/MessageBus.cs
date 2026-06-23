@@ -1,5 +1,5 @@
 using FxLink.Core.Abstractions;
-using FxLink.Core.Contracts;
+using FxLink.Core.ContextImplementations;
 using FxLink.Core.PipelineBehaviors;
 using Microsoft.Extensions.DependencyInjection;
 
