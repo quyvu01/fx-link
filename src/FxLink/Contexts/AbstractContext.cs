@@ -1,6 +1,6 @@
 using FxLink.Abstractions;
 
-namespace FxLink.ContextImplementations;
+namespace FxLink.Contexts;
 
 public abstract class AbstractContext(Guid correlationId, Dictionary<string, object> headers) : IContext
 {

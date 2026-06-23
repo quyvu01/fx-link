@@ -1,4 +1,4 @@
-namespace Service1.Dtos;
+namespace Service1.StateMachines.Events;
 
 public class OrderCancelled
 {

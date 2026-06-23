@@ -1,7 +1,10 @@
 using FxLink.Abstractions;
 using FxLink.Extensions;
+using FxLink.StateMachine.Extensions;
 using Serilog;
 using Service1.Dtos;
+using Service1.StateMachines;
+using Service1.StateMachines.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,14 +26,18 @@ builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
     opts.UseInMemory();
-    // opts.AddPublisherPipelineBehaviors(c => c
-    //     .Of(typeof(PublishPipelineBehavior<>))
-    // );
-    // opts.AddConsumerPipelineBehaviors(c => c
-    //     .Of<ConsumerPipelineBehavior>());
+    opts.AddStateMachines(c =>
+    {
+        c.Of<OrderStateMachine>(cfg =>
+        {
+            cfg.UseInMemory();
+        });
+    });
 });
 
 var app = builder.Build();
+
+_ = app.Services.GetRequiredService<OrderStateMachine>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -45,13 +52,6 @@ app.MapPost("/placeOrder", async (IPublisher publisher) =>
     {
         await publisher.PublishAsync(new OrderPlaced { OrderId = Guid.NewGuid(), OrderTime = DateTime.UtcNow });
         return "Order placed";
-    })
-    .WithOpenApi();
-
-app.MapPost("/cancelOrder", async (IPublisher publisher) =>
-    {
-        await publisher.PublishAsync(new OrderCancelled { OrderId = Guid.NewGuid(), CancelledTime = DateTime.UtcNow });
-        return "Order cancelled";
     })
     .WithOpenApi();
 

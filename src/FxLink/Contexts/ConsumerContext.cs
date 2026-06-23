@@ -2,7 +2,7 @@ using FxLink.Abstractions;
 using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.ContextImplementations;
+namespace FxLink.Contexts;
 
 public sealed class ConsumerContext<TMessage>(TMessage message, Guid correlationId, Dictionary<string, object> headers)
     : AbstractContext(correlationId, headers), IConsumerContext<TMessage> where TMessage : class

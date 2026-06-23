@@ -11,7 +11,7 @@ namespace FxLink.Extensions;
 
 public static class DependencyExtensions
 {
-    public static FxLinkRegistryWrapper AddFxLink(this IServiceCollection serviceCollection,
+    public static RegistryWrapper AddFxLink(this IServiceCollection serviceCollection,
         Action<IConfigurator> options)
     {
         var configurator = new Configurator(serviceCollection);
@@ -30,6 +30,6 @@ public static class DependencyExtensions
         configurator.AddConsumerPipelineBehaviors(c => c
             .Of(typeof(ServicesAmbientConsumerPipelineBehavior<>)));
 
-        return new FxLinkRegistryWrapper(serviceCollection);
+        return new RegistryWrapper(serviceCollection);
     }
 }
