@@ -1,5 +1,5 @@
-using FxLink.Core.Abstractions;
-using FxLink.Core.Delegates;
+using FxLink.Abstractions;
+using FxLink.Delegates;
 
 namespace Service1.PipelineBehaviors;
 

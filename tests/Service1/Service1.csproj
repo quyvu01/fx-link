@@ -14,7 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\FxLink.Core\FxLink.Core.csproj"/>
+        <ProjectReference Include="..\..\src\FxLink\FxLink.csproj" />
     </ItemGroup>
 
 </Project>

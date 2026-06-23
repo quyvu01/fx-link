@@ -1,5 +1,5 @@
-using FxLink.Core.Abstractions;
-using FxLink.Core.Extensions;
+using FxLink.Abstractions;
+using FxLink.Extensions;
 using Serilog;
 using Service1.Dtos;
 

@@ -1,4 +1,4 @@
-using FxLink.Core.Abstractions;
+using FxLink.Abstractions;
 using Service1.Dtos;
 
 namespace Service1.Consumers;

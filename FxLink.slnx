@@ -1,8 +1,9 @@
 <Solution>
-  <Folder Name="/FxLink.Core/">
-    <Project Path="src/FxLink.Core/FxLink.Core.csproj" />
-  </Folder>
   <Folder Name="/FxLink.Tests/">
     <Project Path="tests/Service1/Service1.csproj" />
+  </Folder>
+  <Folder Name="/FxLink/">
+    <Project Path="src/FxLink.StateMachine/FxLink.StateMachine.csproj" />
+    <Project Path="src\FxLink\FxLink.csproj" />
   </Folder>
 </Solution>
