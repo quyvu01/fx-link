@@ -10,7 +10,7 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
         // Todo: check later because I'm so tired right now
         services.AddSingleton(typeof(TStateMachine));
         
-        var stateMachineSetup = new StateMachineSetup();
+        var stateMachineSetup = new StateMachineSetup(services);
         config?.Invoke(stateMachineSetup);
         return this;
     }

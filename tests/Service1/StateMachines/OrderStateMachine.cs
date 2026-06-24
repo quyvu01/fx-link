@@ -18,12 +18,32 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
     public OrderStateMachine(ILogger<OrderStateMachine> logger)
     {
         State(o => o.CurrentState);
+
+        Event(OrderCreatedEvent, cfg =>
+            cfg.CorrelationId(x => x.Message.OrderId));
         
-        Event(OrderCreatedEvent, cfg => cfg.CorrelationId(x => x.OrderId));
-        Event(OrderCancelledEvent, cfg => cfg.CorrelationId(x => x.OrderId));
+        Event(OrderCancelledEvent, cfg =>
+            cfg.CorrelationId(x => x.Message.OrderId));
+        
         Event(OrderSucceedEvent, cfg => cfg
-            .CorrelationBy((ins, mes) => ins.OrderId == mes.Message.OrderId));
+            .CorrelationBy((ins, ctx) => ins.OrderId == ctx.Message.OrderId));
+
+        Initially(On(OrderCreatedEvent)
+            .Then((ins, ctx) =>
+            {
+                ins.OrderId = ctx.Message.OrderId;
+                ins.OrderName = ctx.Message.OrderName;
+                logger.LogInformation("Message received is: {@Message}", ctx.Message);
+            })
+        );
         
-        logger.LogInformation("OrderStateMachine states: {@State}", States);
+        // During(Initial, On(OrderCreatedEvent)
+        //     .Then((ins, ctx) =>
+        //     {
+        //         ins.OrderId = ctx.Message.OrderId;
+        //         ins.OrderName = ctx.Message.OrderName;
+        //         logger.LogInformation("Message received is: {@Message}", ctx.Message);
+        //     })
+        // );
     }
 }
