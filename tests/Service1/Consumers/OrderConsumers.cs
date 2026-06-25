@@ -1,14 +1,14 @@
 using FxLink.Abstractions;
-using Service1.Dtos;
+using Service1.StateMachines.Events;
 
 namespace Service1.Consumers;
 
 public sealed class OrderConsumers(ILogger<OrderConsumers> logger) :
-    IConsumer<OrderPlaced>
+    IConsumer<OrderCreated>
 {
-    public Task ConsumeAsync(IConsumerContext<OrderPlaced> context, CancellationToken token = default)
+    public Task ConsumeAsync(IConsumerContext<OrderCreated> context, CancellationToken token = default)
     {
-        logger.LogInformation("Order placed : {@Order}", context);
+        logger.LogInformation("Order created for normal order : {@Order}", context.Message);
         return Task.CompletedTask;
     }
 }

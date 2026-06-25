@@ -14,4 +14,9 @@ public static class StateMachineException
 
     public sealed class EventHasBeenConfiguration(Type eventType)
         : Exception($"Event: {eventType.FullName} has been configuration. Do not config it twice");
+
+    public sealed class EventDoesNotMatchAnyFlow(Type eventType)
+        : Exception($"{eventType.FullName} did not match any flow!");
+
+    public sealed class StateMachineInstanceMustBeInitFirst() : Exception("State machine instance need to be initialized first!");
 }

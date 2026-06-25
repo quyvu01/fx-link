@@ -13,7 +13,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
     // Events declaration
     public IEvent<OrderCreated> OrderCreatedEvent { get; private set; }
     public IEvent<OrderCancelled> OrderCancelledEvent { get; private set; }
-    public IEvent<OrderCancelled> OrderSucceedEvent { get; private set; }
+    public IEvent<OrderSucceed> OrderSucceedEvent { get; private set; }
 
     public OrderStateMachine(ILogger<OrderStateMachine> logger)
     {

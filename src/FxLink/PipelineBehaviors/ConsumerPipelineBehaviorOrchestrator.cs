@@ -1,6 +1,5 @@
 using FxLink.Abstractions;
 using FxLink.Delegates;
-using FxLink.Implementations;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.PipelineBehaviors;
@@ -10,9 +9,9 @@ internal class ConsumerPipelineBehaviorOrchestrator<TMessage>(IServiceProvider s
     // Just lazy load pipeline behaviors and consumers because sometimes we want to defer services loaded on pipelines and consumers
     internal async Task ExecuteAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
     {
-        var consumerData = serviceProvider.GetRequiredService<MessageMapConsumers>();
-        if (!consumerData.Data.TryGetValue(typeof(TMessage), out var consumerKeys)) return;
-        var consumerTasks = consumerKeys.Select(async key =>
+        var messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
+        var keys = messageKeys.GetMessageKeys(typeof(TMessage));
+        var consumerTasks = keys.Select(async key =>
         {
             using var scope = serviceProvider.CreateScope();
             var consumer = scope.ServiceProvider.GetKeyedService<IConsumer<TMessage>>(key);

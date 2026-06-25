@@ -10,7 +10,7 @@ internal class ServicesAmbientConsumerPipelineBehavior<TMessage>(IServiceProvide
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
-        InternalServiceProvider.SetServices(serviceProvider);
+        ServiceProviderAmbient.SetServices(serviceProvider);
         await next.Invoke(token);
     }
 }

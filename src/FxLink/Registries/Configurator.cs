@@ -1,10 +1,9 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using FxLink.Abstractions;
 using FxLink.Extensions;
 using FxLink.Implementations;
 using FxLink.InMemory;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection; 
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FxLink.Registries;
@@ -12,11 +11,7 @@ namespace FxLink.Registries;
 public class Configurator(IServiceCollection serviceCollection) : IConfigurator
 {
     public IServiceCollection Services { get; } = serviceCollection;
-
-    public IReadOnlyDictionary<Type, string[]> MessageMapConsumers =>
-        _messageMapConsumers.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
-
-    private readonly ConcurrentDictionary<Type, List<string>> _messageMapConsumers = [];
+    public IMessageKeys MessageKeys { get; } = new MessageKeys();
     public void AddConsumer<TConsumer>() where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
     public void AddConsumersFromAssemblies(Assembly assembly)
@@ -45,10 +40,8 @@ public class Configurator(IServiceCollection serviceCollection) : IConfigurator
         .ForEach(serviceType =>
         {
             var messageType = serviceType.GetGenericArguments()[0];
-            var consumers = _messageMapConsumers.GetOrAdd(messageType, _ => []);
-            var serviceKey = consumerType.FullName;
-            consumers.Add(serviceKey);
-            Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey, consumerType,
-                ServiceLifetime.Scoped));
+            Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey: consumerType,
+                implementationType: consumerType, ServiceLifetime.Scoped));
+            MessageKeys.AddMessageKey(messageType, consumerType);
         });
 }

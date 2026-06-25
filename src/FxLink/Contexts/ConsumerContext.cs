@@ -12,7 +12,7 @@ public sealed class ConsumerContext<TMessage>(TMessage message, Guid correlation
     public async Task ResponseAsync<TResponse>(TResponse message, CancellationToken token = default)
         where TResponse : class
     {
-        var services = InternalServiceProvider.Services;
+        var services = ServiceProviderAmbient.Services;
         var client = services.GetService<IClient<TResponse>>();
         if (client is null) return;
         await client.SendAsync(message, new ResponseContext(CorrelationId, Headers), token);

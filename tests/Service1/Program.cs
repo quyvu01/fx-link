@@ -55,6 +55,13 @@ app.MapPost("/placeOrder", async (IPublisher publisher) =>
     })
     .WithOpenApi();
 
+app.MapPost("/orderCreated", async (IPublisher publisher) =>
+    {
+        await publisher.PublishAsync(new OrderCreated { OrderId = Guid.NewGuid(), OrderName = "Some order name"});
+        return "Order created";
+    })
+    .WithOpenApi();
+
 app.MapGet("/getOrder", async (IRequest<OrderResult> request, CancellationToken token) =>
     {
         var id = Guid.Parse("c5143803-5477-47b4-8d4f-236cb4b09af9");
