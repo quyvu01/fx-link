@@ -37,8 +37,6 @@ builder.Services.AddFxLink(opts =>
 
 var app = builder.Build();
 
-_ = app.Services.GetRequiredService<OrderStateMachine>();
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
