@@ -30,14 +30,12 @@ builder.Services.AddFxLink(opts =>
     {
         c.Of<OrderStateMachine>(cfg =>
         {
-            cfg.UseInMemory();
+            cfg.InMemoryRepository();
         });
     });
 });
 
 var app = builder.Build();
-
-_ = app.Services.GetRequiredService<OrderStateMachine>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

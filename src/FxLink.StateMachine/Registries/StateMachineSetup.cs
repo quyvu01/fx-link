@@ -6,7 +6,7 @@ namespace FxLink.StateMachine.Registries;
 
 public sealed class StateMachineSetup(IServiceCollection services) : IStateMachineSetup
 {
-    public void UseInMemory()
+    public void InMemoryRepository()
     {
         services.AddSingleton<IStateMachineInstancePersistence, StateMachineInstanceInMemory>();
     }
