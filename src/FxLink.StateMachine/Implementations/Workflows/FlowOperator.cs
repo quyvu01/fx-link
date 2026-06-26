@@ -1,5 +1,8 @@
+using FxLink.Abstractions;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
+using FxLink.Statics;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Implementations.Workflows;
 
@@ -97,6 +100,33 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
             if (conditionResult) activityCallback.Invoke(newFlow);
             else otherwiseCallback.Invoke(newFlow);
             foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> Publish<T>(
+        Func<IStateMachineContext<TInstance, TMessage>, T> messageFactory) where T : class
+    {
+        return PublishAsync(MessageFactoryAsync);
+
+        Task<T> MessageFactoryAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken _)
+        {
+            var message = messageFactory.Invoke(context);
+            return Task.FromResult(message);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> PublishAsync<T>(
+        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<T>> messageFactory) where T : class
+    {
+        ThenAsync(ConditionActionAsync);
+        return this;
+
+        async Task ConditionActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        {
+            var message = await messageFactory.Invoke(context, ct);
+            var services = ServiceProviderAmbient.Services;
+            var publisher = services.GetRequiredService<IPublisher>();
+            await publisher.PublishAsync(message, ct);
         }
     }
 }
