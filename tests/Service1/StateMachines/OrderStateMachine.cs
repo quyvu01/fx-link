@@ -1,5 +1,6 @@
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Implementations.StateMachines;
+using Service1.Dtos;
 using Service1.StateMachines.Events;
 
 namespace Service1.StateMachines;
@@ -60,7 +61,12 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                     )
                     .IfElse(_ => false, _ => { }, elseCallback => elseCallback
                         .ThenAsync(async (_, ct) => await Task.Delay(TimeSpan.FromSeconds(3), ct))
-                        .Then(context => logger.LogInformation("How do you do?: {@Instance}", context.Instance)))
+                        .Then(context => logger.LogInformation("Seems we have done a lot of thing?: {@Instance}", context.Instance))
+                        .Publish(ctx => new OrderPublisherTest
+                        {
+                            OrderId = ctx.Instance.OrderId
+                        })
+                    )
             )
         );
     }

@@ -28,4 +28,10 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
         Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<bool>> condition,
         Action<IFlowOperator<TInstance, TMessage>> activityCallback,
         Action<IFlowOperator<TInstance, TMessage>> otherwiseCallback);
+
+    IFlowOperator<TInstance, TMessage> Publish<T>(Func<IStateMachineContext<TInstance, TMessage>, T> messageFactory)
+        where T : class;
+
+    IFlowOperator<TInstance, TMessage> PublishAsync<T>(
+        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<T>> messageFactory) where T : class;
 }
