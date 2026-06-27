@@ -1,6 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
+using FxLink.StateMachine.Delegates;
 using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,10 +11,10 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
     where TInstance : IStateMachineInstance where TMessage : class
 {
     public IEvent<TMessage> Event { get; } = @event;
-    private readonly List<Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task>> _asyncActions = [];
-    public Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task>[] AsyncActions => [.._asyncActions];
+    private readonly List<AsyncOperatorAction<TInstance, TMessage>> _asyncActions = [];
+    public AsyncOperatorAction<TInstance, TMessage>[] AsyncActions => [.._asyncActions];
 
-    public IFlowOperator<TInstance, TMessage> Then(Action<IStateMachineContext<TInstance, TMessage>> action)
+    public IFlowOperator<TInstance, TMessage> Then(OperatorAction<TInstance, TMessage> action)
     {
         _asyncActions.Add(ActionAsAsync);
         return this;
@@ -25,8 +26,7 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> ThenAsync(
-        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task> asyncAction)
+    public IFlowOperator<TInstance, TMessage> ThenAsync(AsyncOperatorAction<TInstance, TMessage> asyncAction)
     {
         _asyncActions.Add(asyncAction);
         return this;
@@ -43,10 +43,10 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> If(Func<IStateMachineContext<TInstance, TMessage>, bool> condition,
-        Action<IFlowOperator<TInstance, TMessage>> activityCallback)
+    public IFlowOperator<TInstance, TMessage> If(OperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback)
     {
-        return IfAsync(ConditionAsync, activityCallback);
+        return IfAsync(ConditionAsync, callback);
 
         Task<bool> ConditionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
@@ -56,8 +56,8 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
     }
 
     public IFlowOperator<TInstance, TMessage> IfAsync(
-        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<bool>> condition,
-        Action<IFlowOperator<TInstance, TMessage>> activityCallback)
+        AsyncOperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback)
     {
         ThenAsync(ConditionActionAsync);
         return this;
@@ -66,17 +66,16 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         {
             var conditionResult = await condition.Invoke(context, ct);
             if (!conditionResult) return;
-            var newFlow = new FlowOperator<TInstance, TMessage>(Event);
-            activityCallback.Invoke(newFlow);
+            var newFlow = callback.Invoke(new FlowOperator<TInstance, TMessage>(Event));
             foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> IfElse(Func<IStateMachineContext<TInstance, TMessage>, bool> condition,
-        Action<IFlowOperator<TInstance, TMessage>> activityCallback,
-        Action<IFlowOperator<TInstance, TMessage>> otherwiseCallback)
+    public IFlowOperator<TInstance, TMessage> IfElse(OperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback,
+        ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback)
     {
-        return IfElseAsync(ConditionAsync, activityCallback, otherwiseCallback);
+        return IfElseAsync(ConditionAsync, callback, otherwiseCallback);
 
         Task<bool> ConditionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
@@ -86,9 +85,9 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
     }
 
     public IFlowOperator<TInstance, TMessage> IfElseAsync(
-        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<bool>> condition,
-        Action<IFlowOperator<TInstance, TMessage>> activityCallback,
-        Action<IFlowOperator<TInstance, TMessage>> otherwiseCallback)
+        AsyncOperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback,
+        ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback)
     {
         ThenAsync(ConditionActionAsync);
         return this;
@@ -96,15 +95,14 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         async Task ConditionActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var conditionResult = await condition.Invoke(context, ct);
-            var newFlow = new FlowOperator<TInstance, TMessage>(Event);
-            if (conditionResult) activityCallback.Invoke(newFlow);
-            else otherwiseCallback.Invoke(newFlow);
+            var @operator = new FlowOperator<TInstance, TMessage>(Event);
+            var newFlow = conditionResult ? callback.Invoke(@operator) : otherwiseCallback.Invoke(@operator);
             foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
         }
     }
 
     public IFlowOperator<TInstance, TMessage> Publish<T>(
-        Func<IStateMachineContext<TInstance, TMessage>, T> messageFactory) where T : class
+        MessageOperatorFactory<TInstance, TMessage, T> messageFactory) where T : class
     {
         return PublishAsync(MessageFactoryAsync);
 
@@ -116,14 +114,14 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
     }
 
     public IFlowOperator<TInstance, TMessage> PublishAsync<T>(
-        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<T>> messageFactory) where T : class
+        MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
         ThenAsync(ConditionActionAsync);
         return this;
 
         async Task ConditionActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
-            var message = await messageFactory.Invoke(context, ct);
+            var message = await messageFactoryAsync.Invoke(context, ct);
             var services = ServiceProviderAmbient.Services;
             var publisher = services.GetRequiredService<IPublisher>();
             await publisher.PublishAsync(message, ct);
