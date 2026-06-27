@@ -60,10 +60,10 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         AsyncOperatorCondition<TInstance, TMessage> condition,
         ActivityOperatorCallback<TInstance, TMessage> callback)
     {
-        ThenAsync(ConditionActionAsync);
+        ThenAsync(ActionAsync);
         return this;
 
-        async Task ConditionActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var conditionResult = await condition.Invoke(context, ct);
             if (!conditionResult) return;
@@ -90,10 +90,10 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         ActivityOperatorCallback<TInstance, TMessage> callback,
         ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback)
     {
-        ThenAsync(ConditionActionAsync);
+        ThenAsync(ActionAsync);
         return this;
 
-        async Task ConditionActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var conditionResult = await condition.Invoke(context, ct);
             var @operator = new FlowOperator<TInstance, TMessage>(Event);
@@ -117,10 +117,10 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
     public IFlowOperator<TInstance, TMessage> PublishAsync<T>(
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
-        ThenAsync(PublishActionAsync);
+        ThenAsync(ActionAsync);
         return this;
 
-        async Task PublishActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var message = await messageFactoryAsync.Invoke(context, ct);
             var services = ServiceProviderAmbient.Services;
@@ -144,17 +144,14 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
     public IFlowOperator<TInstance, TMessage> ResponseAsync<T>(
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
-        return ThenAsync(ConditionActionAsync);
+        return ThenAsync(ActionAsync);
 
-        async Task ConditionActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var message = await messageFactoryAsync.Invoke(context, ct);
-            var services = ServiceProviderAmbient.Services;
-            var client = services.GetService<IClient<T>>();
-            if (client is null) return;
-            var correlationId = context.CorrelationId;
-            var headers = context.Headers;
-            await client.SendAsync(message, new ResponseContext(correlationId, headers), ct);
+            var consumerContext = new ConsumerContext<TMessage>
+                (context.Message, context.CorrelationId, context.Headers);
+            await consumerContext.ResponseAsync(message, ct);
         }
     }
 }

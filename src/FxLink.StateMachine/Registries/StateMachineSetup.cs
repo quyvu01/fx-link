@@ -8,6 +8,7 @@ public sealed class StateMachineSetup(IServiceCollection services) : IStateMachi
 {
     public void InMemoryRepository()
     {
-        services.AddSingleton<IStateMachineInstanceRepository, StateMachineInstanceInMemoryRepository>();
+        services.AddSingleton(typeof(IStateMachineInstanceRepository<>),
+            typeof(StateMachineInstanceInMemoryRepository<>));
     }
 }
