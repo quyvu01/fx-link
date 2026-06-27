@@ -18,5 +18,9 @@ public static class StateMachineException
     public sealed class EventDoesNotMatchAnyFlow(Type eventType)
         : Exception($"{eventType.FullName} did not match any flow!");
 
-    public sealed class StateMachineInstanceMustBeInitFirst() : Exception("State machine instance need to be initialized first!");
+    public sealed class StateMachineInstanceMustBeInitFirst()
+        : Exception("State machine instance need to be initialized first!");
+
+    public sealed class CorrelationMethodMustBeInvoked()
+        : Exception("No correlation configured. Call CorrelationId or CorrelationBy -> SelectId first.");
 }

@@ -1,29 +1,30 @@
 using System.Linq.Expressions;
 using FxLink.Abstractions;
 using FxLink.StateMachine.Abstractions;
+using FxLink.StateMachine.Exceptions;
 
 namespace FxLink.StateMachine.Registries;
 
-public sealed class EventConfigurator<TInstance, TMessage> :
+internal sealed class EventConfigurator<TInstance, TMessage> :
     IEventCorrelationByConfigurator<TInstance, TMessage>
     where TInstance : IStateMachineInstance
     where TMessage : class
 {
     private Func<IConsumerContext<TMessage>, Expression<Func<TInstance, bool>>> _predicateFactory;
-
-    // Called at dispatch time when context is available
-    private Expression<Func<TInstance, bool>> BuildPredicate(IConsumerContext<TMessage> context)
-        => _predicateFactory?.Invoke(context) ?? throw new InvalidOperationException(
-            "No correlation configured. Call CorrelationId or CorrelationBy first.");
-
     private Expression<Func<IConsumerContext<TMessage>, Guid>> _correlationIdSelector;
 
-    public Expression<Func<TInstance, bool>> GetPredicate(IConsumerContext<TMessage> context) =>
-        BuildPredicate(context);
+    internal Func<IMissingInstanceConfigurator<TInstance, TMessage>, IDispatch<IConsumerContext<TMessage>>>
+        MissingInstanceBehavior { get; private set; }
 
-    public Expression<Func<IConsumerContext<TMessage>, Guid>> CorrelationIdSelector() => _correlationIdSelector;
+    // Called at dispatch time when context is available
+    internal Expression<Func<TInstance, bool>> GetPredicate(IConsumerContext<TMessage> context) =>
+        _predicateFactory?.Invoke(context) ?? throw new StateMachineException.CorrelationMethodMustBeInvoked();
 
-    public void CorrelationId(Expression<Func<IConsumerContext<TMessage>, Guid>> selector)
+    internal Expression<Func<IConsumerContext<TMessage>, Guid>> CorrelationSelector => _correlationIdSelector ??
+        throw new StateMachineException.CorrelationMethodMustBeInvoked();
+
+    public IEventConfigurator<TInstance, TMessage> CorrelationId(
+        Expression<Func<IConsumerContext<TMessage>, Guid>> selector)
     {
         var instanceParam = Expression.Parameter(typeof(TInstance), "instance");
         var instanceCorrelationId = Expression.Property(instanceParam, nameof(IStateMachineInstance.CorrelationId));
@@ -37,7 +38,9 @@ public sealed class EventConfigurator<TInstance, TMessage> :
             return Expression.Lambda<Func<TInstance, bool>>(body, instanceParam);
         };
         _correlationIdSelector = selector;
+        return this;
     }
+
 
     public IEventCorrelationByConfigurator<TInstance, TMessage> CorrelationBy(
         Expression<Func<TInstance, IConsumerContext<TMessage>, bool>> predicate)
@@ -53,8 +56,19 @@ public sealed class EventConfigurator<TInstance, TMessage> :
         return this;
     }
 
-    public void SelectId(Expression<Func<IConsumerContext<TMessage>, Guid>> selector) =>
+    public IEventConfigurator<TInstance, TMessage> OnMissingInstance(
+        Func<IMissingInstanceConfigurator<TInstance, TMessage>, IDispatch<IConsumerContext<TMessage>>> missingBehavior)
+    {
+        MissingInstanceBehavior = missingBehavior;
+        return this;
+    }
+
+    public IEventConfigurator<TInstance, TMessage>
+        SelectId(Expression<Func<IConsumerContext<TMessage>, Guid>> selector)
+    {
         _correlationIdSelector = selector;
+        return this;
+    }
 }
 
 internal sealed class ParameterReplacerVisitor(ParameterExpression target, Expression replacement) : ExpressionVisitor

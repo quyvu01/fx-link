@@ -16,6 +16,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
     public IEvent<OrderCreated> OrderCreatedEvent { get; private set; }
     public IEvent<OrderCancelled> OrderCancelledEvent { get; private set; }
     public IEvent<OrderReactivated> OrderReactivatedEvent { get; private set; }
+    public IEvent<GetOrderStats> GetOrderStatsEvent { get; private set; }
 
     public OrderStateMachine(ILogger<OrderStateMachine> logger)
     {
@@ -28,7 +29,19 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
         Event(OrderReactivatedEvent, cfg => cfg
             .CorrelationBy((ins, ctx) => ins.OrderId == ctx.Message.OrderId));
 
-        Initially(On(OrderCreatedEvent)
+        Event(GetOrderStatsEvent, cfg =>
+        {
+            cfg.CorrelationId(x => x.Message.OrderId);
+            cfg.OnMissingInstance(x => x
+                .Execute(context => context.ResponseAsync(new OrderStatsResponse
+                {
+                    OrderId = context.Message.OrderId,
+                    OrderName = "[Kidding me?, no name]",
+                    State = "Nooo, no instance -> No state"
+                })));
+        });
+
+        Initially(When(OrderCreatedEvent)
             .Then(context =>
             {
                 context.Instance.OrderId = context.Message.OrderId;
@@ -68,11 +81,20 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                             OrderId = ctx.Instance.OrderId
                         })
                     )));
-        
-        During(OrderCancelled, On(OrderReactivatedEvent)
+
+        During(OrderCancelled, When(OrderReactivatedEvent)
             .Then(context => logger.LogInformation("Reactive cancelled order: {@OrderMessage}", context.Message))
             .TransitionTo(OrderSucceed)
             .Publish(ctx => new OrderSucceed { OrderId = ctx.Instance.OrderId })
+        );
+
+        During(OrderCreated, When(GetOrderStatsEvent)
+            .Response(c => new OrderStatsResponse
+            {
+                OrderId = c.Instance.OrderId,
+                OrderName = c.Instance.OrderName,
+                State = c.Instance.State
+            })
         );
     }
 }

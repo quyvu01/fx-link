@@ -5,7 +5,7 @@ using FxLink.StateMachine.Implementations.StateMachines;
 
 namespace FxLink.StateMachine.Implementations;
 
-internal class StateMachineInstanceInMemory : IStateMachineInstancePersistence
+internal class StateMachineInstanceInMemoryRepository : IStateMachineInstanceRepository
 {
     private readonly ConcurrentBag<object> _instances = [];
 

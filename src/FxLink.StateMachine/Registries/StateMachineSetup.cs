@@ -8,6 +8,6 @@ public sealed class StateMachineSetup(IServiceCollection services) : IStateMachi
 {
     public void InMemoryRepository()
     {
-        services.AddSingleton<IStateMachineInstancePersistence, StateMachineInstanceInMemory>();
+        services.AddSingleton<IStateMachineInstanceRepository, StateMachineInstanceInMemoryRepository>();
     }
 }

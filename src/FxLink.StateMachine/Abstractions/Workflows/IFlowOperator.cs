@@ -35,4 +35,10 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
 
     IFlowOperator<TInstance, TMessage> PublishAsync<T>(
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
+
+    IFlowOperator<TInstance, TMessage> Response<T>(MessageOperatorFactory<TInstance, TMessage, T> messageFactory)
+        where T : class;
+
+    IFlowOperator<TInstance, TMessage> ResponseAsync<T>(
+        MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
 }
