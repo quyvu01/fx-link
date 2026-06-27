@@ -22,8 +22,8 @@ public abstract partial class StateMachine<TInstance>
         if (eventConfig?.Configurator is not EventConfigurator<TInstance, TMessage> config) return;
         var consumerContext = new ConsumerContext<TMessage>(message, context.CorrelationId, context.Headers);
         var predicate = config.GetPredicate(consumerContext);
-        var storage = services.GetRequiredService<IStateMachineInstanceRepository>();
-        var instance = await storage.GetInstanceAsync(predicate);
+        var machineInstanceRepository = services.GetRequiredService<IStateMachineInstanceRepository<TInstance>>();
+        var instance = await machineInstanceRepository.GetInstanceAsync(predicate, token);
 
         var statesWithFlows = _stateMapFlows.Where(v => v.Value
                 .OfType<IFlowOperator<TInstance, TMessage>>()
@@ -55,14 +55,13 @@ public abstract partial class StateMachine<TInstance>
             // It means that we already have the initial state => need to init a new instance.
             var correlationIdSelector = config.CorrelationSelector;
             var newCorrelationId = correlationIdSelector.Compile().Invoke(consumerContext);
-            instance = await storage.CreateInstanceAsync<TInstance>(newCorrelationId);
+            instance = await machineInstanceRepository.CreateInstanceAsync(newCorrelationId, token);
         }
 
         var flow = statesWithFlows.First(x => (State)x.State == new State(instance.State)).Flow;
-
-        foreach (var asyncAction in flow.AsyncActions)
-            await asyncAction.Invoke(
-                new StateMachineContext<TInstance, TMessage>(instance, message, context.CorrelationId, context.Headers),
-                token);
+        var stateMachineContext = new StateMachineContext<TInstance, TMessage>
+            (instance, message, context.CorrelationId, context.Headers);
+        foreach (var asyncAction in flow.AsyncActions) await asyncAction.Invoke(stateMachineContext, token);
+        await machineInstanceRepository.SaveInstanceAsync(instance, token);
     }
 }
