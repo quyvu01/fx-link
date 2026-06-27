@@ -1,37 +1,38 @@
+using FxLink.StateMachine.Delegates;
+
 namespace FxLink.StateMachine.Abstractions.Workflows;
 
 public interface IFlowOperator<TInstance, TMessage> : IFlow
     where TInstance : IStateMachineInstance where TMessage : class
 {
     IEvent<TMessage> Event { get; }
-    Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task>[] AsyncActions { get; }
-    IFlowOperator<TInstance, TMessage> Then(Action<IStateMachineContext<TInstance, TMessage>> action);
+    AsyncOperatorAction<TInstance, TMessage>[] AsyncActions { get; }
+    IFlowOperator<TInstance, TMessage> Then(OperatorAction<TInstance, TMessage> action);
 
-    IFlowOperator<TInstance, TMessage> ThenAsync(
-        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task> asyncAction);
+    IFlowOperator<TInstance, TMessage> ThenAsync(AsyncOperatorAction<TInstance, TMessage> asyncAction);
 
     IFlowOperator<TInstance, TMessage> TransitionTo(IState state);
 
-    IFlowOperator<TInstance, TMessage> If(Func<IStateMachineContext<TInstance, TMessage>, bool> condition,
-        Action<IFlowOperator<TInstance, TMessage>> activityCallback);
+    IFlowOperator<TInstance, TMessage> If(OperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback);
 
     IFlowOperator<TInstance, TMessage> IfAsync(
-        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<bool>> condition,
-        Action<IFlowOperator<TInstance, TMessage>> activityCallback);
+        AsyncOperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback);
 
     IFlowOperator<TInstance, TMessage> IfElse(
-        Func<IStateMachineContext<TInstance, TMessage>, bool> condition,
-        Action<IFlowOperator<TInstance, TMessage>> activityCallback,
-        Action<IFlowOperator<TInstance, TMessage>> otherwiseCallback);
+        OperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback,
+        ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback);
 
     IFlowOperator<TInstance, TMessage> IfElseAsync(
-        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<bool>> condition,
-        Action<IFlowOperator<TInstance, TMessage>> activityCallback,
-        Action<IFlowOperator<TInstance, TMessage>> otherwiseCallback);
+        AsyncOperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback,
+        ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback);
 
-    IFlowOperator<TInstance, TMessage> Publish<T>(Func<IStateMachineContext<TInstance, TMessage>, T> messageFactory)
+    IFlowOperator<TInstance, TMessage> Publish<T>(MessageOperatorFactory<TInstance, TMessage, T> messageFactory)
         where T : class;
 
     IFlowOperator<TInstance, TMessage> PublishAsync<T>(
-        Func<IStateMachineContext<TInstance, TMessage>, CancellationToken, Task<T>> messageFactory) where T : class;
+        MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
 }

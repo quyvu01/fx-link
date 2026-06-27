@@ -59,9 +59,10 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                             .Then(context =>
                                 logger.LogInformation("Ok, all good!: {@InstanceState}", context.Instance.State))
                     )
-                    .IfElse(_ => false, _ => { }, elseCallback => elseCallback
+                    .IfElse(_ => false, x => x, elseCallback => elseCallback
                         .ThenAsync(async (_, ct) => await Task.Delay(TimeSpan.FromSeconds(3), ct))
-                        .Then(context => logger.LogInformation("Seems we have done a lot of thing?: {@Instance}", context.Instance))
+                        .Then(context =>
+                            logger.LogInformation("Seems we have done a lot of thing?: {@Instance}", context.Instance))
                         .Publish(ctx => new OrderPublisherTest
                         {
                             OrderId = ctx.Instance.OrderId
