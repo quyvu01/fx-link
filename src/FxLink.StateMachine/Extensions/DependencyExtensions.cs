@@ -1,5 +1,6 @@
 using FxLink.Extensions;
 using FxLink.Registries;
+using FxLink.StateMachine.InternalPipelineBehaviors;
 using FxLink.StateMachine.Registries;
 
 namespace FxLink.StateMachine.Extensions;
@@ -14,5 +15,7 @@ public static class DependencyExtensions
         stateMachineConfigurator.MessageKeys
             .ForEach(mk => mk.Value
                 .ForEach(v => messageKeys.AddMessageKey(mk.Key, v)));
+        
+        configurator.AddConsumerPipelineBehaviors(c => c.Of(typeof(CatchStateMachinePipelineBehavior<>)));
     }
 }
