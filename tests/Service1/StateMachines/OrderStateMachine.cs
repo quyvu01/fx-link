@@ -15,7 +15,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
     // Events declaration
     public IEvent<OrderCreated> OrderCreatedEvent { get; private set; }
     public IEvent<OrderCancelled> OrderCancelledEvent { get; private set; }
-    public IEvent<OrderSucceed> OrderSucceedEvent { get; private set; }
+    public IEvent<OrderReactivated> OrderReactivatedEvent { get; private set; }
 
     public OrderStateMachine(ILogger<OrderStateMachine> logger)
     {
@@ -25,7 +25,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
         Event(OrderCancelledEvent, cfg =>
             cfg.CorrelationId(x => x.Message.OrderId));
 
-        Event(OrderSucceedEvent, cfg => cfg
+        Event(OrderReactivatedEvent, cfg => cfg
             .CorrelationBy((ins, ctx) => ins.OrderId == ctx.Message.OrderId));
 
         Initially(On(OrderCreatedEvent)
@@ -67,8 +67,12 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                         {
                             OrderId = ctx.Instance.OrderId
                         })
-                    )
-            )
+                    )));
+        
+        During(OrderCancelled, On(OrderReactivatedEvent)
+            .Then(context => logger.LogInformation("Reactive cancelled order: {@OrderMessage}", context.Message))
+            .TransitionTo(OrderSucceed)
+            .Publish(ctx => new OrderSucceed { OrderId = ctx.Instance.OrderId })
         );
     }
 }
