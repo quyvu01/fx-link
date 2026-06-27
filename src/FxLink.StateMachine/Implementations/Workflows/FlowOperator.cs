@@ -1,4 +1,5 @@
 using FxLink.Abstractions;
+using FxLink.Contexts;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
 using FxLink.StateMachine.Delegates;
@@ -116,15 +117,44 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
     public IFlowOperator<TInstance, TMessage> PublishAsync<T>(
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
-        ThenAsync(ConditionActionAsync);
+        ThenAsync(PublishActionAsync);
         return this;
 
-        async Task ConditionActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        async Task PublishActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var message = await messageFactoryAsync.Invoke(context, ct);
             var services = ServiceProviderAmbient.Services;
             var publisher = services.GetRequiredService<IPublisher>();
             await publisher.PublishAsync(message, ct);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> Response<T>(MessageOperatorFactory<TInstance, TMessage, T> messageFactory)
+        where T : class
+    {
+        return ResponseAsync(MessageFactoryAsync);
+
+        Task<T> MessageFactoryAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken _)
+        {
+            var message = messageFactory.Invoke(context);
+            return Task.FromResult(message);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> ResponseAsync<T>(
+        MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
+    {
+        return ThenAsync(ConditionActionAsync);
+
+        async Task ConditionActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        {
+            var message = await messageFactoryAsync.Invoke(context, ct);
+            var services = ServiceProviderAmbient.Services;
+            var client = services.GetService<IClient<T>>();
+            if (client is null) return;
+            var correlationId = context.CorrelationId;
+            var headers = context.Headers;
+            await client.SendAsync(message, new ResponseContext(correlationId, headers), ct);
         }
     }
 }

@@ -9,4 +9,6 @@ public static class DistributedException
 
     public sealed class TypeIsNotPublisherPipelineBehavior(Type type) :
         Exception($"{type.Name} must implement {typeof(IPublisherPipelineBehavior<>).FullName}!");
+
+    public sealed class FaultException() : Exception("Fault exception");
 }

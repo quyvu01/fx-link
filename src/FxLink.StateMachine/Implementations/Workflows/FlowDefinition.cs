@@ -5,7 +5,7 @@ namespace FxLink.StateMachine.Implementations.Workflows;
 
 public sealed class FlowDefinition<TInstance>  : IFlowDefinition<TInstance> where TInstance : IStateMachineInstance
 {
-    public IFlowOperator<TInstance, TMessage> On<TMessage>(IEvent<TMessage> @event) where TMessage : class
+    public IFlowOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class
     {
         throw new NotImplementedException();
     }

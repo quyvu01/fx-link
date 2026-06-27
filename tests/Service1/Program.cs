@@ -71,4 +71,11 @@ app.MapGet("/getOrder", async (IRequest<OrderResult> request, CancellationToken 
     })
     .WithOpenApi();
 
+app.MapGet("/getOrderStats", async (IRequest<GetOrderStats> request, Guid orderId, CancellationToken token) =>
+    {
+        var result = await request.RequestAsync<OrderStatsResponse>(new GetOrderStats { OrderId = orderId }, token);
+        return result;
+    })
+    .WithOpenApi();
+
 app.Run();
