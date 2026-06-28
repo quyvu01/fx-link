@@ -4,5 +4,6 @@ public interface IConsumerContext : IContext, IResponse;
 
 public interface IConsumerContext<out TMessage> : IConsumerContext where TMessage : class
 {
+    Guid? RequesterId { get; }
     TMessage Message { get; }
 }

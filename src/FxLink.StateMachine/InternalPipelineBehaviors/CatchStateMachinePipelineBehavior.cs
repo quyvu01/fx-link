@@ -1,11 +1,15 @@
 using FxLink.Abstractions;
+using FxLink.Contexts;
 using FxLink.Delegates;
 using FxLink.StateMachine.Exceptions;
+using FxLink.Wrappers;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FxLink.StateMachine.InternalPipelineBehaviors;
 
 internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
+    IServiceProvider serviceProvider,
     ILogger<CatchStateMachinePipelineBehavior<TMessage>> logger)
     : IConsumerPipelineBehavior<TMessage> where TMessage : class
 {
@@ -18,10 +22,23 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
         }
         catch (Exception e)
         {
-            if (e is StateMachineException.StateMachineInstanceMustBeInitFirst)
+            switch (e)
             {
-                logger.LogError("State machine instance must be initialized fist for context: {@Message}", context);
-                // Do nothing here. We don't need to handle this exception!
+                case StateMachineException.StateMachineInstanceMustBeInitFirst:
+                    logger.LogError("State machine instance must be initialized fist for context: {@Message}", context);
+                    // Do nothing here. We don't need to handle this exception!
+                    break;
+                case StateMachineException.EventWasNotDeclaredForInstanceState ex:
+                    logger.LogError(ex.Message);
+                    // We have to response Fault to requester. Seems we have to implement result pattern here
+                    if (context.RequesterId is { } requesterId)
+                    {
+                        var client = serviceProvider.GetRequiredService<IClient<Result>>();
+                        await client.SendAsync(Result.Failed(ex),
+                            new ResponseContext(context.CorrelationId, requesterId, context.Headers), token);
+                    }
+
+                    break;
             }
 
             throw;

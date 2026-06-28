@@ -7,8 +7,8 @@ namespace FxLink.StateMachine.Registries;
 public interface IMissingInstanceConfigurator<TInstance, TMessage>
     where TInstance : IStateMachineInstance where TMessage : class
 {
-    IDispatch<IConsumerContext<TMessage>> Discard();
-    IDispatch<IConsumerContext<TMessage>> Fault();
-    IDispatch<IConsumerContext<TMessage>> ExecuteAsync(MissingInstanceActionAsync<TMessage> actionAsync);
-    IDispatch<IConsumerContext<TMessage>> Execute(MissingInstanceAction<TMessage> action);
+    IDispatcher<IConsumerContext<TMessage>> Discard();
+    IDispatcher<IConsumerContext<TMessage>> Fault();
+    IDispatcher<IConsumerContext<TMessage>> ExecuteAsync(MissingInstanceActionAsync<TMessage> actionAsync);
+    IDispatcher<IConsumerContext<TMessage>> Execute(MissingInstanceAction<TMessage> action);
 }

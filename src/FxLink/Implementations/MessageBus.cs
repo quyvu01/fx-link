@@ -1,6 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Contexts;
 using FxLink.PipelineBehaviors;
+using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Implementations;
@@ -28,8 +29,10 @@ internal sealed class MessageBus<TMessage> :
                 {
                     using var scope = _serviceProvider.CreateScope();
                     var server = scope.ServiceProvider.GetRequiredService<IServer<TMessage>>();
+                    Guid? requesterId = message.Context is IRequestContext rq ? rq.RequesterId : null;
                     await server.ConsumeAsync(new ConsumerContext<TMessage>(message.Message,
-                        message.Context.CorrelationId, message.Context.Headers), message.Token);
+                            message.Context.CorrelationId, message.Context.Headers) { RequesterId = requesterId },
+                        message.Token);
                 });
                 if (message.Context is IResponseContext)
                     _responseInternal.TrySetResult(message.Context.CorrelationId, message.Message);
@@ -49,12 +52,15 @@ internal sealed class MessageBus<TMessage> :
     }
 
     public async Task<TResponse> RequestAsync<TResponse>(TMessage message, IRequestContext context,
-        CancellationToken token = default)
+        CancellationToken token = default) where TResponse : class
     {
         await SendAsync(message, context, token);
-        return await _responseInternal.GetResponse<TResponse>(context.CorrelationId, token);
+        var internalResult = await _responseInternal.GetResponse<Result>(context.CorrelationId, token);
+        if (internalResult.IsSuccess) return internalResult.Data as TResponse;
+        throw internalResult.Fault.ToException();
     }
 
     public Task<TResponse> RequestAsync<TResponse>(TMessage message, CancellationToken token = default)
-        => RequestAsync<TResponse>(message, new RequestContext(Guid.NewGuid(), []), token);
+        where TResponse : class
+        => RequestAsync<TResponse>(message, new RequestContext(Guid.NewGuid(), Guid.NewGuid(), []), token);
 }

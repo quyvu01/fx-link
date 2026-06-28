@@ -1,5 +1,4 @@
 using FxLink.Abstractions;
-using FxLink.Contexts;
 using FxLink.StateMachine.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,13 +12,12 @@ public sealed class StateMachineConsumer<TMessage>(IMessageKeys messageKeys, ISe
         var stateMachineTypes = messageKeys.GetMessageKeys(typeof(TMessage))
             .OfType<Type>()
             .Where(t => typeof(IStateMachine).IsAssignableFrom(t));
-        
+
         var tasks = stateMachineTypes.Select(async stateMachineType =>
         {
             using var scope = serviceProvider.CreateScope();
             var stateMachine = (scope.ServiceProvider.GetService(stateMachineType) as IStateMachine)!;
-            await stateMachine.RaiseEventAsync(context.Message,
-                new RequestContext(context.CorrelationId, context.Headers), token);
+            await stateMachine.RaiseEventAsync(context, token);
         });
         await Task.WhenAll(tasks);
     }
