@@ -6,6 +6,6 @@ public interface IStateMachine
 {
     IState[] States { get; }
 
-    Task RaiseEventAsync<TMessage>(TMessage message, IContext context, CancellationToken token = default)
+    Task RaiseEventAsync<TMessage>(IConsumerContext<TMessage> context, CancellationToken token = default)
         where TMessage : class;
 }

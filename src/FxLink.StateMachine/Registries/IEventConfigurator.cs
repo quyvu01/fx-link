@@ -15,7 +15,7 @@ public interface IEventConfigurator<TInstance, TMessage> : IEventConfigurator
         Expression<Func<TInstance, IConsumerContext<TMessage>, bool>> predicate);
 
     IEventConfigurator<TInstance, TMessage> OnMissingInstance(
-        Func<IMissingInstanceConfigurator<TInstance, TMessage>, IDispatch<IConsumerContext<TMessage>>> missingBehavior);
+        Func<IMissingInstanceConfigurator<TInstance, TMessage>, IDispatcher<IConsumerContext<TMessage>>> missingBehavior);
 }
 
 public interface IEventCorrelationByConfigurator<TInstance, TMessage> : IEventConfigurator<TInstance, TMessage>

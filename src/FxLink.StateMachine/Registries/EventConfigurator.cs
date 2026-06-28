@@ -13,7 +13,7 @@ internal sealed class EventConfigurator<TInstance, TMessage> :
     private Func<IConsumerContext<TMessage>, Expression<Func<TInstance, bool>>> _predicateFactory;
     private Expression<Func<IConsumerContext<TMessage>, Guid>> _correlationIdSelector;
 
-    internal Func<IMissingInstanceConfigurator<TInstance, TMessage>, IDispatch<IConsumerContext<TMessage>>>
+    internal Func<IMissingInstanceConfigurator<TInstance, TMessage>, IDispatcher<IConsumerContext<TMessage>>>
         MissingInstanceBehavior { get; private set; }
 
     // Called at dispatch time when context is available
@@ -57,7 +57,7 @@ internal sealed class EventConfigurator<TInstance, TMessage> :
     }
 
     public IEventConfigurator<TInstance, TMessage> OnMissingInstance(
-        Func<IMissingInstanceConfigurator<TInstance, TMessage>, IDispatch<IConsumerContext<TMessage>>> missingBehavior)
+        Func<IMissingInstanceConfigurator<TInstance, TMessage>, IDispatcher<IConsumerContext<TMessage>>> missingBehavior)
     {
         MissingInstanceBehavior = missingBehavior;
         return this;

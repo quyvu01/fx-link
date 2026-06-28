@@ -23,4 +23,10 @@ public static class StateMachineException
 
     public sealed class CorrelationMethodMustBeInvoked()
         : Exception("No correlation configured. Call CorrelationId or CorrelationBy -> SelectId first.");
+
+    public sealed class EventWasNotDeclaredForInstanceState(Type eventType, string state) :
+        Exception($"Event: {eventType.FullName} was not declared for state: {state}")
+    {
+        public Type ResponseType { get; set; }
+    }
 }

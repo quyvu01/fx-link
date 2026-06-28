@@ -1,5 +1,4 @@
 using FxLink.Abstractions;
-using FxLink.Contexts;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
 using FxLink.StateMachine.Contexts;
@@ -13,30 +12,33 @@ namespace FxLink.StateMachine.Implementations.StateMachines;
 public abstract partial class StateMachine<TInstance>
 {
     // Note this raise event may have a lot of edge cases like race condition, state fall -> outbox and inbox
-    public async Task RaiseEventAsync<TMessage>(TMessage message, IContext context, CancellationToken token = default)
+    public async Task RaiseEventAsync<TMessage>(IConsumerContext<TMessage> context, CancellationToken token = default)
         where TMessage : class
     {
         var services = ServiceProviderAmbient.Services;
         var @event = new Event<TMessage>();
         var eventConfig = _eventConfigurations.FirstOrDefault(a => a.Event.Equals(@event));
         if (eventConfig?.Configurator is not EventConfigurator<TInstance, TMessage> config) return;
-        var consumerContext = new ConsumerContext<TMessage>(message, context.CorrelationId, context.Headers);
-        var predicate = config.GetPredicate(consumerContext);
+        var predicate = config.GetPredicate(context);
         var machineInstanceRepository = services.GetRequiredService<IStateMachineInstanceRepository<TInstance>>();
-        var instance = await machineInstanceRepository.GetInstanceAsync(predicate, token);
 
-        var statesWithFlows = _stateMapFlows.Where(v => v.Value
-                .OfType<IFlowOperator<TInstance, TMessage>>()
-                .Any(f => f.Event.Equals(@event)))
-            .Select(x => new
-            {
-                State = x.Key,
-                Flow = x.Value.OfType<IFlowOperator<TInstance, TMessage>>()
-                    .First(k => k.Event.Equals(@event))
-            })
-            .ToArray();
-        if (statesWithFlows is not { Length: > 0 })
+        var statesWithFlows = _stateMapFlows
+            .Aggregate(new List<(IState State, IFlowOperator<TInstance, TMessage> FlowOperator)>(),
+                (acc, next) =>
+                {
+                    var flows = next.Value
+                        .OfType<IFlowOperator<TInstance, TMessage>>()
+                        .ToArray();
+                    var matchedFlow = flows.FirstOrDefault(f => f.Event.Equals(@event));
+                    if (matchedFlow is null) return acc;
+                    acc.Add((next.Key, matchedFlow));
+                    return acc;
+                });
+
+        if (statesWithFlows is not { Count: > 0 })
             throw new StateMachineException.EventDoesNotMatchAnyFlow(typeof(IEvent<TMessage>));
+
+        var instance = await machineInstanceRepository.GetInstanceAsync(predicate, token);
         if (instance is null)
         {
             if (statesWithFlows.All(x => x.State != Initial))
@@ -48,19 +50,23 @@ public abstract partial class StateMachine<TInstance>
                 var missingInstanceConfigurator = new MissingInstanceConfigurator<TInstance, TMessage>();
                 var missingInvocationResult = missingInstanceAction
                     .Invoke(missingInstanceConfigurator);
-                await missingInvocationResult.SendAsync(consumerContext, token);
+                await missingInvocationResult.SendAsync(context, token);
                 return;
             }
 
             // It means that we already have the initial state => need to init a new instance.
             var correlationIdSelector = config.CorrelationSelector;
-            var newCorrelationId = correlationIdSelector.Compile().Invoke(consumerContext);
+            var newCorrelationId = correlationIdSelector.Compile().Invoke(context);
             instance = await machineInstanceRepository.CreateInstanceAsync(newCorrelationId, token);
         }
 
-        var flow = statesWithFlows.First(x => (State)x.State == new State(instance.State)).Flow;
+        var flow = statesWithFlows.FirstOrDefault(x => (State)x.State == new State(instance.State)).FlowOperator;
+        if (flow is null)
+            throw new StateMachineException.EventWasNotDeclaredForInstanceState(eventConfig.Event.GetType(),
+                instance.State);
+
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
-            (instance, message, context.CorrelationId, context.Headers);
+            (instance, context.Message, context.CorrelationId, context.Headers);
         foreach (var asyncAction in flow.AsyncActions) await asyncAction.Invoke(stateMachineContext, token);
         await machineInstanceRepository.SaveInstanceAsync(instance, token);
     }
