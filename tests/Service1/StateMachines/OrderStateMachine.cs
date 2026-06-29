@@ -2,6 +2,7 @@ using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Implementations.StateMachines;
 using Service1.Dtos;
 using Service1.StateMachines.Events;
+using Service1.StateMachines.Schedules;
 
 namespace Service1.StateMachines;
 
@@ -17,6 +18,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
     public IEvent<OrderCancelled> OrderCancelledEvent { get; private set; }
     public IEvent<OrderReactivated> OrderReactivatedEvent { get; private set; }
     public IEvent<GetOrderStats> GetOrderStatsEvent { get; private set; }
+    public ISchedule<OrderScheduler> OrderScheduler { get; set; }
 
     public OrderStateMachine(ILogger<OrderStateMachine> logger)
     {
@@ -39,6 +41,15 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                     OrderName = "[Kidding me?, no name]",
                     State = "Nooo, no instance -> No state"
                 })));
+        });
+        
+        Schedule(OrderScheduler, opts =>
+        {
+            opts.DelayProvider = context => context.Message.Delay;
+            opts.Received = x =>
+            {
+                x.CorrelationId(c => c.Message.OrderId);
+            };
         });
 
         Initially(When(OrderCreatedEvent)

@@ -27,7 +27,7 @@ public abstract partial class StateMachine<TInstance>
 
     private void SetEvents() => GetType()
         .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-        .Where(t => typeof(IEvent).IsAssignableFrom(t.PropertyType) && t.PropertyType.IsInterface)
+        .Where(t => typeof(IActivity).IsAssignableFrom(t.PropertyType) && t.PropertyType.IsInterface)
         .Where(t => t.PropertyType.IsGenericType && t.PropertyType
             .GetGenericTypeDefinition() == typeof(IEvent<>))
         .ForEach(p =>
