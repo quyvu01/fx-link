@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using FxLink.Abstractions;
 using FxLink.Extensions;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
@@ -20,8 +19,8 @@ public abstract partial class StateMachine<TInstance> :
     public IState Completed { get; } = new State(nameof(Completed));
     public IState[] States { get; }
 
-    private readonly HashSet<EventConfiguration> _eventConfigurations = [];
-    private readonly HashSet<IEvent> _eventTypes = [];
+    private readonly HashSet<EventConfiguration> _activityConfigurations = [];
+    private readonly HashSet<IActivity> _eventTypes = [];
     private readonly ConcurrentDictionary<IState, List<IFlow>> _stateMapFlows = [];
 
     protected StateMachine()
@@ -39,7 +38,12 @@ public abstract partial class StateMachine<TInstance> :
             throw new StateMachineException.EventHasBeenConfiguration(typeof(TMessage));
         var config = new EventConfigurator<TInstance, TMessage>();
         options.Invoke(config);
-        _eventConfigurations.Add(new EventConfiguration(@event, config));
+        _activityConfigurations.Add(new EventConfiguration(@event, config));
+    }
+
+    protected void Schedule<TMessage>(ISchedule<TMessage> schedule,
+        [NotNull] Action<IScheduleConfigurator<TInstance, TMessage>> options) where TMessage : class
+    {
     }
 
     protected void Initially(params IFlow[] flows) => BindingFlowsState(Initial, flows);

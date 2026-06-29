@@ -27,7 +27,7 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
     private void RegisterStateMachineConsumers<TStateMachine>()
         where TStateMachine : IStateMachine => typeof(TStateMachine)
         .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-        .Where(t => typeof(IEvent).IsAssignableFrom(t.PropertyType) && t.PropertyType.IsInterface)
+        .Where(t => typeof(IActivity).IsAssignableFrom(t.PropertyType) && t.PropertyType.IsInterface)
         .Where(t => t.PropertyType.IsGenericType && t.PropertyType
             .GetGenericTypeDefinition() == typeof(IEvent<>))
         .ForEach(p =>

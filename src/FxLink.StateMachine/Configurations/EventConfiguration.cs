@@ -3,4 +3,4 @@ using FxLink.StateMachine.Registries;
 
 namespace FxLink.StateMachine.Configurations;
 
-public sealed record EventConfiguration(IEvent Event, IEventConfigurator Configurator);
+public sealed record EventConfiguration(IActivity Event, IEventConfigurator Configurator);

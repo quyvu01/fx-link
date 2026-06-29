@@ -17,7 +17,7 @@ public abstract partial class StateMachine<TInstance>
     {
         var services = ServiceProviderAmbient.Services;
         var @event = new Event<TMessage>();
-        var eventConfig = _eventConfigurations.FirstOrDefault(a => a.Event.Equals(@event));
+        var eventConfig = _activityConfigurations.FirstOrDefault(a => a.Event.Equals(@event));
         if (eventConfig?.Configurator is not EventConfigurator<TInstance, TMessage> config) return;
         var predicate = config.GetPredicate(context);
         var machineInstanceRepository = services.GetRequiredService<IStateMachineInstanceRepository<TInstance>>();
