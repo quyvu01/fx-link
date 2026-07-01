@@ -71,11 +71,11 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
             .IfElse(ctx => ctx.Message.RandomNumber > 3,
                 succeed => succeed
                     .TransitionTo(OrderSucceed)
-                    .Then(c => logger.LogInformation("Succeed, hehe: {@State}", c.Instance.State)),
+                    .Then(c => logger.LogInformation("Succeed, instance: {@State}", c.Instance)),
                 otherwise => otherwise
                     .TransitionTo(OrderCancelled)
                     .ThenAsync(async (_, ct) => await Task.Delay(2000, ct))
-                    .Then(c => logger.LogInformation("Cancelled, hehe: {@State}", c.Instance.State))
+                    .Then(c => logger.LogInformation("Cancelled, instance: {@State}", c.Instance))
             ));
 
         During(OrderCancelled, When(OrderScheduler.Received)

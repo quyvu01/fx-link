@@ -203,9 +203,11 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, I
             if (!stateMachine.ActivityConfigurators.TryGetValue(schedule, out var configurator) ||
                 configurator is not IScheduleConfigurator<TInstance, T> scheduleConfigurator) return;
             var publisher = ServiceProviderAmbient.Services.GetRequiredService<IPublisher>();
+            var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             var tokenId = scheduleConfigurator.TokenIdProvider.Compile().Invoke(context.Instance);
             await publisher.PublishAsync(new DiscardMessagePublished<T>(tokenId),
                 new PublisherContext(context.CorrelationId, context.Headers), ct);
+            setter.Invoke(context.Instance, null); // Set the token Id to null
         }
     }
 }
