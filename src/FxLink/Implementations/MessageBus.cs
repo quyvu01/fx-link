@@ -31,7 +31,7 @@ internal sealed class MessageBus<TMessage> :
                     var server = scope.ServiceProvider.GetRequiredService<IServer<TMessage>>();
                     Guid? requesterId = message.Context is IRequestContext rq ? rq.RequesterId : null;
                     await server.ConsumeAsync(new ConsumerContext<TMessage>(message.Message,
-                            message.Context.CorrelationId, message.Context.Headers) { RequesterId = requesterId },
+                            message.Context.CorrelationId, requesterId, message.Context.Headers),
                         message.Token);
                 });
                 if (message.Context is IResponseContext)

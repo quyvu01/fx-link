@@ -13,6 +13,7 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
 {
     public IReadOnlyDictionary<Type, List<object>> MessageKeys => _messageKeys;
     private readonly ConcurrentDictionary<Type, List<object>> _messageKeys = [];
+
     public IStateMachineConfigurator Of<TStateMachine>(Action<IStateMachineSetup> config = null)
         where TStateMachine : IStateMachine
     {
@@ -28,11 +29,12 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
         where TStateMachine : IStateMachine => typeof(TStateMachine)
         .GetProperties(BindingFlags.Public | BindingFlags.Instance)
         .Where(t => typeof(IActivity).IsAssignableFrom(t.PropertyType) && t.PropertyType.IsInterface)
-        .Where(t => t.PropertyType.IsGenericType && t.PropertyType
-            .GetGenericTypeDefinition() == typeof(IEvent<>))
+        .Where(t => t.PropertyType.IsGenericType)
         .ForEach(p =>
         {
             var eventType = p.PropertyType;
+            var genericTypeDefinition = p.PropertyType.GetGenericTypeDefinition();
+            if (genericTypeDefinition != typeof(IEvent<>) && genericTypeDefinition != typeof(ISchedule<>)) return;
             try
             {
                 var arg = eventType.GetGenericArguments()[0];

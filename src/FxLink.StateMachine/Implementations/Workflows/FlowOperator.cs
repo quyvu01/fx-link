@@ -1,14 +1,19 @@
 using FxLink.Abstractions;
 using FxLink.Contexts;
+using FxLink.Entities;
+using FxLink.Extensions;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
 using FxLink.StateMachine.Delegates;
+using FxLink.StateMachine.Exceptions;
+using FxLink.StateMachine.Registries;
 using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Implementations.Workflows;
 
-public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) : IFlowOperator<TInstance, TMessage>
+public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, IStateMachine stateMachine)
+    : IFlowOperator<TInstance, TMessage>
     where TInstance : IStateMachineInstance where TMessage : class
 {
     public IEvent<TMessage> Event { get; } = @event;
@@ -67,7 +72,7 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         {
             var conditionResult = await condition.Invoke(context, ct);
             if (!conditionResult) return;
-            var newFlow = callback.Invoke(new FlowOperator<TInstance, TMessage>(Event));
+            var newFlow = callback.Invoke(new FlowOperator<TInstance, TMessage>(Event, stateMachine));
             foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
         }
     }
@@ -96,7 +101,7 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var conditionResult = await condition.Invoke(context, ct);
-            var @operator = new FlowOperator<TInstance, TMessage>(Event);
+            var @operator = new FlowOperator<TInstance, TMessage>(Event, stateMachine);
             var newFlow = conditionResult ? callback.Invoke(@operator) : otherwiseCallback.Invoke(@operator);
             foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
         }
@@ -150,8 +155,57 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event) :
         {
             var message = await messageFactoryAsync.Invoke(context, ct);
             var consumerContext = new ConsumerContext<TMessage>
-                (context.Message, context.CorrelationId, context.Headers);
+                (context.Message, context.CorrelationId, context.RequesterId, context.Headers);
             await consumerContext.ResponseAsync(message, ct);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> Schedule<T>(ISchedule<T> schedule,
+        MessageOperatorFactory<TInstance, TMessage, T> messageFactory) where T : class
+    {
+        return ScheduleAsync(schedule, MessageFactoryAsync);
+
+        Task<T> MessageFactoryAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken _)
+        {
+            var message = messageFactory.Invoke(context);
+            return Task.FromResult(message);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> ScheduleAsync<T>(ISchedule<T> schedule,
+        MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactory) where T : class
+    {
+        return ThenAsync(ActionAsync);
+
+        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        {
+            var message = await messageFactory.Invoke(context, ct);
+            if (!stateMachine.ActivityConfigurators.TryGetValue(schedule, out var configurator) ||
+                configurator is not IScheduleConfigurator<TInstance, T> scheduleConfigurator) return;
+            if (scheduleConfigurator is { Delay: not null, DelayProvider: not null })
+                throw new StateMachineException.ScheduleTimeCannotBeRegisteredBothDelayAndDelayProvider(schedule.Name);
+            var delay = scheduleConfigurator.Delay ?? scheduleConfigurator.DelayProvider.Invoke(context);
+            var publisher = ServiceProviderAmbient.Services.GetRequiredService<IPublisher>();
+            var tokenId = Guid.NewGuid();
+            var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
+            setter.Invoke(context.Instance, tokenId);
+            await publisher.PublishAsync(message, new PublisherContext(context.CorrelationId, context.Headers)
+                { Delay = delay, ScheduledMessageId = tokenId }, ct);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> Unschedule<T>(ISchedule<T> schedule) where T : class
+    {
+        return ThenAsync(ActionAsync);
+
+        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        {
+            if (!stateMachine.ActivityConfigurators.TryGetValue(schedule, out var configurator) ||
+                configurator is not IScheduleConfigurator<TInstance, T> scheduleConfigurator) return;
+            var publisher = ServiceProviderAmbient.Services.GetRequiredService<IPublisher>();
+            var tokenId = scheduleConfigurator.TokenIdProvider.Compile().Invoke(context.Instance);
+            await publisher.PublishAsync(new DiscardMessagePublished<T>(tokenId),
+                new PublisherContext(context.CorrelationId, context.Headers), ct);
         }
     }
 }

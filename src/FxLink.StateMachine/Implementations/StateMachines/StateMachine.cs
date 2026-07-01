@@ -3,7 +3,6 @@ using System.Diagnostics.CodeAnalysis;
 using FxLink.Extensions;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
-using FxLink.StateMachine.Configurations;
 using FxLink.StateMachine.Exceptions;
 using FxLink.StateMachine.Implementations.Workflows;
 using FxLink.StateMachine.Registries;
@@ -17,35 +16,51 @@ public abstract partial class StateMachine<TInstance> :
 {
     public IState Initial { get; } = new State(nameof(Initial));
     public IState Completed { get; } = new State(nameof(Completed));
-    public IState[] States { get; }
+    public IState[] States { get; private set; }
 
-    private readonly HashSet<EventConfiguration> _activityConfigurations = [];
-    private readonly HashSet<IActivity> _eventTypes = [];
+    public IReadOnlyDictionary<IActivity, IActivityConfigurator> ActivityConfigurators
+        => _activityConfigurators;
+
+    private readonly Dictionary<IActivity, IActivityConfigurator> _activityConfigurators = [];
+    private readonly Dictionary<Type, IActivityConfigurator> _messageConfigurators = [];
     private readonly ConcurrentDictionary<IState, List<IFlow>> _stateMapFlows = [];
 
     protected StateMachine()
     {
-        States = [Initial, ..SetMachineStates(), Completed];
-        SetEvents();
+        SetMachineStates();
+        SetActivitiesInstance();
     }
 
+    // Activities setting up
     protected void Event<TMessage>(IEvent<TMessage> @event,
         [NotNull] Action<IEventConfigurator<TInstance, TMessage>> options) where TMessage : class
     {
         ArgumentNullException.ThrowIfNull(@event);
         ArgumentNullException.ThrowIfNull(options);
-        if (!_eventTypes.Add(@event))
-            throw new StateMachineException.EventHasBeenConfiguration(typeof(TMessage));
         var config = new EventConfigurator<TInstance, TMessage>();
         options.Invoke(config);
-        _activityConfigurations.Add(new EventConfiguration(@event, config));
+        if (!_messageConfigurators.TryAdd(typeof(TMessage), config))
+            throw new StateMachineException.MessageTypeHasBeenConfiguration(typeof(TMessage));
+        if (!_activityConfigurators.TryAdd(@event, config))
+            throw new StateMachineException.ActivityHasBeenConfiguration(typeof(IEvent<TMessage>));
     }
 
     protected void Schedule<TMessage>(ISchedule<TMessage> schedule,
         [NotNull] Action<IScheduleConfigurator<TInstance, TMessage>> options) where TMessage : class
     {
+        ArgumentNullException.ThrowIfNull(schedule);
+        ArgumentNullException.ThrowIfNull(options);
+        var config = new ScheduleConfigurator<TInstance, TMessage>();
+        options.Invoke(config);
+        config.Validate();
+        // Just need to add schedule to _activityConfigurators, not an event.
+        if (!_activityConfigurators.TryAdd(schedule, config))
+            throw new StateMachineException.ActivityHasBeenConfiguration(typeof(TMessage));
+        Event(schedule.Received, ev => config.Received.Invoke(ev));
     }
 
+
+    // Starting flow chains.
     protected void Initially(params IFlow[] flows) => BindingFlowsState(Initial, flows);
 
     protected void During(IState state, params IFlow[] flows) => BindingFlowsState(state, flows);
@@ -65,11 +80,8 @@ public abstract partial class StateMachine<TInstance> :
     protected void DuringAny(params IFlow[] flows) => During(States, flows);
 
     public IFlowOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class =>
-        new FlowOperator<TInstance, TMessage>(@event);
+        new FlowOperator<TInstance, TMessage>(@event, this);
 
-    private void BindingFlowsState(IState state, IFlow[] flows)
-    {
-        var existingFlows = _stateMapFlows.GetOrAdd(state, _ => []);
-        existingFlows.AddRange(flows);
-    }
+    private void BindingFlowsState(IState state, IFlow[] flows) =>
+        _stateMapFlows.GetOrAdd(state, _ => []).AddRange(flows);
 }

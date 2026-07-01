@@ -42,14 +42,12 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                     State = "Nooo, no instance -> No state"
                 })));
         });
-        
+
         Schedule(OrderScheduler, opts =>
         {
-            opts.DelayProvider = context => context.Message.Delay;
-            opts.Received = x =>
-            {
-                x.CorrelationId(c => c.Message.OrderId);
-            };
+            opts.Delay = TimeSpan.FromSeconds(5);
+            opts.TokenIdProvider = o => o.MonitorTokenTimeout;
+            opts.Received = x => x.CorrelationId(c => c.Message.OrderId);
         });
 
         Initially(When(OrderCreatedEvent)
@@ -66,32 +64,23 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                 logger.LogInformation("Message instance is: {@Instance}", context.Instance);
             })
             .TransitionTo(OrderCreated)
+            .Schedule(OrderScheduler, ctx
+                => new OrderScheduler { OrderId = ctx.Instance.OrderId })
             .Then(context => logger.LogInformation("After transition to new state: {@Instance}", context.Instance))
-            .If(context => context.Instance.State == OrderCreated.Name,
-                cb => cb.Then(context =>
-                        logger.LogInformation("Hehe, this is the last instance: {@Instance}", context.Instance))
-                    .ThenAsync(async (context, ct) =>
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(3), ct);
-                        logger.LogWarning("Starting the complex thing, the context did not change: {@Context}",
-                            context);
-                    })
+            .Unschedule(OrderScheduler)
+            .IfElse(ctx => ctx.Message.RandomNumber > 3,
+                succeed => succeed
+                    .TransitionTo(OrderSucceed)
+                    .Then(c => logger.LogInformation("Succeed, hehe: {@State}", c.Instance.State)),
+                otherwise => otherwise
                     .TransitionTo(OrderCancelled)
-                    .If(context => context.Instance.State == OrderCancelled.Name, ctx =>
-                        ctx
-                            .ThenAsync(async (_, ct) => await Task.Delay(TimeSpan.FromSeconds(5), ct))
-                            .Then(context =>
-                                logger.LogInformation("Ok, all good!: {@InstanceState}", context.Instance.State))
-                    )
-                    .IfElse(_ => false, x => x, elseCallback => elseCallback
-                        .ThenAsync(async (_, ct) => await Task.Delay(TimeSpan.FromSeconds(3), ct))
-                        .Then(context =>
-                            logger.LogInformation("Seems we have done a lot of thing?: {@Instance}", context.Instance))
-                        .Publish(ctx => new OrderPublisherTest
-                        {
-                            OrderId = ctx.Instance.OrderId
-                        })
-                    )));
+                    .ThenAsync(async (_, ct) => await Task.Delay(2000, ct))
+                    .Then(c => logger.LogInformation("Cancelled, hehe: {@State}", c.Instance.State))
+            ));
+
+        During(OrderCancelled, When(OrderScheduler.Received)
+            .Then(ctx => logger.LogInformation("OrderScheduler.Received received: {@Message}", ctx.Message))
+        );
 
         During(OrderCancelled, When(OrderReactivatedEvent)
             .Then(context => logger.LogInformation("Reactive cancelled order: {@OrderMessage}", context.Message))
@@ -99,7 +88,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
             .Publish(ctx => new OrderSucceed { OrderId = ctx.Instance.OrderId })
         );
 
-        During(OrderCreated, When(GetOrderStatsEvent)
+        During(OrderCreated, OrderCancelled, When(GetOrderStatsEvent)
             .Response(c => new OrderStatsResponse
             {
                 OrderId = c.Instance.OrderId,

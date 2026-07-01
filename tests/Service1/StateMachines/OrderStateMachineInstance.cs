@@ -9,4 +9,5 @@ public sealed class OrderStateMachineInstance : IStateMachineInstance
     public Guid OrderId { get; set; }
     public string OrderName { get; set; }
     public DateTime OrderTime { get; set; }
+    public Guid? MonitorTokenTimeout { get; set; }
 }

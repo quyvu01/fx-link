@@ -4,13 +4,12 @@ using FxLink.Statics;
 
 namespace FxLink.InternalPipelines;
 
-internal class ServicesAmbientConsumerPipelineBehavior<TMessage>(IServiceProvider serviceProvider) :
+internal class ServicesAmbientConsumerPipelineBehavior<TMessage> :
     IConsumerPipelineBehavior<TMessage> where TMessage : class
 {
-    public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
-        CancellationToken token = default)
-    {
+    public ServicesAmbientConsumerPipelineBehavior(IServiceProvider serviceProvider) =>
         ServiceProviderAmbient.SetServices(serviceProvider);
-        await next.Invoke(token);
-    }
+
+    public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
+        CancellationToken token = default) => await next.Invoke(token);
 }

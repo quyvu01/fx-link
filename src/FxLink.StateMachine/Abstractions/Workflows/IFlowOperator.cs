@@ -41,4 +41,12 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
 
     IFlowOperator<TInstance, TMessage> ResponseAsync<T>(
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
+
+    IFlowOperator<TInstance, TMessage> Schedule<T>(ISchedule<T> schedule,
+        MessageOperatorFactory<TInstance, TMessage, T> messageFactory) where T : class;
+
+    IFlowOperator<TInstance, TMessage> ScheduleAsync<T>(ISchedule<T> schedule,
+        MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactory) where T : class;
+
+    IFlowOperator<TInstance, TMessage> Unschedule<T>(ISchedule<T> schedule) where T : class;
 }
