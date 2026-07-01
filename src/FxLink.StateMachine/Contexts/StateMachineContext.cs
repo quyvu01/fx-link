@@ -6,7 +6,11 @@ internal record StateMachineContext<TInstance, TMessage>(
     TInstance Instance,
     TMessage Message,
     Guid CorrelationId,
+    Guid? RequesterId,
     Dictionary<string, object> Headers)
     : IStateMachineContext<TInstance, TMessage>
     where TInstance : IStateMachineInstance
-    where TMessage : class;
+    where TMessage : class
+{
+    public Guid? RequesterId { get; } = RequesterId;
+}

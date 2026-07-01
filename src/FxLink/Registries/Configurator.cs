@@ -31,6 +31,7 @@ public class Configurator(IServiceCollection serviceCollection) : IConfigurator
     public void UseInMemory()
     {
         Services.TryAddSingleton(typeof(IMessageProcessor<>), typeof(InMemoryMessage<>));
+        Services.AddSingleton<MessageUnPublisherDispatcher>();
     }
 
     // Need to check if we have edge cases here!

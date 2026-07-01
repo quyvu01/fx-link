@@ -15,12 +15,17 @@ public abstract partial class StateMachine<TInstance>
     public async Task RaiseEventAsync<TMessage>(IConsumerContext<TMessage> context, CancellationToken token = default)
         where TMessage : class
     {
+        // Here, we will resolve the activity
+        var activityConfigurator = _messageConfigurators
+            .FirstOrDefault(a => a.Key == typeof(TMessage));
+
+        // Temporary move to this scope, I will write the schedule then merge again.
+        if (activityConfigurator.Value is not EventConfigurator<TInstance, TMessage> configurator) return;
+
         var services = ServiceProviderAmbient.Services;
-        var @event = new Event<TMessage>();
-        var eventConfig = _activityConfigurations.FirstOrDefault(a => a.Event.Equals(@event));
-        if (eventConfig?.Configurator is not EventConfigurator<TInstance, TMessage> config) return;
-        var predicate = config.GetPredicate(context);
         var machineInstanceRepository = services.GetRequiredService<IStateMachineInstanceRepository<TInstance>>();
+
+        var @event = new Event<TMessage>();
 
         var statesWithFlows = _stateMapFlows
             .Aggregate(new List<(IState State, IFlowOperator<TInstance, TMessage> FlowOperator)>(),
@@ -38,12 +43,13 @@ public abstract partial class StateMachine<TInstance>
         if (statesWithFlows is not { Count: > 0 })
             throw new StateMachineException.EventDoesNotMatchAnyFlow(typeof(IEvent<TMessage>));
 
+        var predicate = configurator.GetPredicate(context);
         var instance = await machineInstanceRepository.GetInstanceAsync(predicate, token);
         if (instance is null)
         {
             if (statesWithFlows.All(x => x.State != Initial))
             {
-                var missingInstanceAction = config.MissingInstanceBehavior;
+                var missingInstanceAction = configurator.MissingInstanceBehavior;
                 if (missingInstanceAction is null)
                     throw new StateMachineException.StateMachineInstanceMustBeInitFirst();
                 // Handling missing instance
@@ -55,19 +61,18 @@ public abstract partial class StateMachine<TInstance>
             }
 
             // It means that we already have the initial state => need to init a new instance.
-            var correlationIdSelector = config.CorrelationSelector;
+            var correlationIdSelector = configurator.CorrelationSelector;
             var newCorrelationId = correlationIdSelector.Compile().Invoke(context);
             instance = await machineInstanceRepository.CreateInstanceAsync(newCorrelationId, token);
         }
 
         var flow = statesWithFlows.FirstOrDefault(x => (State)x.State == new State(instance.State)).FlowOperator;
         if (flow is null)
-            throw new StateMachineException.EventWasNotDeclaredForInstanceState(eventConfig.Event.GetType(),
-                instance.State);
+            throw new StateMachineException.EventWasNotDeclaredForInstanceState(typeof(TMessage), instance.State);
 
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
-            (instance, context.Message, context.CorrelationId, context.Headers);
-        foreach (var asyncAction in flow.AsyncActions) await asyncAction.Invoke(stateMachineContext, token);
+            (instance, context.Message, context.CorrelationId, context.RequesterId, context.Headers);
         await machineInstanceRepository.SaveInstanceAsync(instance, token);
+        foreach (var asyncAction in flow.AsyncActions) await asyncAction.Invoke(stateMachineContext, token);
     }
 }

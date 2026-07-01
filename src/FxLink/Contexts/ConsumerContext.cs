@@ -5,10 +5,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Contexts;
 
-public sealed class ConsumerContext<TMessage>(TMessage message, Guid correlationId, Dictionary<string, object> headers)
+public sealed class ConsumerContext<TMessage>(
+    TMessage message,
+    Guid correlationId,
+    Guid? requesterId,
+    Dictionary<string, object> headers)
     : AbstractContext(correlationId, headers), IConsumerContext<TMessage> where TMessage : class
 {
-    public Guid? RequesterId { get; internal set; }
+    public Guid? RequesterId { get; } = requesterId;
     public TMessage Message { get; } = message;
 
     public async Task ResponseAsync<TResponse>(TResponse message, CancellationToken token = default)

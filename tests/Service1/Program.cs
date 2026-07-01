@@ -1,4 +1,5 @@
 using FxLink.Abstractions;
+using FxLink.Contexts;
 using FxLink.Extensions;
 using FxLink.StateMachine.Extensions;
 using Serilog;
@@ -40,17 +41,21 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/placeOrder", async (IPublisher publisher) =>
+app.MapPost("/placeOrder", async (IPublisher publisher, ILogger<Program> logger) =>
     {
-        await publisher.PublishAsync(new OrderPlaced { OrderId = Guid.NewGuid(), OrderTime = DateTime.UtcNow });
+        var orderId = Guid.NewGuid();
+        await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow },
+            new PublisherContext(Guid.NewGuid(), []) { Delay = TimeSpan.FromSeconds(3) });
+        logger.LogInformation("Order placed: {@OrderId}", orderId);
         return "Order placed";
     })
     .WithOpenApi();
 
-app.MapPost("/orderCreated", async (IPublisher publisher) =>
+app.MapPost("/orderCreated", async (IPublisher publisher, int randomNumber) =>
     {
         var newOrderId = Guid.NewGuid();
-        await publisher.PublishAsync(new OrderCreated { OrderId = newOrderId, OrderName = "Some order name" });
+        await publisher.PublishAsync(new OrderCreated
+            { OrderId = newOrderId, RandomNumber = randomNumber, OrderName = "Some order name" });
         return newOrderId;
     })
     .WithOpenApi();
