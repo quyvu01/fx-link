@@ -12,6 +12,7 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
     IFlowOperator<TInstance, TMessage> ThenAsync(AsyncOperatorAction<TInstance, TMessage> asyncAction);
 
     IFlowOperator<TInstance, TMessage> TransitionTo(IState state);
+    IFlowOperator<TInstance, TMessage> Complete();
 
     IFlowOperator<TInstance, TMessage> If(OperatorCondition<TInstance, TMessage> condition,
         ActivityOperatorCallback<TInstance, TMessage> callback);

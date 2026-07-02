@@ -24,4 +24,15 @@ public sealed class ConsumerContext<TMessage>(
         await client.SendAsync(Result.Success(message),
             new ResponseContext(CorrelationId, requesterId, Headers), token);
     }
+
+    public async Task PublishAsync<T>(T message, IPublisherContext context, CancellationToken token = default)
+        where T : class
+    {
+        var services = ServiceProviderAmbient.Services;
+        var publisher = services.GetRequiredService<IPublisher>();
+        await publisher.PublishAsync(message, context, token);
+    }
+
+    public async Task PublishAsync<T>(T message, CancellationToken token = default) where T : class =>
+        await PublishAsync(message, new PublisherContext(CorrelationId, Headers), token);
 }
