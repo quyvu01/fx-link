@@ -49,33 +49,16 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, I
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> If(OperatorCondition<TInstance, TMessage> condition,
-        ActivityOperatorCallback<TInstance, TMessage> callback)
-    {
-        return IfAsync(ConditionAsync, callback);
+    public IFlowOperator<TInstance, TMessage> Complete() => TransitionTo(stateMachine.Completed);
 
-        Task<bool> ConditionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
-        {
-            var conditionResult = condition.Invoke(context);
-            return Task.FromResult(conditionResult);
-        }
-    }
+    public IFlowOperator<TInstance, TMessage> If(OperatorCondition<TInstance, TMessage> condition,
+        ActivityOperatorCallback<TInstance, TMessage> callback) =>
+        IfElse(condition, callback, x => x);
 
     public IFlowOperator<TInstance, TMessage> IfAsync(
         AsyncOperatorCondition<TInstance, TMessage> condition,
-        ActivityOperatorCallback<TInstance, TMessage> callback)
-    {
-        ThenAsync(ActionAsync);
-        return this;
-
-        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
-        {
-            var conditionResult = await condition.Invoke(context, ct);
-            if (!conditionResult) return;
-            var newFlow = callback.Invoke(new FlowOperator<TInstance, TMessage>(Event, stateMachine));
-            foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
-        }
-    }
+        ActivityOperatorCallback<TInstance, TMessage> callback) =>
+        IfElseAsync(condition, callback, x => x);
 
     public IFlowOperator<TInstance, TMessage> IfElse(OperatorCondition<TInstance, TMessage> condition,
         ActivityOperatorCallback<TInstance, TMessage> callback,

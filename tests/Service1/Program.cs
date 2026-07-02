@@ -27,7 +27,13 @@ builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
     opts.UseInMemory();
-    opts.AddStateMachines(c => { c.Of<OrderStateMachine>(cfg => { cfg.InMemoryRepository(); }); });
+    opts.AddStateMachines(c =>
+    {
+        c.Of<OrderStateMachine>(cfg =>
+        {
+            cfg.InMemoryRepository();
+        });
+    });
 });
 
 var app = builder.Build();
