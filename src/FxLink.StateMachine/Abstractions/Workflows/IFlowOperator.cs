@@ -23,12 +23,12 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
 
     IFlowOperator<TInstance, TMessage> IfElse(
         OperatorCondition<TInstance, TMessage> condition,
-        ActivityOperatorCallback<TInstance, TMessage> callback,
+        ActivityOperatorCallback<TInstance, TMessage> succeedCallback,
         ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback);
 
     IFlowOperator<TInstance, TMessage> IfElseAsync(
         AsyncOperatorCondition<TInstance, TMessage> condition,
-        ActivityOperatorCallback<TInstance, TMessage> callback,
+        ActivityOperatorCallback<TInstance, TMessage> succeedCallback,
         ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback);
 
     IFlowOperator<TInstance, TMessage> Publish<T>(MessageOperatorFactory<TInstance, TMessage, T> messageFactory)
@@ -47,7 +47,7 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
         MessageOperatorFactory<TInstance, TMessage, T> messageFactory) where T : class;
 
     IFlowOperator<TInstance, TMessage> ScheduleAsync<T>(ISchedule<T> schedule,
-        MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactory) where T : class;
+        MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
 
     IFlowOperator<TInstance, TMessage> Unschedule<T>(ISchedule<T> schedule) where T : class;
 }
