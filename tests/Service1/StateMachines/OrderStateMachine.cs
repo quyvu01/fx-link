@@ -96,5 +96,6 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                 State = c.Instance.State
             })
         );
+        RemoveInstanceWhenCompleted();
     }
 }

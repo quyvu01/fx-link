@@ -5,16 +5,16 @@ using FxLink.StateMachine.Implementations.StateMachines;
 
 namespace FxLink.StateMachine.Implementations;
 
-internal class StateMachineInstanceInMemoryRepository<TInstance> : IStateMachineInstanceRepository<TInstance>
+internal sealed class StateMachineInstanceInMemoryRepository<TInstance> : IStateMachineInstanceRepository<TInstance>
     where TInstance : IStateMachineInstance
 {
-    private readonly ConcurrentBag<object> _instances = [];
+    private readonly ConcurrentDictionary<Guid, TInstance> _instances = [];
 
     public Task<TInstance> GetInstanceAsync(Expression<Func<TInstance, bool>> filter, CancellationToken token = default)
     {
-        var instance = _instances.OfType<TInstance>()
-            .Where(filter.Compile())
-            .FirstOrDefault();
+        var instance = _instances
+            .Values
+            .FirstOrDefault(filter.Compile());
         return Task.FromResult(instance);
     }
 
@@ -24,16 +24,19 @@ internal class StateMachineInstanceInMemoryRepository<TInstance> : IStateMachine
     public Task<TInstance> CreateInstanceAsync(Guid correlationId, CancellationToken token = default)
     {
         var newInstance = Activator.CreateInstance<TInstance>()!;
-        _instances.Add(newInstance);
         newInstance.CorrelationId = correlationId;
+        _instances.TryAdd(correlationId, newInstance);
         newInstance.State = nameof(StateMachine<>.Initial);
 
         return Task.FromResult(newInstance);
     }
 
     // No need to do because currently, we're using in memory -> instance will be changed by reference
-    public Task SaveInstanceAsync(TInstance instance, CancellationToken token = default)
+    public Task SaveInstanceAsync(TInstance instance, CancellationToken token = default) => Task.CompletedTask;
+
+    public Task RemoveInstanceAsync(TInstance instance, CancellationToken token = default)
     {
+        _instances.TryRemove(instance.CorrelationId, out _);
         return Task.CompletedTask;
     }
 }
