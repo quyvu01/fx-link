@@ -74,5 +74,7 @@ public abstract partial class StateMachine<TInstance>
             (instance, context.Message, context.CorrelationId, context.RequesterId, context.Headers);
         await machineInstanceRepository.SaveInstanceAsync(instance, token);
         foreach (var asyncAction in flow.AsyncActions) await asyncAction.Invoke(stateMachineContext, token);
+        if (_removeInstanceWhenCompleted && instance.State == Completed.Name)
+            await machineInstanceRepository.RemoveInstanceAsync(instance, token);
     }
 }

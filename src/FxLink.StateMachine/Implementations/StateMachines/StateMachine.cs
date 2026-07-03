@@ -24,6 +24,7 @@ public abstract partial class StateMachine<TInstance> :
     private readonly Dictionary<IActivity, IActivityConfigurator> _activityConfigurators = [];
     private readonly Dictionary<Type, IActivityConfigurator> _messageConfigurators = [];
     private readonly ConcurrentDictionary<IState, List<IFlow>> _stateMapFlows = [];
+    private bool _removeInstanceWhenCompleted;
 
     protected StateMachine()
     {
@@ -78,6 +79,8 @@ public abstract partial class StateMachine<TInstance> :
         states.ForEach(state => BindingFlowsState(state, flows));
 
     protected void DuringAny(params IFlow[] flows) => During(States, flows);
+
+    protected void RemoveInstanceWhenCompleted() => _removeInstanceWhenCompleted = true;
 
     public IFlowOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class =>
         new FlowOperator<TInstance, TMessage>(@event, this);
