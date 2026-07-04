@@ -1,8 +1,9 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.Contexts;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
 using FxLink.StateMachine.Contexts;
 using FxLink.StateMachine.Exceptions;
+using FxLink.StateMachine.Extensions;
 using FxLink.StateMachine.Registries;
 using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,9 +16,11 @@ public abstract partial class StateMachine<TInstance>
     public async Task RaiseEventAsync<TMessage>(IConsumerContext<TMessage> context, CancellationToken token = default)
         where TMessage : class
     {
+        var @event = new Event<TMessage>();
         // Here, we will resolve the activity
+        if (context.MessageKey is { } messageKey) @event.SetName(messageKey);
         var activityConfigurator = _messageConfigurators
-            .FirstOrDefault(a => a.Key == typeof(TMessage));
+            .FirstOrDefault(a => a.Key.Equals(@event));
 
         // Temporary move to this scope, I will write the schedule then merge again.
         if (activityConfigurator.Value is not EventConfigurator<TInstance, TMessage> configurator) return;
@@ -25,7 +28,6 @@ public abstract partial class StateMachine<TInstance>
         var services = ServiceProviderAmbient.Services;
         var machineInstanceRepository = services.GetRequiredService<IStateMachineInstanceRepository<TInstance>>();
 
-        var @event = new Event<TMessage>();
 
         var statesWithFlows = _stateMapFlows
             .Aggregate(new List<(IState State, IFlowOperator<TInstance, TMessage> FlowOperator)>(),
@@ -71,7 +73,7 @@ public abstract partial class StateMachine<TInstance>
             throw new StateMachineException.EventWasNotDeclaredForInstanceState(typeof(TMessage), instance.State);
 
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
-            (instance, context.Message, context.CorrelationId, context.RequesterId, context.Headers);
+            (instance, context.Message, context.RequesterId, context);
         await machineInstanceRepository.SaveInstanceAsync(instance, token);
         foreach (var asyncAction in flow.AsyncActions) await asyncAction.Invoke(stateMachineContext, token);
         if (_removeInstanceWhenCompleted && instance.State == Completed.Name)

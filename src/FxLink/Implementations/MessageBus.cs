@@ -1,5 +1,6 @@
 using FxLink.Abstractions;
-using FxLink.Contexts;
+using FxLink.Abstractions.Contexts;
+using FxLink.Exceptions;
 using FxLink.PipelineBehaviors;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +10,7 @@ namespace FxLink.Implementations;
 internal sealed class MessageBus<TMessage> :
     IClient<TMessage>,
     IServer<TMessage>,
-    IRequest<TMessage> where TMessage : class
+    IRequester<TMessage> where TMessage : class
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IMessageProcessor<TMessage> _messageProcessor;
@@ -30,12 +31,11 @@ internal sealed class MessageBus<TMessage> :
                     using var scope = _serviceProvider.CreateScope();
                     var server = scope.ServiceProvider.GetRequiredService<IServer<TMessage>>();
                     Guid? requesterId = message.Context is IRequestContext rq ? rq.RequesterId : null;
-                    await server.ConsumeAsync(new ConsumerContext<TMessage>(message.Message,
-                            message.Context.CorrelationId, requesterId, message.Context.Headers),
-                        message.Token);
+                    await server.ConsumeAsync(
+                        new ConsumerContext<TMessage>(message.Message, requesterId, message.Context), message.Token);
                 });
-                if (message.Context is IResponseContext)
-                    _responseInternal.TrySetResult(message.Context.CorrelationId, message.Message);
+                if (message.Context is IResponseContext responseContext)
+                    _responseInternal.TrySetResult(responseContext.RequesterId, message);
             }
         });
     }
@@ -43,7 +43,7 @@ internal sealed class MessageBus<TMessage> :
     public async Task SendAsync(TMessage message, IContext context, CancellationToken token = default)
         => await _messageProcessor.PushMessageAsync(message, context, token);
 
-    public async Task ConsumeAsync(IConsumerContext<TMessage> context, CancellationToken token)
+    public async Task ConsumeAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
     {
         using var scope = _serviceProvider.CreateScope();
         var consumerPipelineBehavior = scope.ServiceProvider
@@ -51,16 +51,23 @@ internal sealed class MessageBus<TMessage> :
         await consumerPipelineBehavior.ExecuteAsync(context, token);
     }
 
-    public async Task<TResponse> RequestAsync<TResponse>(TMessage message, IRequestContext context,
+    public async Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message, IRequestContext context,
         CancellationToken token = default) where TResponse : class
     {
-        await SendAsync(message, context, token);
-        var internalResult = await _responseInternal.GetResponse<Result>(context.CorrelationId, token);
-        if (internalResult.IsSuccess) return internalResult.Data as TResponse;
-        throw internalResult.Fault.ToException();
+        if (context.Timeout < TimeSpan.Zero)
+            throw new DistributedException.RequestTimeoutCannotBeSmallerThanZero(context.Timeout);
+        using var tcs = CancellationTokenSource.CreateLinkedTokenSource(token);
+        tcs.CancelAfter(context.Timeout);
+        await SendAsync(message, context, tcs.Token);
+        var (result, ctx, _) = await _responseInternal
+            .GetResponse<Result>(context.RequesterId, tcs.Token);
+        if (!result.IsSuccess) throw result.Fault.ToException();
+        var response = result.Data as TResponse;
+        return new ResponseContext<TResponse>(response, context.RequesterId, ctx);
     }
 
-    public Task<TResponse> RequestAsync<TResponse>(TMessage message, CancellationToken token = default)
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message,
+        CancellationToken token = default)
         where TResponse : class
-        => RequestAsync<TResponse>(message, new RequestContext(Guid.NewGuid(), Guid.NewGuid(), []), token);
+        => RequestAsync<TResponse>(message, new RequestContext(Guid.NewGuid(), []), token);
 }

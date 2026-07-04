@@ -5,7 +5,7 @@ using FxLink.StateMachine.Exceptions;
 
 namespace FxLink.StateMachine.Registries;
 
-public sealed class ScheduleConfigurator<TInstance, TMessage> :
+internal sealed class ScheduleConfigurator<TInstance, TMessage> :
     IScheduleConfigurator<TInstance, TMessage>
     where TInstance : IStateMachineInstance where TMessage : class
 {

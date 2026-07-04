@@ -1,3 +1,5 @@
+using FxLink.Abstractions.Contexts;
+
 namespace FxLink.Abstractions;
 
 public interface IClient<in TMessage> : IBus where TMessage : class

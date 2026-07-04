@@ -1,11 +1,11 @@
+using FxLink.Abstractions.Contexts;
+
 namespace FxLink.StateMachine.Abstractions;
 
-public interface IStateMachineContext<out TInstance> where TInstance : IStateMachineInstance
+public interface IStateMachineContext<out TInstance> : IContext where TInstance : IStateMachineInstance
 {
     TInstance Instance { get; }
-    Guid CorrelationId { get; }
     Guid? RequesterId { get; }
-    Dictionary<string, object> Headers { get; }
 }
 
 public interface IStateMachineContext<out TInstance, out TMessage> : IStateMachineContext<TInstance>

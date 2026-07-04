@@ -1,5 +1,5 @@
 using FxLink.Abstractions;
-using FxLink.Contexts;
+using FxLink.Abstractions.Contexts;
 using FxLink.Delegates;
 using FxLink.StateMachine.Exceptions;
 using FxLink.Wrappers;
@@ -34,13 +34,14 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
                     if (context.RequesterId is { } requesterId)
                     {
                         var client = serviceProvider.GetRequiredService<IClient<Result>>();
-                        await client.SendAsync(Result.Failed(ex),
-                            new ResponseContext(context.CorrelationId, requesterId, context.Headers), token);
+                        await client.SendAsync(Result.Failed(ex), new ResponseContext(requesterId, context), token);
                     }
 
                     break;
             }
 
+            logger.LogError("Error while process message: {@Message} with exception: {@Exception}",
+                context.Message, e.Message);
             throw;
         }
     }

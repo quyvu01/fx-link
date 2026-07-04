@@ -12,13 +12,15 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
     public IState OrderCreated { get; private set; }
     public IState OrderCancelled { get; private set; }
     public IState OrderSucceed { get; private set; }
+    public IState OrderInRequesting { get; private set; }
 
     // Events declaration
     public IEvent<OrderCreated> OrderCreatedEvent { get; private set; }
     public IEvent<OrderCancelled> OrderCancelledEvent { get; private set; }
     public IEvent<OrderReactivated> OrderReactivatedEvent { get; private set; }
     public IEvent<GetOrderStats> GetOrderStatsEvent { get; private set; }
-    public ISchedule<OrderScheduler> OrderScheduler { get; set; }
+    public ISchedule<OrderScheduler> OrderScheduler { get; private set; }
+    public IRequest<GetOrderHistory, OrderHistoryResponse> GetOrderHistory { get; private set; }
 
     public OrderStateMachine(ILogger<OrderStateMachine> logger)
     {
@@ -50,6 +52,14 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
             opts.Received = x => x.CorrelationId(c => c.Message.OrderId);
         });
 
+        Request(GetOrderHistory, opts =>
+        {
+            opts.TimeToLive = TimeSpan.FromSeconds(5);
+            opts.Timeout = TimeSpan.FromSeconds(10);
+            opts.TimeoutExpired = ev => ev.CorrelationId(x => x.Message.Message.OrderId);
+        });
+
+
         Initially(When(OrderCreatedEvent)
             .Then(context =>
             {
@@ -67,7 +77,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
             .Schedule(OrderScheduler, ctx
                 => new OrderScheduler { OrderId = ctx.Instance.OrderId })
             .Then(context => logger.LogInformation("After transition to new state: {@Instance}", context.Instance))
-            .Unschedule(OrderScheduler)
+            // .Unschedule(OrderScheduler)
             .IfElse(ctx => ctx.Message.RandomNumber > 3,
                 succeed => succeed
                     .TransitionTo(OrderSucceed)
@@ -80,6 +90,21 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
 
         During(OrderCancelled, When(OrderScheduler.Received)
             .Then(ctx => logger.LogInformation("OrderScheduler.Received received: {@Message}", ctx.Message))
+            .TransitionTo(OrderInRequesting)
+            .Then(ctx => logger.LogInformation("Changed state to: {@State}", ctx.Instance.State))
+        );
+
+        During(OrderInRequesting, When(OrderCreatedEvent)
+            .Then(ctx => logger.LogInformation("Start testing request flow: {@Message}", ctx.Message))
+            .Request(GetOrderHistory, ctx => new GetOrderHistory
+            {
+                OrderId = ctx.Instance.OrderId
+            })
+            .TransitionTo(GetOrderHistory.Pending)
+        );
+
+        During(GetOrderHistory.Pending, When(GetOrderHistory.TimeoutExpired)
+            .Then(ctx => logger.LogInformation("Timeout for request: {@Message}", ctx.Message))
         );
 
         During(OrderCancelled, When(OrderReactivatedEvent)
