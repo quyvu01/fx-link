@@ -1,4 +1,4 @@
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.Contexts;
 
 public interface IHostInfo
 {

@@ -1,5 +1,5 @@
 using FxLink.Abstractions;
-using FxLink.Contexts;
+using FxLink.Abstractions.Contexts;
 using FxLink.Extensions;
 using FxLink.StateMachine.Extensions;
 using Serilog;
@@ -27,13 +27,7 @@ builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
     opts.UseInMemory();
-    opts.AddStateMachines(c =>
-    {
-        c.Of<OrderStateMachine>(cfg =>
-        {
-            cfg.InMemoryRepository();
-        });
-    });
+    opts.AddStateMachines(c => { c.Of<OrderStateMachine>(cfg => { cfg.InMemoryRepository(); }); });
 });
 
 var app = builder.Build();
@@ -57,9 +51,9 @@ app.MapPost("/placeOrder", async (IPublisher publisher, ILogger<Program> logger)
     })
     .WithOpenApi();
 
-app.MapPost("/orderCreated", async (IPublisher publisher, int randomNumber) =>
+app.MapPost("/orderCreated", async (IPublisher publisher, Guid? orderId, int randomNumber) =>
     {
-        var newOrderId = Guid.NewGuid();
+        var newOrderId = orderId ?? Guid.NewGuid();
         await publisher.PublishAsync(new OrderCreated
             { OrderId = newOrderId, RandomNumber = randomNumber, OrderName = "Some order name" });
         return newOrderId;
@@ -74,17 +68,18 @@ app.MapPost("/reactiveOrder", async (IPublisher publisher, Guid orderId) =>
     .WithOpenApi();
 
 
-app.MapGet("/getOrder", async (IRequest<OrderResult> request, CancellationToken token) =>
+app.MapGet("/getOrder", async (IRequester<OrderResult> requester, CancellationToken token) =>
     {
         var id = Guid.Parse("c5143803-5477-47b4-8d4f-236cb4b09af9");
-        var result = await request.RequestAsync<OrderResultResponse>(new OrderResult { OrderId = id }, token);
+        var result = await requester.RequestAsync<OrderResultResponse>(new OrderResult { OrderId = id },
+            new RequestContext(Guid.NewGuid(), []) { Timeout = TimeSpan.FromSeconds(3) }, token);
         return result;
     })
     .WithOpenApi();
 
-app.MapGet("/getOrderStats", async (IRequest<GetOrderStats> request, Guid orderId, CancellationToken token) =>
+app.MapGet("/getOrderStats", async (IRequester<GetOrderStats> requester, Guid orderId, CancellationToken token) =>
     {
-        var result = await request.RequestAsync<OrderStatsResponse>(new GetOrderStats { OrderId = orderId }, token);
+        var result = await requester.RequestAsync<OrderStatsResponse>(new GetOrderStats { OrderId = orderId }, token);
         return result;
     })
     .WithOpenApi();

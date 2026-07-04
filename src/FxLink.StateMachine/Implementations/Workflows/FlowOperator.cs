@@ -1,8 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Abstractions;
-using FxLink.Contexts;
+using FxLink.Abstractions.Contexts;
 using FxLink.Entities;
 using FxLink.Extensions;
+using FxLink.Faults;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
 using FxLink.StateMachine.Delegates;
@@ -13,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Implementations.Workflows;
 
-public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, IStateMachine stateMachine)
+internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, IStateMachine stateMachine)
     : IFlowOperator<TInstance, TMessage>
     where TInstance : IStateMachineInstance where TMessage : class
 {
@@ -153,7 +154,7 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, I
         {
             var message = await messageFactoryAsync.Invoke(context, ct);
             var consumerContext = new ConsumerContext<TMessage>
-                (context.Message, context.CorrelationId, context.RequesterId, context.Headers);
+                (context.Message, context.RequesterId, context.CorrelationId, context.Headers);
             await consumerContext.ResponseAsync(message, ct);
         }
     }
@@ -181,18 +182,19 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, I
 
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
-            var message = await messageFactoryAsync.Invoke(context, ct);
-            if (!stateMachine.ActivityConfigurators.TryGetValue(schedule, out var configurator) ||
+            if (!stateMachine.InternalActivityConfigurators.TryGetValue(schedule, out var configurator) ||
                 configurator is not IScheduleConfigurator<TInstance, T> scheduleConfigurator) return;
             if (scheduleConfigurator is { Delay: not null, DelayProvider: not null })
                 throw new StateMachineException.ScheduleTimeCannotBeRegisteredBothDelayAndDelayProvider(schedule.Name);
+            var message = await messageFactoryAsync.Invoke(context, ct);
             var delay = scheduleConfigurator.Delay ?? scheduleConfigurator.DelayProvider.Invoke(context);
             var publisher = ServiceProviderAmbient.Services.GetRequiredService<IPublisher>();
             var tokenId = Guid.NewGuid();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             setter.Invoke(context.Instance, tokenId);
-            await publisher.PublishAsync(message, new PublisherContext(context.CorrelationId, context.Headers)
-                { Delay = delay, ScheduledMessageId = tokenId }, ct);
+            await publisher.PublishAsync(message,
+                new PublisherContext(context)
+                    { Delay = delay, ScheduledMessageId = tokenId, MessageKey = schedule.Received.Name }, ct);
         }
     }
 
@@ -203,14 +205,90 @@ public sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, I
 
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
-            if (!stateMachine.ActivityConfigurators.TryGetValue(schedule, out var configurator) ||
+            if (!stateMachine.InternalActivityConfigurators.TryGetValue(schedule, out var configurator) ||
                 configurator is not IScheduleConfigurator<TInstance, T> scheduleConfigurator) return;
             var publisher = ServiceProviderAmbient.Services.GetRequiredService<IPublisher>();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             var tokenId = scheduleConfigurator.TokenIdProvider.Compile().Invoke(context.Instance);
             await publisher.PublishAsync(new DiscardMessagePublished<T>(tokenId),
-                new PublisherContext(context.CorrelationId, context.Headers), ct);
+                new PublisherContext(context) { MessageKey = schedule.Received.Name }, ct);
             setter.Invoke(context.Instance, null); // Set the token Id to null
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> Request<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+        MessageOperatorFactory<TInstance, TMessage, TRequest> messageFactory)
+        where TRequest : class where TResponse : class
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(messageFactory);
+        return RequestAsync(request, MessageFactoryAsync);
+
+        Task<TRequest> MessageFactoryAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken _)
+        {
+            var message = messageFactory.Invoke(context);
+            return Task.FromResult(message);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+        MessageOperatorFactoryAsync<TInstance, TMessage, TRequest> messageFactoryAsync)
+        where TRequest : class where TResponse : class
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(messageFactoryAsync);
+        return ThenAsync(ActionAsync);
+
+        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        {
+            if (!stateMachine.InternalActivityConfigurators.TryGetValue(request, out var configurator) ||
+                configurator is not IRequestConfigurator<TInstance, TRequest, TResponse> scheduleConfigurator) return;
+            var message = await messageFactoryAsync.Invoke(context, ct);
+            // in-memory process message based on request/reply pattern
+            // run in background without current process
+            var newScope = ServiceProviderAmbient.Services.CreateScope();
+            _ = Task.Run(async () =>
+            {
+                var services = newScope.ServiceProvider;
+                var requester = services.GetRequiredService<IRequester<TRequest>>();
+                var timeout = scheduleConfigurator.Timeout;
+                var ttl = scheduleConfigurator.TimeToLive;
+
+                var requestContext = new RequestContext(context.CorrelationId, context.Headers)
+                {
+                    Timeout = timeout, TimeToLive = ttl
+                };
+                // Re-check this one, if we resolve IServer or the stateMachine directly? Or we have some other specification ways
+                try
+                {
+                    var responseContext = await requester.RequestAsync<TResponse>(message, requestContext, ct);
+                    var server = services.GetRequiredService<IServer<TResponse>>();
+                    await server.ConsumeAsync(new ConsumerContext<TResponse>(responseContext.Message,
+                        responseContext.RequesterId, responseContext) { MessageKey = request.Completed.Name }, ct);
+                }
+                catch (TimeoutException)
+                {
+                    // Need to invoke timeout event
+                    var server = services.GetRequiredService<IServer<RequestTimeoutExpired<TRequest>>>();
+                    var timeoutResponse = new RequestTimeoutExpired<TRequest>(message, context.CorrelationId,
+                        DateTime.UtcNow.Add(timeout),
+                        requestContext.RequesterId);
+                    await server.ConsumeAsync(new ConsumerContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
+                        requestContext.RequesterId, context), ct);
+                }
+                catch (Exception e)
+                {
+                    // Need to invoke fault event
+                    var server = services.GetRequiredService<IServer<Fault<TRequest>>>();
+                    var faultResponse = new Fault<TRequest>(message).FromException(e);
+                    await server.ConsumeAsync(new ConsumerContext<Fault<TRequest>>(faultResponse,
+                        requestContext.RequesterId, context), ct);
+                }
+                finally
+                {
+                    newScope.Dispose();
+                }
+            }, ct);
         }
     }
 }

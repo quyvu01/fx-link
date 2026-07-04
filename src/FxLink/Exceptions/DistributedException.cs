@@ -11,4 +11,7 @@ public static class DistributedException
         Exception($"{type.Name} must implement {typeof(IPublisherPipelineBehavior<>).FullName}!");
 
     public sealed class FaultException() : Exception("Fault exception");
+
+    public sealed class RequestTimeoutCannotBeSmallerThanZero(TimeSpan timeSpan)
+        : Exception($"Request timeout : {timeSpan} cannot be smaller than zero!");
 }

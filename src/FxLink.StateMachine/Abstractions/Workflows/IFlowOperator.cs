@@ -50,4 +50,12 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
 
     IFlowOperator<TInstance, TMessage> Unschedule<T>(ISchedule<T> schedule) where T : class;
+
+    IFlowOperator<TInstance, TMessage> Request<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+        MessageOperatorFactory<TInstance, TMessage, TRequest> messageFactory)
+        where TRequest : class where TResponse : class;
+    
+    IFlowOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+        MessageOperatorFactoryAsync<TInstance, TMessage, TRequest> messageFactoryAsync)
+        where TRequest : class where TResponse : class;
 }

@@ -18,11 +18,11 @@ public abstract partial class StateMachine<TInstance> :
     public IState Completed { get; } = new State(nameof(Completed));
     public IState[] States { get; private set; }
 
-    public IReadOnlyDictionary<IActivity, IActivityConfigurator> ActivityConfigurators
-        => _activityConfigurators;
+    public IReadOnlyDictionary<IActivity, IActivityConfigurator> InternalActivityConfigurators
+        => _internalActivityConfigurators;
 
-    private readonly Dictionary<IActivity, IActivityConfigurator> _activityConfigurators = [];
-    private readonly Dictionary<Type, IActivityConfigurator> _messageConfigurators = [];
+    private readonly Dictionary<IActivity, IActivityConfigurator> _internalActivityConfigurators = [];
+    private readonly Dictionary<IEvent, IActivityConfigurator> _messageConfigurators = [];
     private readonly ConcurrentDictionary<IState, List<IFlow>> _stateMapFlows = [];
     private bool _removeInstanceWhenCompleted;
 
@@ -33,20 +33,19 @@ public abstract partial class StateMachine<TInstance> :
     }
 
     // Activities setting up
-    protected void Event<TMessage>(IEvent<TMessage> @event,
+    protected void Event<TMessage>([NotNull] IEvent<TMessage> @event,
         [NotNull] Action<IEventConfigurator<TInstance, TMessage>> options) where TMessage : class
     {
         ArgumentNullException.ThrowIfNull(@event);
         ArgumentNullException.ThrowIfNull(options);
         var config = new EventConfigurator<TInstance, TMessage>();
         options.Invoke(config);
-        if (!_messageConfigurators.TryAdd(typeof(TMessage), config))
+        if (!_messageConfigurators.TryAdd(@event, config))
             throw new StateMachineException.MessageTypeHasBeenConfiguration(typeof(TMessage));
-        if (!_activityConfigurators.TryAdd(@event, config))
-            throw new StateMachineException.ActivityHasBeenConfiguration(typeof(IEvent<TMessage>));
     }
 
-    protected void Schedule<TMessage>(ISchedule<TMessage> schedule,
+    // Need more investigation with Internal behaviors
+    protected void Schedule<TMessage>([NotNull] ISchedule<TMessage> schedule,
         [NotNull] Action<IScheduleConfigurator<TInstance, TMessage>> options) where TMessage : class
     {
         ArgumentNullException.ThrowIfNull(schedule);
@@ -54,10 +53,24 @@ public abstract partial class StateMachine<TInstance> :
         var config = new ScheduleConfigurator<TInstance, TMessage>();
         options.Invoke(config);
         config.Validate();
-        // Just need to add schedule to _activityConfigurators, not an event.
-        if (!_activityConfigurators.TryAdd(schedule, config))
+        if (!_internalActivityConfigurators.TryAdd(schedule, config))
             throw new StateMachineException.ActivityHasBeenConfiguration(typeof(TMessage));
         Event(schedule.Received, ev => config.Received.Invoke(ev));
+    }
+
+    protected void Request<TRequest, TResponse>([NotNull] IRequest<TRequest, TResponse> request,
+        [NotNull] Action<IRequestConfigurator<TInstance, TRequest, TResponse>> options)
+        where TRequest : class where TResponse : class
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(options);
+        var config = new RequestConfigurator<TInstance, TRequest, TResponse>();
+        options.Invoke(config);
+        if (!_internalActivityConfigurators.TryAdd(request, config))
+            throw new StateMachineException.ActivityHasBeenConfiguration(typeof(TRequest));
+        Event(request.Completed, ev => config.Completed?.Invoke(ev));
+        Event(request.Failed, ev => config.Failed?.Invoke(ev));
+        Event(request.TimeoutExpired, ev => config.TimeoutExpired?.Invoke(ev));
     }
 
 

@@ -1,3 +1,5 @@
+using FxLink.Abstractions.Contexts;
+
 namespace FxLink.Abstractions;
 
 public interface IConsumer;

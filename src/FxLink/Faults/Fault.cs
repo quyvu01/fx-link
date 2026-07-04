@@ -1,50 +1,16 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.Contexts;
 
 namespace FxLink.Faults;
 
-/// <summary>
-/// Represents fault information for a failed FxMap request.
-/// Inspired by MassTransit's Fault message structure.
-/// </summary>
-public sealed class Fault
+public class Fault
 {
-    /// <summary>
-    /// The maximum depth of exception chain to capture.
-    /// Prevents infinite loops from circular exception references.
-    /// </summary>
-    private const int MaxExceptionDepth = 16;
-
-    /// <summary>
-    /// Gets or sets the unique identifier for this fault.
-    /// </summary>
+    protected const int MaxExceptionDepth = 16;
     public string FaultId { get; set; }
-
-    /// <summary>
-    /// Gets or sets the identifier of the message that caused the fault.
-    /// </summary>
     public string FaultedMessageId { get; set; }
-
-    /// <summary>
-    /// Gets or sets the timestamp when the fault occurred.
-    /// </summary>
     public DateTime Timestamp { get; set; }
-
-    /// <summary>
-    /// Gets or sets the exception information associated with this fault.
-    /// </summary>
     public ExceptionInfo[] Exceptions { get; set; }
+    public IHostInfo Host { get; set; }
 
-    /// <summary>
-    /// Gets or sets the host information where the fault occurred.
-    /// </summary>
-    public HostInfo Host { get; set; }
-
-    /// <summary>
-    /// Creates a fault from an exception.
-    /// </summary>
-    /// <param name="exception">The exception that caused the fault.</param>
-    /// <param name="faultedMessageId">Optional identifier for the faulted message.</param>
-    /// <returns>A new Fault instance.</returns>
     public static Fault FromException(Exception exception, string faultedMessageId = null)
     {
         var exceptions = new List<ExceptionInfo>();
@@ -74,11 +40,6 @@ public sealed class Fault
         };
     }
 
-    /// <summary>
-    /// Converts this fault back to an exception.
-    /// Reconstructs the exception chain from the stored exception information.
-    /// </summary>
-    /// <returns>An exception representing this fault, or null if no exception info exists.</returns>
     public Exception ToException()
     {
         if (Exceptions is not { Length: > 0 })
@@ -93,6 +54,40 @@ public sealed class Fault
         }
 
         return innerException;
+    }
+}
+
+public sealed class Fault<T>(T message) : Fault
+{
+    public T Message { get; set; }
+
+    public new Fault<T> FromException(Exception exception, string faultedMessageId = null)
+    {
+        var exceptions = new List<ExceptionInfo>();
+        var currentException = exception;
+        var depth = 0;
+
+        while (currentException != null && depth < MaxExceptionDepth)
+        {
+            exceptions.Add(new ExceptionInfo
+            {
+                ExceptionType = currentException.GetType().FullName,
+                Message = currentException.Message,
+                StackTrace = currentException.StackTrace,
+                Source = currentException.Source
+            });
+            currentException = currentException.InnerException;
+            depth++;
+        }
+
+        return new Fault<T>(Message)
+        {
+            FaultId = Guid.NewGuid().ToString(),
+            FaultedMessageId = faultedMessageId,
+            Timestamp = DateTime.UtcNow,
+            Exceptions = exceptions.ToArray(),
+            Host = HostInfo.Current
+        };
     }
 }
 

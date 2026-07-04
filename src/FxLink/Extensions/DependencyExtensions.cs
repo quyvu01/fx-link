@@ -23,7 +23,7 @@ public static class DependencyExtensions
 
         serviceCollection.TryAddSingleton(typeof(IServer<>), typeof(MessageBus<>));
         serviceCollection.TryAddSingleton(typeof(IClient<>), typeof(MessageBus<>));
-        serviceCollection.TryAddSingleton(typeof(IRequest<>), typeof(MessageBus<>));
+        serviceCollection.TryAddSingleton(typeof(IRequester<>), typeof(MessageBus<>));
         serviceCollection.AddSingleton<ResponseInternal>();
 
         configurator.AddConsumerPipelineBehaviors(c => c
