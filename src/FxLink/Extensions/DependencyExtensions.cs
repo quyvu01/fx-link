@@ -1,6 +1,5 @@
 using FxLink.Abstractions;
 using FxLink.Implementations;
-using FxLink.InternalPipelines;
 using FxLink.PipelineBehaviors;
 using FxLink.Registries;
 using FxLink.Wrappers;
@@ -25,9 +24,6 @@ public static class DependencyExtensions
         serviceCollection.TryAddSingleton(typeof(IClient<>), typeof(MessageBus<>));
         serviceCollection.TryAddSingleton(typeof(IRequester<>), typeof(MessageBus<>));
         serviceCollection.AddSingleton<ResponseInternal>();
-
-        configurator.AddConsumerPipelineBehaviors(c => c
-            .Of(typeof(ServicesAmbientConsumerPipelineBehavior<>)));
 
         return new RegistryWrapper(serviceCollection);
     }

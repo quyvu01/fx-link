@@ -1,6 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Delegates;
+using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.PipelineBehaviors;
@@ -17,6 +18,7 @@ internal class ConsumerPipelineBehaviorOrchestrator<TMessage>(IServiceProvider s
             using var scope = serviceProvider.CreateScope();
             var consumer = scope.ServiceProvider.GetKeyedService<IConsumer<TMessage>>(key);
             if (consumer is null) return;
+            ConsumerAmbient.SetConsumerAmbientData(scope.ServiceProvider, key as Type);
             var pipelineBehaviors = scope.ServiceProvider
                 .GetServices<IConsumerPipelineBehavior<TMessage>>();
             var func = pipelineBehaviors

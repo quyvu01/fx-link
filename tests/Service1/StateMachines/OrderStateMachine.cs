@@ -57,6 +57,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
             opts.TimeToLive = TimeSpan.FromSeconds(5);
             opts.Timeout = TimeSpan.FromSeconds(10);
             opts.TimeoutExpired = ev => ev.CorrelationId(x => x.Message.Message.OrderId);
+            opts.Completed = ev => ev.CorrelationBy((ins, ctx) => ins.OrderId == ctx.Message.OrderId);
         });
 
 
@@ -104,7 +105,9 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
         );
 
         During(GetOrderHistory.Pending, When(GetOrderHistory.TimeoutExpired)
-            .Then(ctx => logger.LogInformation("Timeout for request: {@Message}", ctx.Message))
+                .Then(ctx => logger.LogInformation("Timeout for request: {@Message}", ctx.Message)),
+            When(GetOrderHistory.Completed)
+                .Then(ctx => logger.LogInformation("Completed for request: {@Message}", ctx.Message))
         );
 
         During(OrderCancelled, When(OrderReactivatedEvent)
