@@ -6,6 +6,7 @@ using FxLink.Extensions;
 using FxLink.Faults;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
+using FxLink.StateMachine.Contexts;
 using FxLink.StateMachine.Delegates;
 using FxLink.StateMachine.Exceptions;
 using FxLink.StateMachine.Registries;
@@ -124,7 +125,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var message = await messageFactoryAsync.Invoke(context, ct);
-            var services = ServiceProviderAmbient.Services;
+            var services = ConsumerAmbient.Services;
             var publisher = services.GetRequiredService<IPublisher>();
             await publisher.PublishAsync(message, ct);
         }
@@ -188,7 +189,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                 throw new StateMachineException.ScheduleTimeCannotBeRegisteredBothDelayAndDelayProvider(schedule.Name);
             var message = await messageFactoryAsync.Invoke(context, ct);
             var delay = scheduleConfigurator.Delay ?? scheduleConfigurator.DelayProvider.Invoke(context);
-            var publisher = ServiceProviderAmbient.Services.GetRequiredService<IPublisher>();
+            var publisher = ConsumerAmbient.Services.GetRequiredService<IPublisher>();
             var tokenId = Guid.NewGuid();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             setter.Invoke(context.Instance, tokenId);
@@ -207,7 +208,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         {
             if (!stateMachine.InternalActivityConfigurators.TryGetValue(schedule, out var configurator) ||
                 configurator is not IScheduleConfigurator<TInstance, T> scheduleConfigurator) return;
-            var publisher = ServiceProviderAmbient.Services.GetRequiredService<IPublisher>();
+            var publisher = ConsumerAmbient.Services.GetRequiredService<IPublisher>();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             var tokenId = scheduleConfigurator.TokenIdProvider.Compile().Invoke(context.Instance);
             await publisher.PublishAsync(new DiscardMessagePublished<T>(tokenId),
@@ -246,7 +247,8 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
             var message = await messageFactoryAsync.Invoke(context, ct);
             // in-memory process message based on request/reply pattern
             // run in background without current process
-            var newScope = ServiceProviderAmbient.Services.CreateScope();
+            // need to create a new service scope before it is disposed!
+            var newScope = ConsumerAmbient.Services.CreateScope();
             _ = Task.Run(async () =>
             {
                 var services = newScope.ServiceProvider;
@@ -263,7 +265,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                 {
                     var responseContext = await requester.RequestAsync<TResponse>(message, requestContext, ct);
                     var server = services.GetRequiredService<IServer<TResponse>>();
-                    await server.ConsumeAsync(new ConsumerContext<TResponse>(responseContext.Message,
+                    await server.ConsumeAsync(new StateMachineConsumerContext<TResponse>(responseContext.Message,
                         responseContext.RequesterId, responseContext) { MessageKey = request.Completed.Name }, ct);
                 }
                 catch (TimeoutException)
@@ -273,7 +275,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                     var timeoutResponse = new RequestTimeoutExpired<TRequest>(message, context.CorrelationId,
                         DateTime.UtcNow.Add(timeout),
                         requestContext.RequesterId);
-                    await server.ConsumeAsync(new ConsumerContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
+                    await server.ConsumeAsync(new StateMachineConsumerContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
                         requestContext.RequesterId, context), ct);
                 }
                 catch (Exception e)
@@ -281,7 +283,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                     // Need to invoke fault event
                     var server = services.GetRequiredService<IServer<Fault<TRequest>>>();
                     var faultResponse = new Fault<TRequest>(message).FromException(e);
-                    await server.ConsumeAsync(new ConsumerContext<Fault<TRequest>>(faultResponse,
+                    await server.ConsumeAsync(new StateMachineConsumerContext<Fault<TRequest>>(faultResponse,
                         requestContext.RequesterId, context), ct);
                 }
                 finally

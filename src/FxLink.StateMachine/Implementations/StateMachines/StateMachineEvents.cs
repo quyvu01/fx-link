@@ -25,7 +25,7 @@ public abstract partial class StateMachine<TInstance>
         // Temporary move to this scope, I will write the schedule then merge again.
         if (activityConfigurator.Value is not EventConfigurator<TInstance, TMessage> configurator) return;
 
-        var services = ServiceProviderAmbient.Services;
+        var services = ConsumerAmbient.Services;
         var machineInstanceRepository = services.GetRequiredService<IStateMachineInstanceRepository<TInstance>>();
 
 

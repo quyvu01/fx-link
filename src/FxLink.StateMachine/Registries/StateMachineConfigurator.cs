@@ -7,6 +7,7 @@ using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Exceptions;
 using FxLink.StateMachine.Implementations;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FxLink.StateMachine.Registries;
 
@@ -64,13 +65,13 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
             });
         return;
 
-        void RegisterConsumer(Type arg)
+        void RegisterConsumer(Type eventType)
         {
-            var serviceType = typeof(IConsumer<>).MakeGenericType(arg);
-            var implementType = typeof(StateMachineConsumer<>).MakeGenericType(arg);
-            services.Add(new ServiceDescriptor(serviceType, serviceKey: typeof(TStateMachine),
+            var serviceType = typeof(IConsumer<>).MakeGenericType(eventType);
+            var implementType = typeof(StateMachineConsumer<>).MakeGenericType(eventType);
+            services.TryAddEnumerable(new ServiceDescriptor(serviceType, serviceKey: typeof(TStateMachine),
                 implementationType: implementType, ServiceLifetime.Scoped));
-            var keys = _messageKeys.GetOrAdd(arg, _ => []);
+            var keys = _messageKeys.GetOrAdd(eventType, _ => []);
             keys.Add(serviceKey);
         }
     }

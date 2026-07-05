@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Abstractions.Contexts;
 
-public sealed class ConsumerContext<TMessage>(
+public class ConsumerContext<TMessage>(
     TMessage message,
     Guid? requesterId,
     Guid correlationId,
@@ -22,7 +22,7 @@ public sealed class ConsumerContext<TMessage>(
     public async Task ResponseAsync<TResponse>(TResponse message, CancellationToken token = default)
         where TResponse : class
     {
-        var services = ServiceProviderAmbient.Services;
+        var services = ConsumerAmbient.Services;
         var client = services.GetService<IClient<Result>>();
         if (client is null || RequesterId is not { } requesterId) return;
         await client.SendAsync(Result.Success(message), new ResponseContext(requesterId, this), token);
@@ -31,7 +31,7 @@ public sealed class ConsumerContext<TMessage>(
     public async Task PublishAsync<T>(T message, IPublisherContext context, CancellationToken token = default)
         where T : class
     {
-        var services = ServiceProviderAmbient.Services;
+        var services = ConsumerAmbient.Services;
         var publisher = services.GetRequiredService<IPublisher>();
         await publisher.PublishAsync(message, context, token);
     }
