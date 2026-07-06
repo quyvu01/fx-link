@@ -6,7 +6,7 @@ namespace FxLink.StateMachine.EntityFrameworkCore.Registries;
 
 public interface IStateMachineEntityFrameworkConfigurator
 {
-    IsolationLevel IsolationLevel { get; set; }
+    void SetIsolationLevel(IsolationLevel isolationLevel);
     void UseConcurrencyMode([NotNull] Action<IConcurrencyModeConfigurator> options);
     void AddDbContext<TDbContext>() where TDbContext : DbContext;
     void DbContextFactory<TDbContext>(Func<TDbContext> dbContextFactory) where TDbContext : DbContext;

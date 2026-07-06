@@ -11,18 +11,20 @@ namespace FxLink.StateMachine.EntityFrameworkCore.Registries;
 internal class StateMachineEntityFrameworkConfigurator(IServiceCollection services)
     : IStateMachineEntityFrameworkConfigurator
 {
-    public IsolationLevel IsolationLevel { get; set; } = IsolationLevel.Serializable;
-    public ConcurrencyMode ConcurrencyMode { get; set; }
-    public SqlDialect? Dialect { get; set; }
+    private IsolationLevel _isolationLevel = IsolationLevel.Serializable;
+    private ConcurrencyMode _concurrencyMode = ConcurrencyMode.Optimistic;
+    private SqlDialect? _dialect;
     private Type _dbContextType;
     private Delegate _dbContextFactoryDelegate;
+
+    public void SetIsolationLevel(IsolationLevel isolationLevel) => _isolationLevel = isolationLevel;
 
     public void UseConcurrencyMode([NotNull] Action<IConcurrencyModeConfigurator> options)
     {
         var config = new ConcurrencyModeConfigurator();
         options.Invoke(config);
-        ConcurrencyMode = config.ConcurrencyMode;
-        Dialect = config.Dialect;
+        _concurrencyMode = config.ConcurrencyMode;
+        _dialect = config.Dialect;
     }
 
     public void AddDbContext<TDbContext>() where TDbContext : DbContext
@@ -51,9 +53,9 @@ internal class StateMachineEntityFrameworkConfigurator(IServiceCollection servic
             throw new StateMachineEntityFrameworkCoreException.DbContextAlreadyConfigured(_dbContextType);
         if (_dbContextType is null && _dbContextFactoryDelegate is null)
             throw new StateMachineEntityFrameworkCoreException.DbContextNotConfigured();
-        if (ConcurrencyMode is ConcurrencyMode.Pessimistic && Dialect is null)
+        if (_concurrencyMode is ConcurrencyMode.Pessimistic && _dialect is null)
             throw new StateMachineEntityFrameworkCoreException.PessimisticModeDialectNotConfigured();
     }
 
-    internal StateMachineEntityFrameworkOptions ToOptions() => new(IsolationLevel, ConcurrencyMode, Dialect);
+    internal StateMachineEntityFrameworkOptions ToOptions() => new(_isolationLevel, _concurrencyMode, _dialect);
 }
