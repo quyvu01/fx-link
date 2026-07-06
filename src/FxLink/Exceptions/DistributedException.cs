@@ -1,17 +1,18 @@
-using FxLink.Abstractions;
-
 namespace FxLink.Exceptions;
 
-public static class DistributedException
+/// <summary>
+/// Common base type for every exception thrown by the FxLink libraries (FxLink, FxLink.StateMachine,
+/// FxLink.StateMachine.EntityFrameworkCore, ...). Lets consumers catch one type to distinguish
+/// FxLink-originated failures (misconfiguration, invalid state, concurrency conflicts, ...) from
+/// arbitrary BCL or third-party exceptions.
+/// </summary>
+public abstract class DistributedException : Exception
 {
-    public sealed class TypeIsNotConsumerPipelineBehavior(Type type) :
-        Exception($"{type.Name} must implement {typeof(IConsumerPipelineBehavior<>).FullName}!");
+    protected DistributedException(string message) : base(message)
+    {
+    }
 
-    public sealed class TypeIsNotPublisherPipelineBehavior(Type type) :
-        Exception($"{type.Name} must implement {typeof(IPublisherPipelineBehavior<>).FullName}!");
-
-    public sealed class FaultException() : Exception("Fault exception");
-
-    public sealed class RequestTimeoutCannotBeSmallerThanZero(TimeSpan timeSpan)
-        : Exception($"Request timeout : {timeSpan} cannot be smaller than zero!");
+    protected DistributedException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
 }

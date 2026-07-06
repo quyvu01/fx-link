@@ -24,7 +24,7 @@ public abstract partial class StateMachine<TInstance>
                 }
                 catch (Exception)
                 {
-                    throw new StateMachineException.StateConfigurationIsNotCorrect(state.PropertyType);
+                    throw new StateMachineException.StateDeclarationIsInvalid(state.PropertyType);
                 }
             }).OfType<IState>();
         States = [Initial, ..customStates, Completed];
@@ -71,7 +71,7 @@ public abstract partial class StateMachine<TInstance>
             }
             catch (Exception)
             {
-                throw new StateMachineException.EventIsNotCorrect(activityType);
+                throw new StateMachineException.EventDeclarationIsInvalid(activityType);
             }
         });
 }

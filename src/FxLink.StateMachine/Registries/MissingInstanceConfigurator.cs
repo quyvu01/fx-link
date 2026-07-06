@@ -1,9 +1,9 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
-using FxLink.Exceptions;
 using FxLink.Implementations;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Delegates;
+using FxLink.StateMachine.Exceptions;
 
 namespace FxLink.StateMachine.Registries;
 
@@ -19,7 +19,7 @@ public class MissingInstanceConfigurator<TInstance, TMessage>
         {
             try
             {
-                throw new DistributedException.FaultException();
+                throw new StateMachineException.MissingInstanceFaulted();
             }
             catch (Exception exception)
             {

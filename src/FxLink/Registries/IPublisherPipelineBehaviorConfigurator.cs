@@ -32,7 +32,7 @@ public sealed class PublisherPipelineBehaviorConfigurator(IServiceCollection ser
             .ToList();
 
         if (signatureInterfaceTypes is not { Count: > 0 })
-            throw new DistributedException.TypeIsNotPublisherPipelineBehavior(runtimePipelineType);
+            throw new FxLinkException.PublisherPipelineBehaviorTypeMismatch(runtimePipelineType);
 
         if (runtimePipelineType.IsGenericType && runtimePipelineType.ContainsGenericParameters)
         {

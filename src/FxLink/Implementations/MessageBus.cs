@@ -55,7 +55,7 @@ internal sealed class MessageBus<TMessage> :
         CancellationToken token = default) where TResponse : class
     {
         if (context.Timeout < TimeSpan.Zero)
-            throw new DistributedException.RequestTimeoutCannotBeSmallerThanZero(context.Timeout);
+            throw new FxLinkException.RequestTimeoutMustNotBeNegative(context.Timeout);
         using var tcs = CancellationTokenSource.CreateLinkedTokenSource(token);
         tcs.CancelAfter(context.Timeout);
         await SendAsync(message, context, tcs.Token);

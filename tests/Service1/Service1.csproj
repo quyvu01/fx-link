@@ -3,19 +3,26 @@
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>14</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.22"/>
-        <PackageReference Include="Serilog" Version="4.3.1" />
-        <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
-        <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.17">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Serilog" Version="4.3.1"/>
+        <PackageReference Include="Serilog.AspNetCore" Version="10.0.0"/>
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1"/>
         <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2"/>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\FxLink.StateMachine\FxLink.StateMachine.csproj" />
-        <ProjectReference Include="..\..\src\FxLink\FxLink.csproj" />
+        <ProjectReference Include="..\..\src\FxLink.StateMachine.EntityFrameworkCore\FxLink.StateMachine.EntityFrameworkCore.csproj"/>
+        <ProjectReference Include="..\..\src\FxLink.StateMachine\FxLink.StateMachine.csproj"/>
+        <ProjectReference Include="..\..\src\FxLink\FxLink.csproj"/>
     </ItemGroup>
 
 </Project>

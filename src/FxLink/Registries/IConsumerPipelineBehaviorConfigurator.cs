@@ -32,7 +32,7 @@ public sealed class ConsumerPipelineBehaviorConfigurator(IServiceCollection serv
             .ToList();
 
         if (signatureInterfaceTypes is not { Count: > 0 })
-            throw new DistributedException.TypeIsNotConsumerPipelineBehavior(runtimePipelineType);
+            throw new FxLinkException.ConsumerPipelineBehaviorTypeMismatch(runtimePipelineType);
 
         if (runtimePipelineType.IsGenericType && runtimePipelineType.ContainsGenericParameters)
         {
