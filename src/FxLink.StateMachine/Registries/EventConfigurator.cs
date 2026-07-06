@@ -19,10 +19,15 @@ internal sealed class EventConfigurator<TInstance, TMessage> :
 
     // Called at dispatch time when context is available
     internal Expression<Func<TInstance, bool>> GetPredicate(IConsumerContext<TMessage> context) =>
-        _predicateFactory?.Invoke(context) ?? throw new StateMachineException.CorrelationMethodMustBeInvoked();
+        _predicateFactory?.Invoke(context) ?? throw new StateMachineException.CorrelationNotConfigured();
 
     internal Expression<Func<IConsumerContext<TMessage>, Guid>> CorrelationSelector => _correlationIdSelector ??
-        throw new StateMachineException.CorrelationMethodMustBeInvoked();
+        throw new StateMachineException.CorrelationNotConfigured();
+
+    // Unlike CorrelationSelector, this does not throw: CorrelationBy() alone (matching an existing
+    // instance without SelectId()) leaves no way to resolve a correlation id ahead of the DB read.
+    internal Guid? TryGetCorrelationId(IConsumerContext<TMessage> context) =>
+        _correlationIdSelector?.Compile().Invoke(context);
 
     public IEventConfigurator<TInstance, TMessage> CorrelationId(
         Expression<Func<IConsumerContext<TMessage>, Guid>> selector)

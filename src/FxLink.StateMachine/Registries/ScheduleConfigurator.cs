@@ -14,12 +14,12 @@ internal sealed class ScheduleConfigurator<TInstance, TMessage> :
     public ScheduleDelayProvider<TInstance> DelayProvider { get; set; }
     public ScheduleReceived<TInstance, TMessage> Received { get; set; }
 
-    public void Validate()
+    public void ValidateItSelf()
     {
         if (Delay is not null && DelayProvider is not null)
-            throw new StateMachineException.ScheduleTimeCannotBeRegisteredBothDelayAndDelayProvider(nameof(TMessage));
+            throw new StateMachineException.ScheduleDelayConfiguredTwice(nameof(TMessage));
         if (Delay is null && DelayProvider is null)
-            throw new StateMachineException.ScheduleTimeMustBeRegister(nameof(TMessage));
+            throw new StateMachineException.ScheduleDelayNotConfigured(nameof(TMessage));
         ArgumentNullException.ThrowIfNull(Received);
         ArgumentNullException.ThrowIfNull(TokenIdProvider);
     }

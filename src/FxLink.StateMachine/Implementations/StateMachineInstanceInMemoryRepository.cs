@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Data;
 using System.Linq.Expressions;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Implementations.StateMachines;
@@ -9,6 +10,11 @@ internal sealed class StateMachineInstanceInMemoryRepository<TInstance> : IState
     where TInstance : IStateMachineInstance
 {
     private readonly ConcurrentDictionary<Guid, TInstance> _instances = [];
+
+    // No real DB/transaction backing this repository, so there is nothing to isolate or lock.
+    public Task<IStateMachineInstanceScope> BeginScopeAsync(Guid? correlationId, IsolationLevel? isolationLevel = null,
+        CancellationToken token = default) =>
+        Task.FromResult<IStateMachineInstanceScope>(NoopStateMachineInstanceScope.Instance);
 
     public Task<TInstance> GetInstanceAsync(Expression<Func<TInstance, bool>> filter, CancellationToken token = default)
     {
@@ -32,7 +38,7 @@ internal sealed class StateMachineInstanceInMemoryRepository<TInstance> : IState
     }
 
     // No need to do because currently, we're using in memory -> instance will be changed by reference
-    public Task SaveInstanceAsync(TInstance instance, CancellationToken token = default) => Task.CompletedTask;
+    public Task SaveInstanceAsync(CancellationToken token = default) => Task.CompletedTask;
 
     public Task RemoveInstanceAsync(TInstance instance, CancellationToken token = default)
     {

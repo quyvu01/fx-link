@@ -16,14 +16,15 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
     public IReadOnlyDictionary<Type, List<object>> MessageKeys => _messageKeys;
     private readonly ConcurrentDictionary<Type, List<object>> _messageKeys = [];
 
-    public IStateMachineConfigurator Of<TStateMachine>(Action<IStateMachineSetup> config = null)
+    public IStateMachineConfigurator Of<TStateMachine>(Action<IStateMachineSetup> config)
         where TStateMachine : IStateMachine
     {
+        ArgumentNullException.ThrowIfNull(config);
         services.AddSingleton(typeof(TStateMachine));
         // Find all event then register consumer, seems we need something to map or delegate, maybe
         RegisterStateMachineConsumers<TStateMachine>();
         var stateMachineSetup = new StateMachineSetup(services);
-        config?.Invoke(stateMachineSetup);
+        config(stateMachineSetup);
         return this;
     }
 
@@ -60,7 +61,7 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
                 }
                 catch (Exception)
                 {
-                    throw new StateMachineException.EventIsNotCorrect(eventType);
+                    throw new StateMachineException.EventDeclarationIsInvalid(eventType);
                 }
             });
         return;

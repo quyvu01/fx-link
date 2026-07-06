@@ -41,7 +41,7 @@ public abstract partial class StateMachine<TInstance> :
         var config = new EventConfigurator<TInstance, TMessage>();
         options.Invoke(config);
         if (!_messageConfigurators.TryAdd(@event, config))
-            throw new StateMachineException.MessageTypeHasBeenConfiguration(typeof(TMessage));
+            throw new StateMachineException.MessageTypeAlreadyConfigured(typeof(TMessage));
     }
 
     // Need more investigation with Internal behaviors
@@ -52,9 +52,9 @@ public abstract partial class StateMachine<TInstance> :
         ArgumentNullException.ThrowIfNull(options);
         var config = new ScheduleConfigurator<TInstance, TMessage>();
         options.Invoke(config);
-        config.Validate();
+        config.ValidateItSelf();
         if (!_internalActivityConfigurators.TryAdd(schedule, config))
-            throw new StateMachineException.ActivityHasBeenConfiguration(typeof(TMessage));
+            throw new StateMachineException.ActivityAlreadyConfigured(typeof(TMessage));
         Event(schedule.Received, ev => config.Received.Invoke(ev));
     }
 
@@ -67,7 +67,7 @@ public abstract partial class StateMachine<TInstance> :
         var config = new RequestConfigurator<TInstance, TRequest, TResponse>();
         options.Invoke(config);
         if (!_internalActivityConfigurators.TryAdd(request, config))
-            throw new StateMachineException.ActivityHasBeenConfiguration(typeof(TRequest));
+            throw new StateMachineException.ActivityAlreadyConfigured(typeof(TRequest));
         Event(request.Completed, ev => config.Completed?.Invoke(ev));
         Event(request.Failed, ev => config.Failed?.Invoke(ev));
         Event(request.TimeoutExpired, ev => config.TimeoutExpired?.Invoke(ev));

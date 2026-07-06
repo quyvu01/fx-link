@@ -10,4 +10,5 @@ public sealed class OrderStateMachineInstance : IStateMachineInstance
     public string OrderName { get; set; }
     public DateTime OrderTime { get; set; }
     public Guid? MonitorTokenTimeout { get; set; }
+    public uint RowVersion { get; set; }
 }

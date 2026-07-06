@@ -1,8 +1,13 @@
+using System.Data;
+using System.Reflection;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Extensions;
+using FxLink.StateMachine.EntityFrameworkCore.Extensions;
 using FxLink.StateMachine.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
+using Service1.Databases;
 using Service1.Dtos;
 using Service1.StateMachines;
 using Service1.StateMachines.Events;
@@ -23,11 +28,31 @@ builder.Services.AddSerilog((services, lc) => lc
     .ReadFrom.Services(services)
     .Enrich.FromLogContext());
 
+builder.Services.AddDbContextPool<AppDbContext>(options =>
+{
+    options.UseNpgsql("Host=localhost;Username=postgres;Password=Abcd@2021;Database=FxLinkService1", b =>
+    {
+        b.MigrationsAssembly(Assembly.GetExecutingAssembly().GetName().Name);
+        b.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery);
+    });
+});
+
 builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
     opts.UseInMemory();
-    opts.AddStateMachines(c => { c.Of<OrderStateMachine>(cfg => { cfg.InMemoryRepository(); }); });
+    opts.AddStateMachines(c =>
+    {
+        c.Of<OrderStateMachine>(cfg =>
+        {
+            // cfg.InMemoryRepository();
+            cfg.EntityFrameworkRepository(config =>
+            {
+                config.UseConcurrencyMode(x => x.Optimistic());
+                config.AddDbContext<AppDbContext>();
+            });
+        });
+    });
 });
 
 var app = builder.Build();

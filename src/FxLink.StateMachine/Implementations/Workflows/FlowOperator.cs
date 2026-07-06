@@ -186,7 +186,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
             if (!stateMachine.InternalActivityConfigurators.TryGetValue(schedule, out var configurator) ||
                 configurator is not IScheduleConfigurator<TInstance, T> scheduleConfigurator) return;
             if (scheduleConfigurator is { Delay: not null, DelayProvider: not null })
-                throw new StateMachineException.ScheduleTimeCannotBeRegisteredBothDelayAndDelayProvider(schedule.Name);
+                throw new StateMachineException.ScheduleDelayConfiguredTwice(schedule.Name);
             var message = await messageFactoryAsync.Invoke(context, ct);
             var delay = scheduleConfigurator.Delay ?? scheduleConfigurator.DelayProvider.Invoke(context);
             var publisher = ConsumerAmbient.Services.GetRequiredService<IPublisher>();

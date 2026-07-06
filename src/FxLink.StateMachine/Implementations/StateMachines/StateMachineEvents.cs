@@ -43,7 +43,10 @@ public abstract partial class StateMachine<TInstance>
                 });
 
         if (statesWithFlows is not { Count: > 0 })
-            throw new StateMachineException.EventDoesNotMatchAnyFlow(typeof(IEvent<TMessage>));
+            throw new StateMachineException.NoFlowMatchesEvent(typeof(IEvent<TMessage>));
+
+        var correlationId = configurator.TryGetCorrelationId(context);
+        await using var scope = await machineInstanceRepository.BeginScopeAsync(correlationId, token: token);
 
         var predicate = configurator.GetPredicate(context);
         var instance = await machineInstanceRepository.GetInstanceAsync(predicate, token);
@@ -53,7 +56,7 @@ public abstract partial class StateMachine<TInstance>
             {
                 var missingInstanceAction = configurator.MissingInstanceBehavior;
                 if (missingInstanceAction is null)
-                    throw new StateMachineException.StateMachineInstanceMustBeInitFirst();
+                    throw new StateMachineException.InstanceMustBeInitializedFirst();
                 // Handling missing instance
                 var missingInstanceConfigurator = new MissingInstanceConfigurator<TInstance, TMessage>();
                 var missingInvocationResult = missingInstanceAction
@@ -70,13 +73,14 @@ public abstract partial class StateMachine<TInstance>
 
         var flow = statesWithFlows.FirstOrDefault(x => (State)x.State == new State(instance.State)).FlowOperator;
         if (flow is null)
-            throw new StateMachineException.EventWasNotDeclaredForInstanceState(typeof(TMessage), instance.State);
+            throw new StateMachineException.EventNotDeclaredForState(typeof(TMessage), instance.State);
 
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
             (instance, context.Message, context.RequesterId, context);
-        await machineInstanceRepository.SaveInstanceAsync(instance, token);
         foreach (var asyncAction in flow.AsyncActions) await asyncAction.Invoke(stateMachineContext, token);
         if (_removeInstanceWhenCompleted && instance.State == Completed.Name)
             await machineInstanceRepository.RemoveInstanceAsync(instance, token);
+        await machineInstanceRepository.SaveInstanceAsync(token);
+        await scope.CommitAsync(token);
     }
 }

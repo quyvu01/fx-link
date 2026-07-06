@@ -24,11 +24,11 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
         {
             switch (e)
             {
-                case StateMachineException.StateMachineInstanceMustBeInitFirst:
+                case StateMachineException.InstanceMustBeInitializedFirst:
                     logger.LogError("State machine instance must be initialized fist for context: {@Message}", context);
                     // Do nothing here. We don't need to handle this exception!
                     break;
-                case StateMachineException.EventWasNotDeclaredForInstanceState ex:
+                case StateMachineException.EventNotDeclaredForState ex:
                     logger.LogError(ex.Message);
                     // We have to response Fault to requester. Seems we have to implement result pattern here
                     if (context.RequesterId is { } requesterId)

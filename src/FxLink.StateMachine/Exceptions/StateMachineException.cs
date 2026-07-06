@@ -1,38 +1,63 @@
+using FxLink.Exceptions;
 using FxLink.StateMachine.Abstractions;
 
 namespace FxLink.StateMachine.Exceptions;
 
+/// <summary>
+/// Groups the exceptions thrown by FxLink.StateMachine (state/event declaration, flow configuration,
+/// instance lifecycle).
+/// </summary>
 public static class StateMachineException
 {
-    public sealed class StateConfigurationIsNotCorrect(Type type) :
-        Exception(
+    /// <summary>A state property was not declared as `public IState X { get; private set; }`.</summary>
+    public sealed class StateDeclarationIsInvalid(Type type) :
+        DistributedException(
             $"{type.FullName} is not configured correctly. Try to declare like `public {nameof(IState)} {type.Name} {{get; private set;}}`");
 
-    public sealed class EventIsNotCorrect(Type type) :
-        Exception(
+    /// <summary>An event/activity property was not declared as `public IActivity&lt;T&gt; XEvent { get; private set; }`.</summary>
+    public sealed class EventDeclarationIsInvalid(Type type) :
+        DistributedException(
             $"{type.FullName} is not configured correctly. Try to declare like `public {nameof(IActivity)}<{type.Name}> {type.Name}Event {{get; private set;}}`");
 
-    public sealed class ActivityHasBeenConfiguration(Type activityType)
-        : Exception($"Activity: {activityType.FullName} has been configuration. Do not config it twice");
-    
-    public sealed class MessageTypeHasBeenConfiguration(Type messageType)
-        : Exception($"Message type: {messageType.FullName} cannot be duplicated on StateMachine");
+    /// <summary>Event(...)/Request(...)/Schedule(...) was called more than once for the same activity type.</summary>
+    public sealed class ActivityAlreadyConfigured(Type activityType)
+        : DistributedException($"Activity: {activityType.FullName} has been configured. Do not configure it twice");
 
-    public sealed class EventDoesNotMatchAnyFlow(Type eventType)
-        : Exception($"{eventType.FullName} did not match any flow!");
+    /// <summary>The same message type was registered on more than one event within the same state machine.</summary>
+    public sealed class MessageTypeAlreadyConfigured(Type messageType)
+        : DistributedException($"Message type: {messageType.FullName} cannot be duplicated on StateMachine");
 
-    public sealed class StateMachineInstanceMustBeInitFirst()
-        : Exception("State machine instance need to be initialized first!");
+    /// <summary>An incoming event does not match any flow declared via Initially(...)/During(...).</summary>
+    public sealed class NoFlowMatchesEvent(Type eventType)
+        : DistributedException($"{eventType.FullName} did not match any flow!");
 
-    public sealed class CorrelationMethodMustBeInvoked()
-        : Exception("No correlation configured. Call CorrelationId or CorrelationBy -> SelectId first.");
+    /// <summary>
+    /// An event arrived for a correlation id with no existing instance, and no OnMissingInstance(...)
+    /// behavior was configured to handle it.
+    /// </summary>
+    public sealed class InstanceMustBeInitializedFirst()
+        : DistributedException("State machine instance need to be initialized first!");
 
-    public sealed class EventWasNotDeclaredForInstanceState(Type eventType, string state) :
-        Exception($"Event: {eventType.FullName} was not declared for state: {state}");
+    /// <summary>Neither CorrelationId(...) nor CorrelationBy(...) + SelectId(...) was configured for this event.</summary>
+    public sealed class CorrelationNotConfigured()
+        : DistributedException("No correlation configured. Call CorrelationId or CorrelationBy -> SelectId first.");
 
-    public sealed class ScheduleTimeCannotBeRegisteredBothDelayAndDelayProvider(string scheduleName)
-        : Exception($"Schedule: {scheduleName} time cannot be configured for both Delay and DelayProvider");
-    
-    public sealed class ScheduleTimeMustBeRegister(string scheduleName)
-        : Exception($"Schedule: {scheduleName} time must be registered for Delay or DelayProvider");
+    /// <summary>The event was raised while the instance is in a state that never declared handling for it.</summary>
+    public sealed class EventNotDeclaredForState(Type eventType, string state) :
+        DistributedException($"Event: {eventType.FullName} was not declared for state: {state}");
+
+    /// <summary>A Schedule(...) configured both Delay(...) and DelayProvider(...), which are mutually exclusive.</summary>
+    public sealed class ScheduleDelayConfiguredTwice(string scheduleName)
+        : DistributedException($"Schedule: {scheduleName} time cannot be configured for both Delay and DelayProvider");
+
+    /// <summary>A Schedule(...) configured neither Delay(...) nor DelayProvider(...).</summary>
+    public sealed class ScheduleDelayNotConfigured(string scheduleName)
+        : DistributedException($"Schedule: {scheduleName} time must be registered for Delay or DelayProvider");
+
+    /// <summary>
+    /// The message was intentionally faulted because OnMissingInstance(cfg => cfg.Fault()) was configured
+    /// and no matching instance was found for the incoming event.
+    /// </summary>
+    public sealed class MissingInstanceFaulted()
+        : DistributedException("The message was explicitly faulted because no matching state machine instance was found.");
 }
