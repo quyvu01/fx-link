@@ -275,7 +275,8 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                     var timeoutResponse = new RequestTimeoutExpired<TRequest>(message, context.CorrelationId,
                         DateTime.UtcNow.Add(timeout),
                         requestContext.RequesterId);
-                    await server.ConsumeAsync(new StateMachineConsumerContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
+                    await server.ConsumeAsync(new StateMachineConsumerContext<RequestTimeoutExpired<TRequest>>(
+                        timeoutResponse,
                         requestContext.RequesterId, context), ct);
                 }
                 catch (Exception e)
@@ -291,6 +292,32 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                     newScope.Dispose();
                 }
             }, ct);
+        }
+    }
+
+    public IFlowOperator<TInstance, TMessage> Activity(StateMchineOperatorActivity<TInstance, TMessage> activity)
+    {
+        ArgumentNullException.ThrowIfNull(activity);
+        return ThenAsync(ActionAsync);
+
+        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        {
+            var stateMachineActivityConfigurator = new StateMachineActivityConfigurator<TInstance, TMessage>();
+            activity.Invoke(stateMachineActivityConfigurator);
+            var stateMachineActivityType = stateMachineActivityConfigurator.StateMachineActivityType;
+            var services = ConsumerAmbient.Services;
+            var stateMachineActity = services
+                .GetRequiredKeyedService<IStateMachineActivity<TInstance, TMessage>>(stateMachineActivityType);
+            try
+            {
+                await stateMachineActity.ExecuteAsync(context, ct);
+            }
+            catch (Exception e)
+            {
+                await stateMachineActity.FaultedAsync(
+                    new StateMachineContext<TInstance, TMessage>(context.Instance, context.Message,
+                        context.RequesterId, context), e, ct);
+            }
         }
     }
 }

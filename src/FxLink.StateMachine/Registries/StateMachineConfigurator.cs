@@ -21,10 +21,43 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
     {
         ArgumentNullException.ThrowIfNull(config);
         services.AddSingleton(typeof(TStateMachine));
-        // Find all event then register consumer, seems we need something to map or delegate, maybe
         RegisterStateMachineConsumers<TStateMachine>();
         var stateMachineSetup = new StateMachineSetup(services);
         config(stateMachineSetup);
+        return this;
+    }
+
+    public IStateMachineConfigurator AddActivity<TStateMachineActivity>()
+        where TStateMachineActivity : IStateMachineActivity => AddActivity(typeof(TStateMachineActivity));
+
+    public IStateMachineConfigurator AddActivity(Type stateMachineActivityType)
+    {
+        stateMachineActivityType
+            .GetInterfaces()
+            .Where(a => a.IsGenericType && a.GetGenericTypeDefinition() == typeof(IStateMachineActivity<,>))
+            .ForEach(serviceType =>
+            {
+                services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType,
+                    serviceKey: stateMachineActivityType,
+                    implementationType: stateMachineActivityType, ServiceLifetime.Scoped));
+            });
+        return this;
+    }
+
+    public IStateMachineConfigurator AddActivitiesFromAssembly<TAssembly>()
+        => AddActivitiesFromAssembly(typeof(TAssembly).Assembly);
+
+    public IStateMachineConfigurator AddActivitiesFromAssemblies(params Assembly[] assemblies)
+    {
+        assemblies.ForEach(a => AddActivitiesFromAssembly(a));
+        return this;
+    }
+
+    private IStateMachineConfigurator AddActivitiesFromAssembly(Assembly assembly)
+    {
+        assembly.DefinedTypes
+            .Where(type => typeof(IStateMachineActivity).IsAssignableFrom(type) && type.IsClosedConcreteType())
+            .ForEach(type => AddActivity(type));
         return this;
     }
 

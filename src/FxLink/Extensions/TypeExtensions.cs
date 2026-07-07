@@ -9,6 +9,6 @@ namespace FxLink.Extensions;
 /// </remarks>
 public static class TypeExtensions
 {
-    internal static bool IsClosedConcreteType(this Type type) =>
+    public static bool IsClosedConcreteType(this Type type) =>
         type is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false };
 }

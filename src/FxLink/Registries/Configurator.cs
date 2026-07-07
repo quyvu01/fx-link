@@ -16,7 +16,7 @@ public class Configurator(IServiceCollection serviceCollection) : IConfigurator
 
     public void AddConsumersFromAssemblies(Assembly assembly)
     {
-        var consumerTypes = assembly.ExportedTypes
+        var consumerTypes = assembly.DefinedTypes
             .Where(type => typeof(IConsumer).IsAssignableFrom(type) && type.IsClosedConcreteType());
         foreach (var consumerType in consumerTypes) AddConsumer(consumerType);
     }

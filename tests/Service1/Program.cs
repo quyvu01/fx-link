@@ -1,4 +1,3 @@
-using System.Data;
 using System.Reflection;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
@@ -43,9 +42,11 @@ builder.Services.AddFxLink(opts =>
     opts.UseInMemory();
     opts.AddStateMachines(c =>
     {
+        c.AddActivitiesFromAssemblies(typeof(Program).Assembly);
         c.Of<OrderStateMachine>(cfg =>
         {
             // cfg.InMemoryRepository();
+            
             cfg.EntityFrameworkRepository(config =>
             {
                 config.UseConcurrencyMode(x => x.Optimistic());
