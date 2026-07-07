@@ -54,8 +54,10 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
     IFlowOperator<TInstance, TMessage> Request<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
         MessageOperatorFactory<TInstance, TMessage, TRequest> messageFactory)
         where TRequest : class where TResponse : class;
-    
+
     IFlowOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
         MessageOperatorFactoryAsync<TInstance, TMessage, TRequest> messageFactoryAsync)
         where TRequest : class where TResponse : class;
+
+    IFlowOperator<TInstance, TMessage> Activity(StateMchineOperatorActivity<TInstance, TMessage> activity);
 }

@@ -1,5 +1,6 @@
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Implementations.StateMachines;
+using Service1.Activities;
 using Service1.Dtos;
 using Service1.StateMachines.Events;
 using Service1.StateMachines.Schedules;
@@ -108,6 +109,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                 .Then(ctx => logger.LogInformation("Timeout for request: {@Message}", ctx.Message)),
             When(GetOrderHistory.Completed)
                 .Then(ctx => logger.LogInformation("Completed for request: {@Message}", ctx.Message))
+                .Activity(c => c.Of<OrderTestActivity>())
         );
 
         During(OrderCancelled, When(OrderReactivatedEvent)
