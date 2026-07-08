@@ -1,4 +1,4 @@
-namespace Service1.StateMachines.Schedules;
+namespace Service1.StateMachines.Orders;
 
 public sealed class OrderScheduler
 {

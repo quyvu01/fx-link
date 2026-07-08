@@ -12,6 +12,22 @@ namespace Service1.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "InventoryReservations",
+                columns: table => new
+                {
+                    CorrelationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    State = table.Column<string>(type: "text", nullable: true),
+                    OrderId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Sku = table.Column<string>(type: "text", nullable: true),
+                    Quantity = table.Column<int>(type: "integer", nullable: false),
+                    ReservedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_InventoryReservations", x => x.CorrelationId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "OrderStateMachines",
                 columns: table => new
                 {
@@ -32,6 +48,9 @@ namespace Service1.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "InventoryReservations");
+
             migrationBuilder.DropTable(
                 name: "OrderStateMachines");
         }

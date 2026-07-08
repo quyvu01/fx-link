@@ -1,6 +1,6 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
-using Service1.StateMachines.Events;
+using Service1.Dtos.Orders;
 
 namespace Service1.Consumers;
 

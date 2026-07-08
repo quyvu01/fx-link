@@ -12,7 +12,7 @@ using Service1.Databases;
 namespace Service1.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260706144331_initDb")]
+    [Migration("20260708081404_initDb")]
     partial class initDb
     {
         /// <inheritdoc />
@@ -25,7 +25,33 @@ namespace Service1.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Service1.StateMachines.OrderStateMachineInstance", b =>
+            modelBuilder.Entity("Service1.StateMachines.Inventory.InventoryReservationInstance", b =>
+                {
+                    b.Property<Guid>("CorrelationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ReservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Sku")
+                        .HasColumnType("text");
+
+                    b.Property<string>("State")
+                        .HasColumnType("text");
+
+                    b.HasKey("CorrelationId");
+
+                    b.ToTable("InventoryReservations");
+                });
+
+            modelBuilder.Entity("Service1.StateMachines.Orders.OrderStateMachineInstance", b =>
                 {
                     b.Property<Guid>("CorrelationId")
                         .ValueGeneratedOnAdd()
