@@ -21,7 +21,12 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
 {
     public IEvent<TMessage> Event { get; } = @event;
     private readonly List<AsyncOperatorAction<TInstance, TMessage>> _asyncActions = [];
-    public AsyncOperatorAction<TInstance, TMessage>[] AsyncActions => [.._asyncActions];
+
+    public async Task ExecuteFlowAsync(IStateMachineContext<TInstance, TMessage> context,
+        CancellationToken token = default)
+    {
+        foreach (var asyncAction in _asyncActions) await asyncAction.Invoke(context, token);
+    }
 
     public IFlowOperator<TInstance, TMessage> Then([NotNull] OperatorAction<TInstance, TMessage> action)
     {
@@ -103,7 +108,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
             var conditionResult = await condition.Invoke(context, ct);
             var @operator = new FlowOperator<TInstance, TMessage>(Event, stateMachine);
             var newFlow = conditionResult ? succeedCallback.Invoke(@operator) : otherwiseCallback.Invoke(@operator);
-            foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
+            await newFlow.ExecuteFlowAsync(context, ct);
         }
     }
 
@@ -358,6 +363,6 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         if (transitionAction is null) return;
         var newFlow = new FlowOperator<TInstance, TMessage>(Event, stateMachine);
         newFlow.TransitionTo(new State(transitionAction.Invoke()));
-        foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
+        await newFlow.ExecuteFlowAsync(context, ct);
     }
 }
