@@ -59,7 +59,7 @@ public class Fault
 
 public sealed class Fault<T>(T message) : Fault
 {
-    public T Message { get; set; }
+    public T Message { get; } = message;
 
     public new Fault<T> FromException(Exception exception, string faultedMessageId = null)
     {

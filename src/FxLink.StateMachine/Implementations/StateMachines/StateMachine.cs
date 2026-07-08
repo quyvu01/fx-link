@@ -16,7 +16,8 @@ public abstract partial class StateMachine<TInstance> :
 {
     public IState Initial { get; } = new State(nameof(Initial));
     public IState Completed { get; } = new State(nameof(Completed));
-    public IState[] States { get; private set; }
+    public IState[] States => _states.ToArray();
+    private readonly HashSet<IState> _states = [];
 
     public IReadOnlyDictionary<IActivity, IActivityConfigurator> InternalActivityConfigurators
         => _internalActivityConfigurators;
@@ -71,6 +72,7 @@ public abstract partial class StateMachine<TInstance> :
         Event(request.Completed, ev => config.Completed?.Invoke(ev));
         Event(request.Failed, ev => config.Failed?.Invoke(ev));
         Event(request.TimeoutExpired, ev => config.TimeoutExpired?.Invoke(ev));
+        AddState(request.Pending);
     }
 
 

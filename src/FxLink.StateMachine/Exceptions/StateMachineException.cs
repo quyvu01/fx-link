@@ -59,5 +59,16 @@ public static class StateMachineException
     /// and no matching instance was found for the incoming event.
     /// </summary>
     public sealed class MissingInstanceFaulted()
-        : DistributedException("The message was explicitly faulted because no matching state machine instance was found.");
+        : DistributedException(
+            "The message was explicitly faulted because no matching state machine instance was found.");
+
+    /// <summary>An Activity(...) configured both OfType(...) and OfInstanceType(...), which are mutually exclusive.</summary>
+    public sealed class ActivityTypeConfiguredTwice(Type instanceType, Type messageType) :
+        DistributedException(
+            $"Activity configuration for instance {instanceType.FullName} / message {messageType.FullName} cannot call both OfType(...) and OfInstanceType(...). Choose one.");
+
+    /// <summary>An Activity(...) configured neither OfType(...) nor OfInstanceType(...).</summary>
+    public sealed class ActivityTypeNotConfigured(Type instanceType, Type messageType) :
+        DistributedException(
+            $"Activity configuration for instance {instanceType.FullName} / message {messageType.FullName} must call either OfType(...) or OfInstanceType(...).");
 }

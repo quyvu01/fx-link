@@ -1,23 +1,23 @@
 using FxLink.StateMachine.Abstractions;
 using Service1.StateMachines;
-using Service1.StateMachines.Events;
 
 namespace Service1.Activities;
 
-public sealed class OrderTestActivity(ILogger<OrderTestActivity> logger)
-    : IStateMachineActivity<OrderStateMachineInstance, OrderHistoryResponse>
+public sealed class OrderTestActivity(ILogger<OrderTestActivity> logger) :
+    IStateMachineActivity<OrderStateMachineInstance>
 {
-    public Task ExecuteAsync(IStateMachineContext<OrderStateMachineInstance, OrderHistoryResponse> context,
+    public Task ExecuteAsync(IStateMachineActivityContext<OrderStateMachineInstance> context,
         CancellationToken token = default)
     {
-        logger.LogInformation("[OrderTestActivity] activity: {@Context}", context);
+        logger.LogInformation("[OrderTestActivity] - instance only - activity: {@Context}", context);
+        context.TranslationTo(nameof(OrderStateMachine.OrderSucceed));
         return Task.CompletedTask;
     }
 
-    public Task FaultedAsync(IStateMachineContext<OrderStateMachineInstance, OrderHistoryResponse> context, Exception e,
+    public Task FaultedAsync(IStateMachineActivityContext<OrderStateMachineInstance> context, Exception exception,
         CancellationToken token = default)
     {
-        logger.LogInformation("[OrderTestActivity] failed: {@Context}", context);
+        logger.LogInformation("[OrderTestActivity] - instance only failed: {@Context}", context);
         return Task.CompletedTask;
     }
 }

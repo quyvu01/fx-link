@@ -109,7 +109,7 @@ public class OrderStateMachine : StateMachine<OrderStateMachineInstance>
                 .Then(ctx => logger.LogInformation("Timeout for request: {@Message}", ctx.Message)),
             When(GetOrderHistory.Completed)
                 .Then(ctx => logger.LogInformation("Completed for request: {@Message}", ctx.Message))
-                .Activity(c => c.Of<OrderTestActivity>())
+                .Activity(c => c.OfInstanceType<OrderTestActivity>())
         );
 
         During(OrderCancelled, When(OrderReactivatedEvent)

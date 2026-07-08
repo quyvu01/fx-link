@@ -34,7 +34,13 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
     {
         stateMachineActivityType
             .GetInterfaces()
-            .Where(a => a.IsGenericType && a.GetGenericTypeDefinition() == typeof(IStateMachineActivity<,>))
+            .Where(a =>
+            {
+                if (!a.IsGenericType) return false;
+                var genericTypeDefinition = a.GetGenericTypeDefinition();
+                return genericTypeDefinition == typeof(IStateMachineActivity<,>) ||
+                       genericTypeDefinition == typeof(IStateMachineActivity<>);
+            })
             .ForEach(serviceType =>
             {
                 services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType,

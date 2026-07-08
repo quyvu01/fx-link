@@ -45,6 +45,11 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
     public IFlowOperator<TInstance, TMessage> TransitionTo([NotNull] IState state)
     {
         ArgumentNullException.ThrowIfNull(state);
+        if (!stateMachine.States.Contains(state))
+        {
+            throw new Exception();
+        }
+
         Then(StateTransitionAction);
         return this;
 
@@ -304,20 +309,55 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         {
             var stateMachineActivityConfigurator = new StateMachineActivityConfigurator<TInstance, TMessage>();
             activity.Invoke(stateMachineActivityConfigurator);
-            var stateMachineActivityType = stateMachineActivityConfigurator.StateMachineActivityType;
+            stateMachineActivityConfigurator.ValidateItSelf();
+
             var services = ConsumerAmbient.Services;
-            var stateMachineActity = services
-                .GetRequiredKeyedService<IStateMachineActivity<TInstance, TMessage>>(stateMachineActivityType);
-            try
+
+            if (stateMachineActivityConfigurator.ActivityOfType is { } activityOfType)
             {
-                await stateMachineActity.ExecuteAsync(context, ct);
+                var service = services
+                    .GetRequiredKeyedService<IStateMachineActivity<TInstance, TMessage>>(activityOfType);
+                var ctx = new StateMachineActivityContext<TInstance, TMessage>(context.Instance, context.Message,
+                    context.RequesterId, context);
+                try
+                {
+                    await service.ExecuteAsync(ctx, ct);
+                }
+                catch (Exception e)
+                {
+                    await service.FaultedAsync(ctx, e, ct);
+                }
+
+                await ExecuteTranslationInActivityAsync(ctx.TranslationToAction, context, ct);
+
+                return;
             }
-            catch (Exception e)
+
+            if (stateMachineActivityConfigurator.ActivityOfInstanceType is { } activityOfInstanceType)
             {
-                await stateMachineActity.FaultedAsync(
-                    new StateMachineContext<TInstance, TMessage>(context.Instance, context.Message,
-                        context.RequesterId, context), e, ct);
+                var service = services
+                    .GetRequiredKeyedService<IStateMachineActivity<TInstance>>(activityOfInstanceType);
+                var ctx = new StateMachineActivityContext<TInstance>(context.Instance, context.RequesterId, context);
+                try
+                {
+                    await service.ExecuteAsync(ctx, ct);
+                }
+                catch (Exception e)
+                {
+                    await service.FaultedAsync(ctx, e, ct);
+                }
+
+                await ExecuteTranslationInActivityAsync(ctx.TranslationToAction, context, ct);
             }
         }
+    }
+
+    private async Task ExecuteTranslationInActivityAsync(Func<string> transitionAction,
+        IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+    {
+        if (transitionAction is null) return;
+        var newFlow = new FlowOperator<TInstance, TMessage>(Event, stateMachine);
+        newFlow.TransitionTo(new State(transitionAction.Invoke()));
+        foreach (var asyncAction in newFlow.AsyncActions) await asyncAction.Invoke(context, ct);
     }
 }
