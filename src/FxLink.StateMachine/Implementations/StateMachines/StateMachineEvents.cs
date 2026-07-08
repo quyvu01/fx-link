@@ -77,7 +77,7 @@ public abstract partial class StateMachine<TInstance>
 
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
             (instance, context.Message, context.RequesterId, context);
-        foreach (var asyncAction in flow.AsyncActions) await asyncAction.Invoke(stateMachineContext, token);
+        await flow.ExecuteFlowAsync(stateMachineContext, token);
         if (_removeInstanceWhenCompleted && instance.State == Completed.Name)
             await machineInstanceRepository.RemoveInstanceAsync(instance, token);
         await machineInstanceRepository.SaveInstanceAsync(token);

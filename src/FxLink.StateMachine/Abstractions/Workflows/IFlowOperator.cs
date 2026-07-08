@@ -6,9 +6,8 @@ public interface IFlowOperator<TInstance, TMessage> : IFlow
     where TInstance : IStateMachineInstance where TMessage : class
 {
     IEvent<TMessage> Event { get; }
-    AsyncOperatorAction<TInstance, TMessage>[] AsyncActions { get; }
+    Task ExecuteFlowAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken token = default);
     IFlowOperator<TInstance, TMessage> Then(OperatorAction<TInstance, TMessage> action);
-
     IFlowOperator<TInstance, TMessage> ThenAsync(AsyncOperatorAction<TInstance, TMessage> asyncAction);
 
     IFlowOperator<TInstance, TMessage> TransitionTo(IState state);
