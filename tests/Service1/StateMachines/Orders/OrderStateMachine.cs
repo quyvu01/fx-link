@@ -127,6 +127,15 @@ public sealed class OrderStateMachine : StateMachine<OrderStateMachineInstance>
 
         During(OrderCreated, When(OrderCancelledEvent)
             .Then(context => logger.LogInformation("Order cancelled directly: {@Message}", context.Message))
+            .IfElse(ctx => ctx.Message.CancelledTime > DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)),
+                succeed => succeed
+                    .TransitionTo(OrderSucceed)
+                    .Publish(xtc => new OrderCancelled())
+                , otherwise => otherwise
+                    .TransitionTo(OrderCancelled)
+                    .Publish(_ => new OrderPlaced())
+                    .IfElse(_ => true, x => x, f => f)
+            )
             .TransitionTo(OrderCancelled)
         );
 
