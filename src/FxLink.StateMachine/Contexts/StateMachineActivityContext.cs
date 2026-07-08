@@ -3,41 +3,51 @@ using FxLink.StateMachine.Abstractions;
 
 namespace FxLink.StateMachine.Contexts;
 
-internal record StateMachineContext<TInstance, TMessage>(
+internal record StateMachineActivityContext<TInstance, TMessage>(
     TInstance Instance,
     TMessage Message,
     Guid? RequesterId,
     Guid CorrelationId,
     Dictionary<string, object> Headers)
-    : IStateMachineContext<TInstance, TMessage>
+    : IStateMachineActivityContext<TInstance, TMessage>
     where TInstance : IStateMachineInstance
     where TMessage : class
 {
-    public StateMachineContext(TInstance Instance, TMessage Message, Guid? RequesterId, IContext context) :
+    internal Func<string> TranslationToAction { get; private set; }
+
+    public StateMachineActivityContext(TInstance Instance, TMessage Message, Guid? RequesterId, IContext context) :
         this(Instance, Message, RequesterId, context.CorrelationId, context.Headers)
     {
     }
 
     public Guid? RequesterId { get; } = RequesterId;
+
+    public void TranslationTo(string state) => TranslationToAction = () => state;
+
     public string MessageKey { get; set; }
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
 }
 
-internal record StateMachineContext<TInstance>(
+internal record StateMachineActivityContext<TInstance>(
     TInstance Instance,
     Guid? RequesterId,
     Guid CorrelationId,
     Dictionary<string, object> Headers)
-    : IStateMachineContext<TInstance>
+    : IStateMachineActivityContext<TInstance>
     where TInstance : IStateMachineInstance
 {
-    internal StateMachineContext(TInstance Instance, Guid? RequesterId, IContext context) :
+    internal Func<string> TranslationToAction { get; private set; }
+
+    internal StateMachineActivityContext(TInstance Instance, Guid? RequesterId, IContext context) :
         this(Instance, RequesterId, context.CorrelationId, context.Headers)
     {
     }
 
     public Guid? RequesterId { get; } = RequesterId;
+
+    public void TranslationTo(string state) => TranslationToAction = () => state;
+
     public string MessageKey { get; set; }
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;

@@ -11,7 +11,7 @@ public abstract partial class StateMachine<TInstance>
 {
     private void SetMachineStates()
     {
-        var customStates = GetType()
+        GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(a => typeof(IState).IsAssignableFrom(a.PropertyType) && a.Name != nameof(Initial) &&
                         a.Name != nameof(Completed))
@@ -26,8 +26,10 @@ public abstract partial class StateMachine<TInstance>
                 {
                     throw new StateMachineException.StateDeclarationIsInvalid(state.PropertyType);
                 }
-            }).OfType<IState>();
-        States = [Initial, ..customStates, Completed];
+            }).OfType<IState>()
+            .ForEach(AddState);
+        AddState(Initial);
+        AddState(Completed);
     }
 
     private void SetActivitiesInstance() => GetType()
@@ -74,4 +76,6 @@ public abstract partial class StateMachine<TInstance>
                 throw new StateMachineException.EventDeclarationIsInvalid(activityType);
             }
         });
+
+    private void AddState(IState state) => _states.Add(state);
 }
