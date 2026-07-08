@@ -6,6 +6,9 @@
   <Folder Name="/FxLink.Tests/">
     <Project Path="tests/Service1/Service1.csproj" />
   </Folder>
+  <Folder Name="/FxLink.Transports/">
+    <Project Path="src/FxLink.RabbitMq/FxLink.RabbitMq.csproj" />
+  </Folder>
   <Folder Name="/FxLink/">
     <Project Path="src\FxLink\FxLink.csproj" />
   </Folder>
