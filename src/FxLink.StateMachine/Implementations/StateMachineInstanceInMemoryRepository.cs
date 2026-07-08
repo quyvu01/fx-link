@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Linq.Expressions;
 using FxLink.StateMachine.Abstractions;
+using FxLink.StateMachine.Helpers;
 using FxLink.StateMachine.Implementations.StateMachines;
 
 namespace FxLink.StateMachine.Implementations;
@@ -24,12 +25,11 @@ internal sealed class StateMachineInstanceInMemoryRepository<TInstance> : IState
         return Task.FromResult(instance);
     }
 
-    // Todo: Check the best way to init a new StateMachine instance. Or we can put a validation like new().
-    // Also, we have to check the Initial state, this is the very simple example to set the state(to test only)
+    // Todo: we have to check the Initial state, this is the very simple example to set the state(to test only)
     // We need to have more scenario for state setting like enum, int, string or immutable object?
     public Task<TInstance> CreateInstanceAsync(Guid correlationId, CancellationToken token = default)
     {
-        var newInstance = Activator.CreateInstance<TInstance>()!;
+        var newInstance = InstanceUltilities.CreateInstance<TInstance>();
         newInstance.CorrelationId = correlationId;
         _instances.TryAdd(correlationId, newInstance);
         newInstance.State = nameof(StateMachine<>.Initial);

@@ -4,6 +4,7 @@ using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.EntityFrameworkCore.Delegates;
 using FxLink.StateMachine.EntityFrameworkCore.Exceptions;
 using FxLink.StateMachine.EntityFrameworkCore.Registries;
+using FxLink.StateMachine.Helpers;
 using FxLink.StateMachine.Implementations.StateMachines;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,7 +34,7 @@ public sealed class StateMachineInstanceRepository<TInstance> :
 
     public async Task<TInstance> CreateInstanceAsync(Guid correlationId, CancellationToken token = default)
     {
-        var newInstance = Activator.CreateInstance<TInstance>()!;
+        var newInstance = InstanceUltilities.CreateInstance<TInstance>();
         newInstance.CorrelationId = correlationId;
         newInstance.State = nameof(StateMachine<>.Initial);
         await _collections.AddAsync(newInstance, token);

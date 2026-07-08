@@ -71,4 +71,16 @@ public static class StateMachineException
     public sealed class ActivityTypeNotConfigured(Type instanceType, Type messageType) :
         DistributedException(
             $"Activity configuration for instance {instanceType.FullName} / message {messageType.FullName} must call either OfType(...) or OfInstanceType(...).");
+
+    /// <summary>TransitionTo(...) was called with a state that was not declared on the state machine.</summary>
+    public sealed class StateNotDeclaredOnStateMachine(string stateName) :
+        DistributedException($"State: {stateName} is not declared on this state machine. Declare it as a `public {nameof(IState)}` property first.");
+
+    /// <summary>
+    /// A state machine instance type must declare exactly one public constructor, and it must be
+    /// parameterless, so InstanceUltilities can create instances without guessing constructor arguments.
+    /// </summary>
+    public sealed class InstanceMustHaveParameterlessConstructor(Type instanceType) :
+        DistributedException(
+            $"{instanceType.FullName} must declare exactly one public constructor, and it must have no parameters.");
 }
