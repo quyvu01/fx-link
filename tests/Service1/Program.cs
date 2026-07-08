@@ -1,22 +1,37 @@
+using System.Data;
 using System.Reflection;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Extensions;
 using FxLink.StateMachine.EntityFrameworkCore.Extensions;
+using FxLink.StateMachine.EntityFrameworkCore.Registries;
 using FxLink.StateMachine.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using Service1.Databases;
-using Service1.Dtos;
-using Service1.StateMachines;
-using Service1.StateMachines.Events;
+using Service1.Dtos.Inventory;
+using Service1.Dtos.Orders;
+using Service1.PipelineBehaviors;
+using Service1.StateMachines.Inventory;
+using Service1.StateMachines.Orders;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "FxLink Service1 Sample",
+        Version = "v1",
+        Description = "Sample endpoints exercising FxLink, FxLink.StateMachine and " +
+                      "FxLink.StateMachine.EntityFrameworkCore (Orders = Optimistic concurrency, " +
+                      "Inventory = Pessimistic concurrency)."
+    });
+});
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .WriteTo.Console()
@@ -40,17 +55,34 @@ builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
     opts.UseInMemory();
+
+    opts.AddConsumerPipelineBehaviors(c => c.Of<OrderPlacedLoggingBehavior>());
+    opts.AddPublisherPipelineBehaviors(c => c.Of<OrderPlacedPublishBehavior>());
+
     opts.AddStateMachines(c =>
     {
         c.AddActivitiesFromAssemblies(typeof(Program).Assembly);
+
+        // Optimistic concurrency: relies on EF's own RowVersion/xmin token (see AppDbContext).
         c.Of<OrderStateMachine>(cfg =>
         {
-            // cfg.InMemoryRepository();
-            
             cfg.EntityFrameworkRepository(config =>
             {
                 config.UseConcurrencyMode(x => x.Optimistic());
                 config.AddDbContext<AppDbContext>();
+            });
+        });
+
+        // Pessimistic concurrency: a Postgres advisory lock (keyed on correlation id) serializes
+        // concurrent writers instead. Also demonstrates SetIsolationLevel(...) and the
+        // DbContextFactory<T>(Func<IServiceProvider,T>) overload as an alternative to AddDbContext<T>.
+        c.Of<InventoryReservationStateMachine>(cfg =>
+        {
+            cfg.EntityFrameworkRepository(config =>
+            {
+                config.SetIsolationLevel(IsolationLevel.ReadCommitted);
+                config.UseConcurrencyMode(x => x.Pessimistic(SqlDialect.PostgreSql));
+                config.DbContextFactory<AppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
             });
         });
     });
@@ -67,47 +99,114 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/placeOrder", async (IPublisher publisher, ILogger<Program> logger) =>
+if (app.Environment.IsDevelopment())
+    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+
+// ----- Plain pub/sub (no state machine) -----
+
+app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logger) =>
     {
         var orderId = Guid.NewGuid();
+        // IPublisherContext.Delay used directly (Schedule(...) is the state-machine sugar for this).
         await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow },
             new PublisherContext(Guid.NewGuid(), []) { Delay = TimeSpan.FromSeconds(3) });
         logger.LogInformation("Order placed: {@OrderId}", orderId);
         return "Order placed";
     })
+    .WithTags("Plain pub/sub")
+    .WithSummary("Publish OrderPlaced with a 3s delay (IPublisherContext.Delay, no state machine)")
     .WithOpenApi();
 
-app.MapPost("/orderCreated", async (IPublisher publisher, Guid? orderId, int randomNumber) =>
+app.MapGet("/orders/result", async (IRequester<OrderResult> requester, Guid orderId, CancellationToken token) =>
+    {
+        var result = await requester.RequestAsync<OrderResultResponse>(new OrderResult { OrderId = orderId },
+            new RequestContext(Guid.NewGuid(), []) { Timeout = TimeSpan.FromSeconds(5) }, token);
+        return result;
+    })
+    .WithTags("Plain pub/sub")
+    .WithSummary("Raw IRequester<T> request/reply (no state machine)")
+    .WithOpenApi();
+
+// ----- OrderStateMachine -----
+
+app.MapPost("/orders/create", async (IPublisher publisher, Guid? orderId, int randomNumber,
+        string orderName = "Some order name") =>
     {
         var newOrderId = orderId ?? Guid.NewGuid();
         await publisher.PublishAsync(new OrderCreated
-            { OrderId = newOrderId, RandomNumber = randomNumber, OrderName = "Some order name" });
+            { OrderId = newOrderId, RandomNumber = randomNumber, OrderName = orderName });
         return newOrderId;
     })
+    .WithTags("Orders")
+    .WithSummary("Create an order (randomNumber > 3 succeeds, < 0 forces the history request to fail)")
     .WithOpenApi();
 
-app.MapPost("/reactiveOrder", async (IPublisher publisher, Guid orderId) =>
+app.MapPost("/orders/{orderId:guid}/cancel", async (IPublisher publisher, Guid orderId) =>
+    {
+        await publisher.PublishAsync(new OrderCancelled { OrderId = orderId, CancelledTime = DateTime.UtcNow });
+        return "Order cancellation requested";
+    })
+    .WithTags("Orders")
+    .WithSummary("Cancel an order directly")
+    .WithOpenApi();
+
+app.MapPost("/orders/{orderId:guid}/reactivate", async (IPublisher publisher, Guid orderId) =>
     {
         await publisher.PublishAsync(new OrderReactivated { OrderId = orderId });
-        return "Order reactivated";
+        return "Order reactivation requested";
     })
+    .WithTags("Orders")
+    .WithSummary("Reactivate a cancelled order")
     .WithOpenApi();
 
-
-app.MapGet("/getOrder", async (IRequester<OrderResult> requester, CancellationToken token) =>
-    {
-        var id = Guid.Parse("c5143803-5477-47b4-8d4f-236cb4b09af9");
-        var result = await requester.RequestAsync<OrderResultResponse>(new OrderResult { OrderId = id },
-            new RequestContext(Guid.NewGuid(), []) { Timeout = TimeSpan.FromSeconds(3) }, token);
-        return result;
-    })
-    .WithOpenApi();
-
-app.MapGet("/getOrderStats", async (IRequester<GetOrderStats> requester, Guid orderId, CancellationToken token) =>
+app.MapGet("/orders/{orderId:guid}/stats", async (IRequester<GetOrderStats> requester, Guid orderId,
+        CancellationToken token) =>
     {
         var result = await requester.RequestAsync<OrderStatsResponse>(new GetOrderStats { OrderId = orderId }, token);
         return result;
     })
+    .WithTags("Orders")
+    .WithSummary("Query order stats (During(OrderCreated, OrderCancelled))")
+    .WithOpenApi();
+
+app.MapGet("/orders/{orderId:guid}/summary", async (IRequester<GetOrderSummary> requester, Guid orderId,
+        CancellationToken token) =>
+    {
+        var result =
+            await requester.RequestAsync<OrderSummaryResponse>(new GetOrderSummary { OrderId = orderId }, token);
+        return result;
+    })
+    .WithTags("Orders")
+    .WithSummary("Query order summary from any state (DuringAny)")
+    .WithOpenApi();
+
+// ----- InventoryReservationStateMachine -----
+
+app.MapPost("/inventory/reserve", async (IPublisher publisher, Guid orderId, string sku, int quantity) =>
+    {
+        await publisher.PublishAsync(new ReserveInventory { OrderId = orderId, Sku = sku, Quantity = quantity });
+        return "Inventory reservation requested";
+    })
+    .WithTags("Inventory")
+    .WithSummary("Reserve inventory for an order (creates the reservation instance)")
+    .WithOpenApi();
+
+app.MapPost("/inventory/release", async (IPublisher publisher, Guid orderId, string sku) =>
+    {
+        await publisher.PublishAsync(new ReleaseInventory { OrderId = orderId, Sku = sku });
+        return "Inventory release requested";
+    })
+    .WithTags("Inventory")
+    .WithSummary("Release a reservation (missing instance -> Fault())")
+    .WithOpenApi();
+
+app.MapPost("/inventory/confirm", async (IPublisher publisher, Guid orderId) =>
+    {
+        await publisher.PublishAsync(new ConfirmInventory { OrderId = orderId });
+        return "Inventory confirmation requested";
+    })
+    .WithTags("Inventory")
+    .WithSummary("Confirm a reservation (missing instance -> ExecuteAsync())")
     .WithOpenApi();
 
 app.Run();

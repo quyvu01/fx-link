@@ -1,6 +1,6 @@
 using FxLink.StateMachine.Abstractions;
 
-namespace Service1.StateMachines;
+namespace Service1.StateMachines.Orders;
 
 public sealed class OrderStateMachineInstance : IStateMachineInstance
 {
@@ -10,5 +10,7 @@ public sealed class OrderStateMachineInstance : IStateMachineInstance
     public string OrderName { get; set; }
     public DateTime OrderTime { get; set; }
     public Guid? MonitorTokenTimeout { get; set; }
+
+    // EF Core concurrency token (mapped to Postgres' xmin), only meaningful under Optimistic mode.
     public uint RowVersion { get; set; }
 }
