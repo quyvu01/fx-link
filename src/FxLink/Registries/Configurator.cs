@@ -3,15 +3,17 @@ using FxLink.Abstractions;
 using FxLink.Extensions;
 using FxLink.Implementations;
 using FxLink.InMemory;
-using Microsoft.Extensions.DependencyInjection; 
+using FxLink.Supervision;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FxLink.Registries;
 
-public class Configurator(IServiceCollection serviceCollection) : IConfigurator
+internal class Configurator(IServiceCollection serviceCollection) : IConfigurator
 {
     public IServiceCollection Services { get; } = serviceCollection;
     public IMessageKeys MessageKeys { get; } = new MessageKeys();
+    internal ISupervisorOptions SupervisorOptions { get; private set; } = new SupervisorOptions();
     public void AddConsumer<TConsumer>() where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
     public void AddConsumersFromAssemblies(Assembly assembly)
@@ -33,6 +35,14 @@ public class Configurator(IServiceCollection serviceCollection) : IConfigurator
         Services.TryAddSingleton(typeof(IMessageProcessor<>), typeof(InMemoryMessage<>));
         Services.AddSingleton<MessageUnPublisherDispatcher>();
     }
+
+    public void ConfigureSupervisor(Action<ISupervisorOptions> options)
+    {
+        var supervisorOptions = new SupervisorOptions();
+        options?.Invoke(supervisorOptions);
+        SupervisorOptions = supervisorOptions;
+    }
+
 
     // Need to check if we have edge cases here!
     private void AddConsumer(Type consumerType) => consumerType

@@ -3,6 +3,7 @@ using System.Reflection;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Extensions;
+using FxLink.RabbitMq.Extensions;
 using FxLink.StateMachine.EntityFrameworkCore.Extensions;
 using FxLink.StateMachine.EntityFrameworkCore.Registries;
 using FxLink.StateMachine.Extensions;
@@ -12,7 +13,7 @@ using Serilog;
 using Service1.Databases;
 using Service1.Dtos.Inventory;
 using Service1.Dtos.Orders;
-using Service1.PipelineBehaviors;
+using Service1.RabbitMqTests;
 using Service1.StateMachines.Inventory;
 using Service1.StateMachines.Orders;
 
@@ -54,16 +55,13 @@ builder.Services.AddDbContextPool<AppDbContext>(options =>
 builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
-    opts.UseInMemory();
 
-    opts.AddConsumerPipelineBehaviors(c => c.Of<OrderPlacedLoggingBehavior>());
-    opts.AddPublisherPipelineBehaviors(c => c.Of<OrderPlacedPublishBehavior>());
+    opts.AddRabbitMq(config => config.Host("localhost", "/"));
 
     opts.AddStateMachines(c =>
     {
         c.AddActivitiesFromAssemblies(typeof(Program).Assembly);
 
-        // Optimistic concurrency: relies on EF's own RowVersion/xmin token (see AppDbContext).
         c.Of<OrderStateMachine>(cfg =>
         {
             cfg.EntityFrameworkRepository(config =>
@@ -73,9 +71,6 @@ builder.Services.AddFxLink(opts =>
             });
         });
 
-        // Pessimistic concurrency: a Postgres advisory lock (keyed on correlation id) serializes
-        // concurrent writers instead. Also demonstrates SetIsolationLevel(...) and the
-        // DbContextFactory<T>(Func<IServiceProvider,T>) overload as an alternative to AddDbContext<T>.
         c.Of<InventoryReservationStateMachine>(cfg =>
         {
             cfg.EntityFrameworkRepository(config =>
@@ -207,6 +202,15 @@ app.MapPost("/inventory/confirm", async (IPublisher publisher, Guid orderId) =>
     })
     .WithTags("Inventory")
     .WithSummary("Confirm a reservation (missing instance -> ExecuteAsync())")
+    .WithOpenApi();
+
+app.MapPost("/rabbitmq/test", async (IPublisher publisher) =>
+    {
+        await publisher.PublishAsync(new RabbitMqTestPublisher
+            { TestData = $"Test at: {DateTime.UtcNow:dd/MM/yyyy HH:mm:ss}" });
+        return "RabbitMq test publish";
+    })
+    .WithTags("Rabbitmq")
     .WithOpenApi();
 
 app.Run();
