@@ -24,9 +24,7 @@ internal sealed class StateMachineInstanceInMemoryRepository<TInstance> : IState
             .FirstOrDefault(filter.Compile());
         return Task.FromResult(instance);
     }
-
-    // Todo: we have to check the Initial state, this is the very simple example to set the state(to test only)
-    // We need to have more scenario for state setting like enum, int, string or immutable object?
+    
     public Task<TInstance> CreateInstanceAsync(Guid correlationId, CancellationToken token = default)
     {
         var newInstance = InstanceUltilities.CreateInstance<TInstance>();
