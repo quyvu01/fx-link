@@ -50,13 +50,9 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
     public IFlowOperator<TInstance, TMessage> TransitionTo([NotNull] IState state)
     {
         ArgumentNullException.ThrowIfNull(state);
-        if (!stateMachine.States.Contains(state))
-        {
-            throw new Exception();
-        }
-
-        Then(StateTransitionAction);
-        return this;
+        return !stateMachine.States.Contains(state)
+            ? throw new StateMachineException.StateNotDeclaredOnStateMachine(state.Name)
+            : Then(StateTransitionAction);
 
         void StateTransitionAction(IStateMachineContext<TInstance, TMessage> context)
         {
@@ -100,8 +96,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         ArgumentNullException.ThrowIfNull(condition);
         ArgumentNullException.ThrowIfNull(succeedCallback);
         ArgumentNullException.ThrowIfNull(otherwiseCallback);
-        ThenAsync(ActionAsync);
-        return this;
+        return ThenAsync(ActionAsync);
 
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
@@ -129,8 +124,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         [NotNull] MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
         ArgumentNullException.ThrowIfNull(messageFactoryAsync);
-        ThenAsync(ActionAsync);
-        return this;
+        return ThenAsync(ActionAsync);
 
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
