@@ -10,7 +10,7 @@ public sealed class StateMachineConsumer<TMessage>(IMessageKeys messageKeys, ISe
 {
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
     {
-        var stateMachineTypes = messageKeys.GetMessageKeys(typeof(TMessage))
+        var stateMachineTypes = messageKeys.GetKeysByMessageType(typeof(TMessage))
             .OfType<Type>()
             .Where(t => typeof(IStateMachine).IsAssignableFrom(t));
 

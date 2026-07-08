@@ -12,7 +12,7 @@ internal class ConsumerPipelineBehaviorOrchestrator<TMessage>(IServiceProvider s
     internal async Task ExecuteAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
     {
         var messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
-        var keys = messageKeys.GetMessageKeys(typeof(TMessage));
+        var keys = messageKeys.GetKeysByMessageType(typeof(TMessage));
         var consumerTasks = keys.Select(async key =>
         {
             using var scope = serviceProvider.CreateScope();

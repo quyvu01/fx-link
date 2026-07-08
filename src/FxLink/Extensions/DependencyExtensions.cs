@@ -10,7 +10,7 @@ namespace FxLink.Extensions;
 
 public static class DependencyExtensions
 {
-    public static RegistryWrapper AddFxLink(this IServiceCollection serviceCollection,
+    public static IDistributedConfigurator AddFxLink(this IServiceCollection serviceCollection,
         Action<IConfigurator> options)
     {
         var configurator = new Configurator(serviceCollection);
@@ -24,7 +24,8 @@ public static class DependencyExtensions
         serviceCollection.TryAddSingleton(typeof(IClient<>), typeof(MessageBus<>));
         serviceCollection.TryAddSingleton(typeof(IRequester<>), typeof(MessageBus<>));
         serviceCollection.AddSingleton<ResponseInternal>();
+        serviceCollection.AddSingleton(configurator.SupervisorOptions);
 
-        return new RegistryWrapper(serviceCollection);
+        return new DistributedConfigurator(serviceCollection);
     }
 }

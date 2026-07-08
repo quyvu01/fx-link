@@ -1,5 +1,6 @@
 using System.Reflection;
 using FxLink.Abstractions;
+using FxLink.Supervision;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Registries;
@@ -12,4 +13,5 @@ public interface IConfigurator
     void AddConsumersFromAssemblies(Assembly assembly);
     void AddConsumersFromAssemblies(params Assembly[] assemblies);
     void UseInMemory();
+    public void ConfigureSupervisor(Action<ISupervisorOptions> options);
 }
