@@ -34,6 +34,10 @@ internal class Configurator(IServiceCollection serviceCollection) : IConfigurato
     {
         Services.TryAddSingleton(typeof(IMessageProcessor<>), typeof(InMemoryMessage<>));
         Services.AddSingleton<MessageUnPublisherDispatcher>();
+        Services.TryAddSingleton(typeof(IServerConnector<>), typeof(MessageBus<>));
+        Services.TryAddSingleton(typeof(IClientConnector<>), typeof(MessageBus<>));
+        Services.TryAddSingleton(typeof(IRequester<>), typeof(MessageBus<>));
+        Services.AddSingleton<ResponseInternal>();
     }
 
     public void ConfigureSupervisor(Action<ISupervisorOptions> options)

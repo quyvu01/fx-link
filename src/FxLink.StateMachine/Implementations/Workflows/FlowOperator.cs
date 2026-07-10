@@ -268,14 +268,14 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                 try
                 {
                     var responseContext = await requester.RequestAsync<TResponse>(message, requestContext, ct);
-                    var server = services.GetRequiredService<IServer<TResponse>>();
+                    var server = services.GetRequiredService<IServerConnector<TResponse>>();
                     await server.ConsumeAsync(new StateMachineConsumerContext<TResponse>(responseContext.Message,
                         responseContext.RequesterId, responseContext) { MessageKey = request.Completed.Name }, ct);
                 }
                 catch (TimeoutException)
                 {
                     // Need to invoke timeout event
-                    var server = services.GetRequiredService<IServer<RequestTimeoutExpired<TRequest>>>();
+                    var server = services.GetRequiredService<IServerConnector<RequestTimeoutExpired<TRequest>>>();
                     var timeoutResponse = new RequestTimeoutExpired<TRequest>(message, context.CorrelationId,
                         DateTime.UtcNow.Add(timeout),
                         requestContext.RequesterId);
@@ -286,7 +286,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                 catch (Exception e)
                 {
                     // Need to invoke fault event
-                    var server = services.GetRequiredService<IServer<Fault<TRequest>>>();
+                    var server = services.GetRequiredService<IServerConnector<Fault<TRequest>>>();
                     var faultResponse = new Fault<TRequest>(message).FromException(e);
                     await server.ConsumeAsync(new StateMachineConsumerContext<Fault<TRequest>>(faultResponse,
                         requestContext.RequesterId, context), ct);

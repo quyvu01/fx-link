@@ -1,5 +1,6 @@
 using FxLink.Abstractions;
 using FxLink.Implementations;
+using FxLink.InMemory;
 using FxLink.PipelineBehaviors;
 using FxLink.Registries;
 using FxLink.Wrappers;
@@ -19,11 +20,6 @@ public static class DependencyExtensions
         serviceCollection.AddTransient<IPublisher, PublisherImpl>();
         serviceCollection.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
         serviceCollection.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));
-
-        serviceCollection.TryAddSingleton(typeof(IServer<>), typeof(MessageBus<>));
-        serviceCollection.TryAddSingleton(typeof(IClient<>), typeof(MessageBus<>));
-        serviceCollection.TryAddSingleton(typeof(IRequester<>), typeof(MessageBus<>));
-        serviceCollection.AddSingleton<ResponseInternal>();
         serviceCollection.AddSingleton(configurator.SupervisorOptions);
 
         return new DistributedConfigurator(serviceCollection);

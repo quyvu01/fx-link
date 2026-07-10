@@ -33,7 +33,7 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
                     // We have to response Fault to requester. Seems we have to implement result pattern here
                     if (context.RequesterId is { } requesterId)
                     {
-                        var client = serviceProvider.GetRequiredService<IClient<Result>>();
+                        var client = serviceProvider.GetRequiredService<IClientConnector<Result>>();
                         await client.SendAsync(Result.Failed(ex), new ResponseContext(requesterId, context), token);
                     }
 

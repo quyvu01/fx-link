@@ -23,7 +23,7 @@ public class ConsumerContext<TMessage>(
         where TResponse : class
     {
         var services = ConsumerAmbient.Services;
-        var client = services.GetService<IClient<Result>>();
+        var client = services.GetService<IClientConnector<Result>>();
         if (client is null || RequesterId is not { } requesterId) return;
         await client.SendAsync(Result.Success(message), new ResponseContext(requesterId, this), token);
     }
