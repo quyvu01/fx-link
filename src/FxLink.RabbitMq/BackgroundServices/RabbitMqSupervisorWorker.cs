@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace FxLink.RabbitMq.BackgroundServices;
 
 internal sealed class RabbitMqSupervisorWorker(
-    IMessageBrokerConnector rabbitMqServer,
+    IMessageBrokerConnector connector,
     ILogger<RabbitMqSupervisorWorker> logger,
     IServiceProvider serviceProvider,
     ISupervisorOptions options)
@@ -25,7 +25,7 @@ internal sealed class RabbitMqSupervisorWorker(
         try
         {
             // Register the single RabbitMQ server
-            _supervisor.RegisterServer("RabbitMqServer", rabbitMqServer);
+            _supervisor.RegisterServer("RabbitMqServer", connector);
 
             // Start the supervisor
             await _supervisor.StartAsync(stoppingToken);

@@ -15,13 +15,13 @@ using RabbitMQ.Client.Events;
 
 namespace FxLink.RabbitMq.Implementations;
 
-internal class RabbitMqServer(IServiceProvider serviceProvider) :
+internal class RabbitmqConnector(IServiceProvider serviceProvider) :
     IMessageBrokerConnector,
     IRequestMessage,
     IPublishMessage,
     IConsumeMessage
 {
-    private readonly ILogger<RabbitMqServer> _logger = serviceProvider.GetService<ILogger<RabbitMqServer>>();
+    private readonly ILogger<RabbitmqConnector> _logger = serviceProvider.GetService<ILogger<RabbitmqConnector>>();
 
     private readonly IRabbitMqConfiguration _rabbitMqConfiguration =
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
@@ -34,7 +34,6 @@ internal class RabbitMqServer(IServiceProvider serviceProvider) :
 
     private IConnection _connection;
     private IChannel _channel;
-    private const string TransportName = "rabbitmq";
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
