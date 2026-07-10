@@ -1,15 +1,16 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Exceptions;
+using FxLink.Implementations;
 using FxLink.PipelineBehaviors;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Implementations;
+namespace FxLink.InMemory;
 
 internal sealed class MessageBus<TMessage> :
-    IClient<TMessage>,
-    IServer<TMessage>,
+    IClientConnector<TMessage>,
+    IServerConnector<TMessage>,
     IRequester<TMessage> where TMessage : class
 {
     private readonly IServiceProvider _serviceProvider;
@@ -29,7 +30,7 @@ internal sealed class MessageBus<TMessage> :
                 _ = Task.Run(async () =>
                 {
                     using var scope = _serviceProvider.CreateScope();
-                    var server = scope.ServiceProvider.GetRequiredService<IServer<TMessage>>();
+                    var server = scope.ServiceProvider.GetRequiredService<IServerConnector<TMessage>>();
                     Guid? requesterId = message.Context is IRequestContext rq ? rq.RequesterId : null;
                     await server.ConsumeAsync(
                         new ConsumerContext<TMessage>(message.Message, requesterId, message.Context), message.Token);

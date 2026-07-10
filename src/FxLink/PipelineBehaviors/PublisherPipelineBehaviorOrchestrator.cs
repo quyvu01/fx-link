@@ -11,7 +11,7 @@ internal sealed class PublisherPipelineBehaviorOrchestrator<TMessage>(IServicePr
     // Just lazy load pipeline behaviors and client because sometimes we want to defer services loaded on pipelines and client
     public async Task ExecuteAsync(TMessage message, IPublisherContext context, CancellationToken token = default)
     {
-        var client = serviceProvider.GetRequiredService<IClient<TMessage>>();
+        var client = serviceProvider.GetRequiredService<IClientConnector<TMessage>>();
         var pipelineBehaviors = serviceProvider
             .GetServices<IPublisherPipelineBehavior<TMessage>>();
         var func = pipelineBehaviors.Reverse()
