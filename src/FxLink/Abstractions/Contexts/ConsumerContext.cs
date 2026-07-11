@@ -18,6 +18,7 @@ public class ConsumerContext<TMessage>(
 
     public Guid? RequesterId { get; } = requesterId;
     public TMessage Message { get; } = message;
+    public string RoutingKey { get; set; }
 
     public async Task ResponseAsync<TResponse>(TResponse message, CancellationToken token = default)
         where TResponse : class
@@ -25,7 +26,8 @@ public class ConsumerContext<TMessage>(
         var services = ConsumerAmbient.Services;
         var client = services.GetService<IClientConnector<Result>>();
         if (client is null || RequesterId is not { } requesterId) return;
-        await client.SendAsync(Result.Success(message), new ResponseContext(requesterId, this), token);
+        await client.SendAsync(Result.Success(message),
+            new ResponseContext(requesterId, this) { RoutingKey = RoutingKey }, token);
     }
 
     public async Task PublishAsync<T>(T message, IPublisherContext context, CancellationToken token = default)

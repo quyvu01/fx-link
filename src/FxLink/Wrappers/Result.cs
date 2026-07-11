@@ -1,3 +1,5 @@
+using System.Text.Json;
+using FxLink.Configurators;
 using FxLink.Faults;
 
 namespace FxLink.Wrappers;
@@ -19,6 +21,8 @@ public class Result
     /// </summary>
     public object Data { get; init; }
 
+    public string DataAsJson { get; set; }
+
     /// <summary>
     /// Gets the fault information when the request failed.
     /// Will be null when <see cref="IsSuccess"/> is true.
@@ -34,7 +38,8 @@ public class Result
     {
         IsSuccess = true,
         Data = data,
-        Fault = null
+        Fault = null,
+        DataAsJson = JsonSerializer.Serialize(data, DistributedConfigurators.JsonSerializerOptions)
     };
 
     /// <summary>

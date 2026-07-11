@@ -1,11 +1,9 @@
 using FxLink.Abstractions;
 using FxLink.Implementations;
-using FxLink.InMemory;
 using FxLink.PipelineBehaviors;
 using FxLink.Registries;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FxLink.Extensions;
 
@@ -18,9 +16,18 @@ public static class DependencyExtensions
         options?.Invoke(configurator);
         serviceCollection.AddSingleton(configurator.MessageKeys);
         serviceCollection.AddTransient<IPublisher, PublisherImpl>();
+        serviceCollection.AddScoped(typeof(IServerConnector<>), typeof(ServerConnector<>));
         serviceCollection.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
         serviceCollection.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));
         serviceCollection.AddSingleton(configurator.SupervisorOptions);
+        serviceCollection.AddSingleton<InMemoryResponseProcessor>();
+        
+        serviceCollection.AddSingleton<IInMemoryResponseSetter>(sp =>
+            sp.GetRequiredService<InMemoryResponseProcessor>());
+        serviceCollection.AddSingleton<IInMemoryResponseGetter>(sp =>
+            sp.GetRequiredService<InMemoryResponseProcessor>());
+        
+        serviceCollection.AddSingleton(typeof(IRequester<>), typeof(RequesterImpl<>));
 
         return new DistributedConfigurator(serviceCollection);
     }

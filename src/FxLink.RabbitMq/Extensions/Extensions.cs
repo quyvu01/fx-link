@@ -1,23 +1,46 @@
+using System.Collections.Concurrent;
 using FxLink.Faults;
 
 namespace FxLink.RabbitMq.Extensions;
 
 internal static class Extensions
 {
+    private static readonly ConcurrentDictionary<Type, string> ConsumerNameCache = new();
+    private static readonly ConcurrentDictionary<Type, string> ExchangeNameCache = new();
+
     extension(Type consumerType)
     {
-        internal string GetConsumerName() =>
-            $"{consumerType.Namespace}-{consumerType.Name}".Replace('.', '-').ToLower();
+        internal string GetConsumerName()
+        {
+            ArgumentNullException.ThrowIfNull(consumerType);
+            return ConsumerNameCache.GetOrAdd(consumerType,
+                static t => $"{t.Namespace}-{t.Name}".Replace('.', '-').ToLower());
+        }
 
-        // Todo: check more edge case for Message exchange name
         internal string GetExchangeName()
         {
             ArgumentNullException.ThrowIfNull(consumerType);
-            if (!typeof(Fault).IsAssignableFrom(consumerType)) return $"{consumerType.Namespace}:{consumerType.Name}";
-            if (!consumerType.IsGenericType || consumerType.GetGenericTypeDefinition() != typeof(Fault<>))
-                return $"{consumerType.Namespace}:{nameof(Fault)}";
-            var innerMessageType = consumerType.GetGenericArguments()[0];
-            return $"{consumerType.Namespace}:{nameof(Fault)}-{innerMessageType.Name}";
+            return ExchangeNameCache.GetOrAdd(consumerType, static t =>
+            {
+                if (!typeof(Fault).IsAssignableFrom(t)) return $"{t!.Namespace}:{GetSafeTypeName(t)}";
+                if (!t.IsGenericType || t.GetGenericTypeDefinition() != typeof(Fault<>))
+                    return $"{t.Namespace}:{nameof(Fault)}";
+                var innerMessageType = t.GetGenericArguments()[0];
+                return $"{t.Namespace}:{nameof(Fault)}-{GetSafeTypeName(innerMessageType)}";
+            });
         }
+    }
+
+    // Builds a name that stays unique across closed generic types (e.g. Fault<OrderCreated> vs
+    // Fault<OrderCancelled> both have the raw Name "Fault`1" — the backtick/arity marker alone
+    // doesn't disambiguate them), recursing into nested generic arguments. Not cached directly:
+    // it only ever runs behind ExchangeNameCache's GetOrAdd, so it already executes once per type.
+    private static string GetSafeTypeName(Type type)
+    {
+        if (!type.IsGenericType) return type.Name;
+        var backtickIndex = type.Name.IndexOf('`');
+        var baseName = backtickIndex >= 0 ? type.Name[..backtickIndex] : type.Name;
+        var genericArgNames = type.GetGenericArguments().Select(GetSafeTypeName);
+        return $"{baseName}-{string.Join('-', genericArgNames)}";
     }
 }

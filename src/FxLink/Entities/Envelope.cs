@@ -1,0 +1,22 @@
+using FxLink.Abstractions.Contexts;
+
+namespace FxLink.Entities;
+
+public record Envelope<TMessage>(TMessage Message, object Context) where TMessage : class;
+
+public sealed record ConsumerContextEnvelope<TMessage> where TMessage : class
+{
+    public TMessage Message { get; set; }
+    public ConsumerContextSerializable Context { get; set; }
+}
+
+public sealed record ConsumerContextSerializable
+{
+    public Guid? RequesterId { get; set; }
+    public Guid CorrelationId { get; set; }
+    public Dictionary<string, object> Headers { get; set; }
+    public string MessageKey { get; set; }
+    public DateTime? SentTime { get; set; }
+    public HostInfo HostInfo { get; set; }
+    public TimeSpan? Delay { get; set; }
+}
