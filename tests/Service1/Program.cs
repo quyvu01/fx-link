@@ -77,7 +77,7 @@ builder.Services.AddFxLink(opts =>
             {
                 config.SetIsolationLevel(IsolationLevel.ReadCommitted);
                 config.UseConcurrencyMode(x => x.Pessimistic(SqlDialect.PostgreSql));
-                config.DbContextFactory<AppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+                config.DbContextFactory(sp => sp.GetRequiredService<AppDbContext>());
             });
         });
     });
@@ -204,11 +204,20 @@ app.MapPost("/inventory/confirm", async (IPublisher publisher, Guid orderId) =>
     .WithSummary("Confirm a reservation (missing instance -> ExecuteAsync())")
     .WithOpenApi();
 
-app.MapPost("/rabbitmq/test", async (IPublisher publisher) =>
+app.MapPost("/rabbitmq/test-publish", async (IPublisher publisher) =>
     {
         await publisher.PublishAsync(new RabbitMqTestPublisher
             { TestData = $"Test at: {DateTime.UtcNow:dd/MM/yyyy HH:mm:ss}" });
         return "RabbitMq test publish";
+    })
+    .WithTags("Rabbitmq")
+    .WithOpenApi();
+
+app.MapPost("/rabbitmq/test-request", async (IRequester<RabbitMqTestRequest> requester) =>
+    {
+        var result = await requester.RequestAsync<RabbitMqTestResponse>(new RabbitMqTestRequest
+            { TestData = $"Test request at: {DateTime.UtcNow:dd/MM/yyyy HH:mm:ss}" });
+        return result;
     })
     .WithTags("Rabbitmq")
     .WithOpenApi();

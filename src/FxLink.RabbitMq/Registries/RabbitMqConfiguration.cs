@@ -1,7 +1,7 @@
 using FxLink.RabbitMq.Abstractions;
 using RabbitMQ.Client;
 
-namespace FxLink.RabbitMq.Implementations;
+namespace FxLink.RabbitMq.Registries;
 
 internal sealed class RabbitMqConfiguration(
     string rabbitMqHost,

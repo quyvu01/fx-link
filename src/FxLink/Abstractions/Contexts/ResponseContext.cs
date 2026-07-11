@@ -11,6 +11,7 @@ public class ResponseContext(
     }
 
     public Guid RequesterId { get; } = requesterId;
+    public string RoutingKey { get; set; }
 }
 
 internal sealed class ResponseContext<TResponse>(
