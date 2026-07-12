@@ -16,7 +16,7 @@ public static class DependencyExtensions
         options?.Invoke(configurator);
         serviceCollection.AddSingleton(configurator.MessageKeys);
         serviceCollection.AddTransient<IPublisher, PublisherImpl>();
-        serviceCollection.AddScoped(typeof(IServerConnector<>), typeof(ServerConnector<>));
+        serviceCollection.AddScoped(typeof(IConsumerConnector<>), typeof(ConsumerConnector<>));
         serviceCollection.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
         serviceCollection.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));
         serviceCollection.AddSingleton(configurator.SupervisorOptions);

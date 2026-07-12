@@ -4,6 +4,7 @@ using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
+using FxLink.Registries;
 using FxLink.StateMachine.EntityFrameworkCore.Extensions;
 using FxLink.StateMachine.EntityFrameworkCore.Registries;
 using FxLink.StateMachine.Extensions;
@@ -56,6 +57,8 @@ builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
 
+    opts.AddConsumerDefinitionsFromAssemblies(typeof(Program).Assembly);
+    
     opts.AddRabbitMq(config => config.Host("localhost", "/"));
 
     opts.AddStateMachines(c =>

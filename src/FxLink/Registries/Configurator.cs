@@ -14,7 +14,14 @@ internal class Configurator(IServiceCollection serviceCollection) : IConfigurato
     public IServiceCollection Services { get; } = serviceCollection;
     public IMessageKeys MessageKeys { get; } = new MessageKeys();
     internal ISupervisorOptions SupervisorOptions { get; private set; } = new SupervisorOptions();
-    public void AddConsumer<TConsumer>() where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
+
+    public void AddConsumer<TConsumer>(Action<IConsumerDefinition<TConsumer>> options = null)
+        where TConsumer : IConsumer
+    {
+        var consumerDefinition = new ConsumerDefinition<TConsumer>();
+        options?.Invoke(consumerDefinition);
+        AddConsumer(typeof(TConsumer), consumerDefinition);
+    }
 
     public void AddConsumersFromAssemblies(Assembly assembly)
     {
@@ -47,14 +54,17 @@ internal class Configurator(IServiceCollection serviceCollection) : IConfigurato
 
 
     // Need to check if we have edge cases here!
-    private void AddConsumer(Type consumerType) => consumerType
-        .GetInterfaces()
-        .Where(a => a.IsGenericType && a.GetGenericTypeDefinition() == typeof(IConsumer<>))
-        .ForEach(serviceType =>
-        {
-            var messageType = serviceType.GetGenericArguments()[0];
-            Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey: consumerType,
-                implementationType: consumerType, ServiceLifetime.Scoped));
-            MessageKeys.AddMessageKey(messageType, consumerType);
-        });
+    private void AddConsumer(Type consumerType, IConsumerDefinition consumerDefinition = null)
+    {
+        consumerType
+            .GetInterfaces()
+            .Where(a => a.IsGenericType && a.GetGenericTypeDefinition() == typeof(IConsumer<>))
+            .ForEach(serviceType =>
+            {
+                var messageType = serviceType.GetGenericArguments()[0];
+                Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey: consumerType,
+                    implementationType: consumerType, ServiceLifetime.Scoped));
+                MessageKeys.AddMessageKey(messageType, consumerType);
+            });
+    }
 }

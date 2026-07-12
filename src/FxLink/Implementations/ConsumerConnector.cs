@@ -6,9 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Implementations;
 
-internal class ServerConnector<TMessage>(
+internal class ConsumerConnector<TMessage>(
     IServiceProvider serviceProvider)
-    : IServerConnector<TMessage> where TMessage : class
+    : IConsumerConnector<TMessage> where TMessage : class
 {
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, Type consumerType,
         CancellationToken token = default)

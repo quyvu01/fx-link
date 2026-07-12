@@ -101,11 +101,11 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         await handlerAsync.Invoke(sender, ea, consumerType, cancellationToken);
                 };
 
-                await Channel.BasicConsumeAsync(queueName, true, consumer, cancellationToken: cancellationToken);
+                await Channel.BasicConsumeAsync(queueName, false, consumer, cancellationToken: cancellationToken);
             });
-
-        await Task.WhenAll(tasks);
+        foreach (var task in tasks) await task;
     }
+
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {

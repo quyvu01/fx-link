@@ -22,7 +22,7 @@ internal sealed class InMemoryClientConnector<TMessage> :
                 {
                     using var scope = serviceProvider.CreateScope();
                     var services = scope.ServiceProvider;
-                    var server = services.GetRequiredService<IServerConnector<TMessage>>();
+                    var server = services.GetRequiredService<IConsumerConnector<TMessage>>();
                     Guid? requesterId = message.Context is IRequestContext rq ? rq.RequesterId : null;
                     var messageKeys = services.GetRequiredService<IMessageKeys>();
                     var consumerTypes = messageKeys.GetKeysByMessageType(typeof(TMessage));
