@@ -21,7 +21,7 @@ internal class RabbitMqClientConnector<TMessage> :
         IInMemoryResponseSetter inMemoryResponseSetter)
     {
         _client = client;
-        client.MessageConsumed(async (_, e, ct) =>
+        client.MessageConsumed(async (_, e, consumerType, ct) =>
         {
             var messageType = e.BasicProperties.Type;
             if (typeof(TMessage).AssemblyQualifiedName != messageType) return;
@@ -35,7 +35,7 @@ internal class RabbitMqClientConnector<TMessage> :
             var serverConnector = scope.ServiceProvider.GetRequiredService<IServerConnector<TMessage>>();
             var consumerContext = new ConsumerContext<TMessage>(envelope.Message, envelope.Context.RequesterId,
                 envelope.Context.CorrelationId, envelope.Context.Headers) { RoutingKey = e.BasicProperties.ReplyTo };
-            await serverConnector.ConsumeAsync(consumerContext, ct);
+            await serverConnector.ConsumeAsync(consumerContext, consumerType, ct);
         });
 
         client.MessageRequesterConsumer((_, e, ct) =>

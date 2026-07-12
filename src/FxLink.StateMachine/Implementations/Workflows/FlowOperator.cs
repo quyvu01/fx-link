@@ -259,18 +259,20 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                 var requester = services.GetRequiredService<IRequester<TRequest>>();
                 var timeout = scheduleConfigurator.Timeout;
                 var ttl = scheduleConfigurator.TimeToLive;
-
+                
                 var requestContext = new RequestContext(context.CorrelationId, context.Headers)
                 {
                     Timeout = timeout, TimeToLive = ttl
                 };
+                var consumerType = stateMachine.GetType();
                 // Re-check this one, if we resolve IServer or the stateMachine directly? Or we have some other specification ways
                 try
                 {
                     var responseContext = await requester.RequestAsync<TResponse>(message, requestContext, ct);
                     var server = services.GetRequiredService<IServerConnector<TResponse>>();
                     await server.ConsumeAsync(new StateMachineConsumerContext<TResponse>(responseContext.Message,
-                        responseContext.RequesterId, responseContext) { MessageKey = request.Completed.Name }, ct);
+                            responseContext.RequesterId, responseContext) { MessageKey = request.Completed.Name },
+                        consumerType, ct);
                 }
                 catch (TimeoutException)
                 {
@@ -280,8 +282,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                         DateTime.UtcNow.Add(timeout),
                         requestContext.RequesterId);
                     await server.ConsumeAsync(new StateMachineConsumerContext<RequestTimeoutExpired<TRequest>>(
-                        timeoutResponse,
-                        requestContext.RequesterId, context), ct);
+                        timeoutResponse, requestContext.RequesterId, context), consumerType, ct);
                 }
                 catch (Exception e)
                 {
@@ -289,7 +290,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                     var server = services.GetRequiredService<IServerConnector<Fault<TRequest>>>();
                     var faultResponse = new Fault<TRequest>(message).FromException(e);
                     await server.ConsumeAsync(new StateMachineConsumerContext<Fault<TRequest>>(faultResponse,
-                        requestContext.RequesterId, context), ct);
+                        requestContext.RequesterId, context), consumerType, ct);
                 }
                 finally
                 {

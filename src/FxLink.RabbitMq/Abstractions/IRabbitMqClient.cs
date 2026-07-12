@@ -8,6 +8,6 @@ internal interface IRabbitMqClient
     IConnection Connection { get; }
     IChannel Channel { get; }
     void MessageConsumed(MessageReceivedAsync messageReceivedAsync);
-    void MessageRequesterConsumer(MessageReceivedAsync messageReceivedAsync);
+    void MessageRequesterConsumer(MessageRequestReceivedAsync messageReceivedAsync);
     string ReplyQueueName { get; }
 }

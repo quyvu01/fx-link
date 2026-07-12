@@ -26,10 +26,15 @@ internal sealed class MessageBus<TMessage> :
                 _ = Task.Run(async () =>
                 {
                     using var scope = serviceProvider.CreateScope();
-                    var server = scope.ServiceProvider.GetRequiredService<IServerConnector<TMessage>>();
+                    var services = scope.ServiceProvider;
+                    var server = services.GetRequiredService<IServerConnector<TMessage>>();
                     Guid? requesterId = message.Context is IRequestContext rq ? rq.RequesterId : null;
-                    await server.ConsumeAsync(
-                        new ConsumerContext<TMessage>(message.Message, requesterId, message.Context), message.Token);
+                    var messageKeys = services.GetRequiredService<IMessageKeys>();
+                    var consumerTypes = messageKeys.GetKeysByMessageType(typeof(TMessage));
+                    var consumerContext = new ConsumerContext<TMessage>(message.Message, requesterId, message.Context);
+                    var tasks = consumerTypes.Select(async c =>
+                        await server.ConsumeAsync(consumerContext, c as Type, message.Token));
+                    await Task.WhenAll(tasks);
                 });
                 if (message.Context is IResponseContext responseContext)
                     _inMemoryResponseProcessor.TrySetResult(responseContext.RequesterId, message);
