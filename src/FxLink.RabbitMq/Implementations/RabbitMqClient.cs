@@ -16,17 +16,16 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
 
-    private readonly SemaphoreSlim _semaphore = new(128, 128);
     public IConnection Connection { get; private set; }
     public IChannel Channel { get; private set; }
 
     private MessageReceivedAsync _messageReceivedAsync;
-    private MessageReceivedAsync _messageRequesterConsumerAsync;
+    private MessageRequestReceivedAsync _messageRequesterConsumerAsync;
 
     public void MessageConsumed(MessageReceivedAsync messageReceivedAsync) =>
         _messageReceivedAsync += messageReceivedAsync;
 
-    public void MessageRequesterConsumer(MessageReceivedAsync messageReceivedAsync) =>
+    public void MessageRequesterConsumer(MessageRequestReceivedAsync messageReceivedAsync) =>
         _messageRequesterConsumerAsync = messageReceivedAsync;
 
     public string ReplyQueueName { get; private set; }
@@ -54,19 +53,11 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         var requestConsumer = new AsyncEventingBasicConsumer(Channel);
         requestConsumer.ReceivedAsync += async (sender, ea) =>
         {
-            await _semaphore.WaitAsync(cancellationToken);
-            try
-            {
-                if (_messageRequesterConsumerAsync is { } handlerAsync)
-                    await handlerAsync.Invoke(sender, ea, cancellationToken);
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
+            if (_messageRequesterConsumerAsync is { } handlerAsync)
+                await handlerAsync.Invoke(sender, ea, cancellationToken);
         };
-        await Channel.BasicConsumeAsync(ReplyQueueName, true, requestConsumer, cancellationToken);
-        
+        await Channel.BasicConsumeAsync(ReplyQueueName, false, requestConsumer, cancellationToken);
+
         var messageKeys = _messageKeys.GetMessageKeys();
 
         // Force IClientConnector<TMessage> to be constructed for every message type this process
@@ -87,7 +78,8 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             .GroupBy(a => a.ConsumerType)
             .Select(async c =>
             {
-                var queueName = (c.Key as Type).GetConsumerName();
+                var consumerType = c.Key as Type;
+                var queueName = consumerType.GetConsumerName();
                 await Channel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
                     autoDelete: false, arguments: null, cancellationToken: cancellationToken);
 
@@ -97,7 +89,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 {
                     await Channel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout,
                         cancellationToken: cancellationToken);
-                    await Channel.QueueBindAsync(queue: queueName, exchangeName, "",
+                    await Channel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,
                         cancellationToken: cancellationToken);
                 }
 
@@ -105,19 +97,11 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                 consumer.ReceivedAsync += async (sender, ea) =>
                 {
-                    await _semaphore.WaitAsync(cancellationToken);
-                    try
-                    {
-                        if (_messageReceivedAsync is { } handlerAsync)
-                            await handlerAsync.Invoke(sender, ea, cancellationToken);
-                    }
-                    finally
-                    {
-                        _semaphore.Release();
-                    }
+                    if (_messageReceivedAsync is { } handlerAsync)
+                        await handlerAsync.Invoke(sender, ea, consumerType, cancellationToken);
                 };
 
-                await Channel.BasicConsumeAsync(queueName, false, consumer, cancellationToken: cancellationToken);
+                await Channel.BasicConsumeAsync(queueName, true, consumer, cancellationToken: cancellationToken);
             });
 
         await Task.WhenAll(tasks);
@@ -127,6 +111,5 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     {
         if (Channel is not null) await Channel.CloseAsync(cancellationToken);
         if (Connection is not null) await Connection.CloseAsync(cancellationToken);
-        _semaphore?.Dispose();
     }
 }
