@@ -1,40 +1,19 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
-using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Entities;
 
 namespace FxLink.InMemory;
 
-internal class MessageUnPublisherDispatcher
-{
-    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _lookup = [];
-
-    internal CancellationToken AcquiredToken(Guid tokenId, TimeSpan delay)
-    {
-        var cts = new CancellationTokenSource();
-        cts.CancelAfter(delay.Add(TimeSpan.FromMilliseconds(10)));
-        _lookup.TryAdd(tokenId, cts);
-        return cts.Token;
-    }
-
-    internal void CancelToken(Guid tokenId)
-    {
-        if (!_lookup.TryGetValue(tokenId, out var cts)) return;
-        cts.Cancel();
-        cts.Dispose();
-    }
-}
-
-internal class InMemoryMessage<TMessage>
-    : IMessageProcessor<TMessage> where TMessage : class
+internal class InMemoryInMemoryMessage<TMessage>
+    : IInMemoryMessageProcessor<TMessage> where TMessage : class
 {
     private readonly ConcurrentQueue<MessageData<TMessage>> _inboundMessages = [];
     private readonly ConcurrentQueue<MessageData<TMessage>> _processingMessages = [];
     private readonly SemaphoreSlim _processingRing = new(0, 1);
     private readonly SemaphoreSlim _inboundRing = new(0, 1);
     private readonly Channel<MessageData<TMessage>> _channel = Channel.CreateUnbounded<MessageData<TMessage>>();
-    private readonly MessageUnPublisherDispatcher _dispatcher;
+    private readonly InMemoryMessageUnPublisherDispatcher _dispatcher;
 
     private void PushToDelayChannel(MessageData<TMessage> item, TimeSpan delay) => _ = Task.Run(async () =>
     {
@@ -49,7 +28,7 @@ internal class InMemoryMessage<TMessage>
         await _channel.Writer.WriteAsync(item, CancellationToken.None);
     });
 
-    public InMemoryMessage(MessageUnPublisherDispatcher dispatcher)
+    public InMemoryInMemoryMessage(InMemoryMessageUnPublisherDispatcher dispatcher)
     {
         _dispatcher = dispatcher;
         _ = Task.Run(async () =>

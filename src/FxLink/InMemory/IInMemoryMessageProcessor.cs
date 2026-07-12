@@ -1,9 +1,9 @@
 using FxLink.Abstractions.Contexts;
 using FxLink.Entities;
 
-namespace FxLink.Abstractions;
+namespace FxLink.InMemory;
 
-public interface IMessageProcessor<TMessage> where TMessage : class
+internal interface IInMemoryMessageProcessor<TMessage> where TMessage : class
 {
     Task PushMessageAsync(TMessage message, IContext context, CancellationToken token = default);
     IAsyncEnumerable<MessageData<TMessage>> MessagesProcessingAsync();

@@ -19,7 +19,6 @@ public class Result
     /// Gets the response data when the request is successful.
     /// Will be null when <see cref="IsSuccess"/> is false.
     /// </summary>
-    public object Data { get; init; }
 
     public string DataAsJson { get; set; }
 
@@ -37,7 +36,6 @@ public class Result
     public static Result Success(object data) => new()
     {
         IsSuccess = true,
-        Data = data,
         Fault = null,
         DataAsJson = JsonSerializer.Serialize(data, DistributedConfigurators.JsonSerializerOptions)
     };
@@ -50,7 +48,7 @@ public class Result
     public static Result Failed(Fault fault) => new()
     {
         IsSuccess = false,
-        Data = null,
+        DataAsJson = null,
         Fault = fault
     };
 
@@ -63,7 +61,7 @@ public class Result
     public static Result Failed(Exception exception, string faultedMessageId = null) => new()
     {
         IsSuccess = false,
-        Data = null,
+        DataAsJson = null,
         Fault = Fault.FromException(exception, faultedMessageId)
     };
 }

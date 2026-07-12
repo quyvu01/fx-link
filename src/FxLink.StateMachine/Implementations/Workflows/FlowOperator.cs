@@ -259,7 +259,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                 var requester = services.GetRequiredService<IRequester<TRequest>>();
                 var timeout = scheduleConfigurator.Timeout;
                 var ttl = scheduleConfigurator.TimeToLive;
-                
+
                 var requestContext = new RequestContext(context.CorrelationId, context.Headers)
                 {
                     Timeout = timeout, TimeToLive = ttl
@@ -270,9 +270,9 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                 {
                     var responseContext = await requester.RequestAsync<TResponse>(message, requestContext, ct);
                     var server = services.GetRequiredService<IServerConnector<TResponse>>();
-                    await server.ConsumeAsync(new StateMachineConsumerContext<TResponse>(responseContext.Message,
-                            responseContext.RequesterId, responseContext) { MessageKey = request.Completed.Name },
-                        consumerType, ct);
+                    var ctx = new ConsumerContext<TResponse>(responseContext.Message,
+                        responseContext.RequesterId, responseContext) { MessageKey = request.Completed.Name };
+                    await server.ConsumeAsync(ctx, consumerType, ct);
                 }
                 catch (TimeoutException)
                 {
@@ -281,16 +281,17 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                     var timeoutResponse = new RequestTimeoutExpired<TRequest>(message, context.CorrelationId,
                         DateTime.UtcNow.Add(timeout),
                         requestContext.RequesterId);
-                    await server.ConsumeAsync(new StateMachineConsumerContext<RequestTimeoutExpired<TRequest>>(
-                        timeoutResponse, requestContext.RequesterId, context), consumerType, ct);
+                    var ctx = new ConsumerContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
+                        requestContext.RequesterId, context);
+                    await server.ConsumeAsync(ctx, consumerType, ct);
                 }
                 catch (Exception e)
                 {
                     // Need to invoke fault event
                     var server = services.GetRequiredService<IServerConnector<Fault<TRequest>>>();
                     var faultResponse = new Fault<TRequest>(message).FromException(e);
-                    await server.ConsumeAsync(new StateMachineConsumerContext<Fault<TRequest>>(faultResponse,
-                        requestContext.RequesterId, context), consumerType, ct);
+                    var ctx = new ConsumerContext<Fault<TRequest>>(faultResponse, requestContext.RequesterId, context);
+                    await server.ConsumeAsync(ctx, consumerType, ct);
                 }
                 finally
                 {

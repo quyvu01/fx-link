@@ -17,7 +17,6 @@ public static class DependencyExtensions
                 .ForEach(v => messageKeys.AddMessageKey(mk.Key, v)));
 
         configurator.AddConsumerPipelineBehaviors(c => c
-            .Of(typeof(AllowStateMachineConsumerPipelineBehavior<>))
             .Of(typeof(CatchStateMachinePipelineBehavior<>))
         );
     }

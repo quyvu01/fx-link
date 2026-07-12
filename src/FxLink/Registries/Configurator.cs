@@ -32,11 +32,9 @@ internal class Configurator(IServiceCollection serviceCollection) : IConfigurato
     // Not use in production
     public void UseInMemory()
     {
-        Services.TryAddSingleton(typeof(IMessageProcessor<>), typeof(InMemoryMessage<>));
-        Services.AddSingleton<MessageUnPublisherDispatcher>();
-        Services.TryAddSingleton(typeof(IServerConnector<>), typeof(MessageBus<>));
-        Services.TryAddSingleton(typeof(IClientConnector<>), typeof(MessageBus<>));
-        Services.TryAddSingleton(typeof(IRequester<>), typeof(MessageBus<>));
+        Services.TryAddSingleton(typeof(IInMemoryMessageProcessor<>), typeof(InMemoryInMemoryMessage<>));
+        Services.AddSingleton<InMemoryMessageUnPublisherDispatcher>();
+        Services.TryAddSingleton(typeof(IClientConnector<>), typeof(InMemoryClientConnector<>));
         Services.AddSingleton<InMemoryResponseProcessor>();
     }
 
