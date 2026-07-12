@@ -9,6 +9,7 @@ using FxLink.RabbitMq.Extensions;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 
 namespace FxLink.RabbitMq.Implementations;
 
@@ -21,7 +22,7 @@ internal class RabbitMqClientConnector<TMessage> :
         IInMemoryResponseSetter inMemoryResponseSetter)
     {
         _client = client;
-        client.MessageConsumed(async (_, e, consumerType, ct) =>
+        client.MessageConsumed(async (sender, e, consumerType, ct) =>
         {
             var messageType = e.BasicProperties.Type;
             if (typeof(TMessage).AssemblyQualifiedName != messageType) return;
@@ -32,24 +33,26 @@ internal class RabbitMqClientConnector<TMessage> :
             if (envelope is null) return;
 
             using var scope = services.CreateScope();
-            var serverConnector = scope.ServiceProvider.GetRequiredService<IServerConnector<TMessage>>();
+            var serverConnector = scope.ServiceProvider.GetRequiredService<IConsumerConnector<TMessage>>();
             var consumerContext = new ConsumerContext<TMessage>(envelope.Message, envelope.Context.RequesterId,
                 envelope.Context.CorrelationId, envelope.Context.Headers) { RoutingKey = e.BasicProperties.ReplyTo };
             await serverConnector.ConsumeAsync(consumerContext, consumerType, ct);
+            var channel = ((AsyncEventingBasicConsumer)sender).Channel;
+            await channel.BasicAckAsync(e.DeliveryTag, true, ct);
         });
 
-        client.MessageRequesterConsumer((_, e, ct) =>
+        client.MessageRequesterConsumer(async (sender, e, ct) =>
         {
             var messageType = e.BasicProperties.Type;
-            if (typeof(Result).AssemblyQualifiedName != messageType) return Task.CompletedTask;
+            if (typeof(Result).AssemblyQualifiedName != messageType) return;
             var bodyAsJson = Encoding.UTF8.GetString(e.Body.Span);
             var envelope = JsonSerializer.Deserialize<ConsumerContextEnvelope<Result>>(bodyAsJson,
                 DistributedConfigurators.JsonSerializerOptions);
-            if (envelope?.Context.RequesterId is not { } requesterId) return Task.CompletedTask;
-            inMemoryResponseSetter.TrySetResult(requesterId,
-                new MessageData<Result>(envelope.Message,
-                    new ResponseContext(requesterId, envelope.Context.CorrelationId, envelope.Context.Headers), ct));
-            return Task.CompletedTask;
+            if (envelope?.Context.RequesterId is not { } requesterId) return;
+            inMemoryResponseSetter.TrySetResult(requesterId, new MessageData<Result>(envelope.Message,
+                new ResponseContext(requesterId, envelope.Context.CorrelationId, envelope.Context.Headers), ct));
+            var channel = ((AsyncEventingBasicConsumer)sender).Channel;
+            await channel.BasicAckAsync(e.DeliveryTag, true, ct);
         });
     }
 

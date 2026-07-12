@@ -9,9 +9,9 @@ public interface IConfigurator
 {
     IServiceCollection Services { get; }
     IMessageKeys MessageKeys { get; }
-    void AddConsumer<TConsumer>() where TConsumer : IConsumer;
+    void AddConsumer<TConsumer>(Action<IConsumerDefinition<TConsumer>> options = null) where TConsumer : IConsumer;
     void AddConsumersFromAssemblies(Assembly assembly);
     void AddConsumersFromAssemblies(params Assembly[] assemblies);
     void UseInMemory();
-    public void ConfigureSupervisor(Action<ISupervisorOptions> options);
+    void ConfigureSupervisor(Action<ISupervisorOptions> options);
 }
