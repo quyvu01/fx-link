@@ -24,7 +24,7 @@ internal class RequesterImpl<TMessage>(
         var (result, ctx, _) = await inMemoryResponseGetter
             .GetResponse<Result>(context.RequesterId, tcs.Token);
         if (!result.IsSuccess) throw result.Fault.ToException();
-        var response = result.Data as TResponse ?? JsonSerializer.Deserialize<TResponse>(result.DataAsJson,
+        var response = JsonSerializer.Deserialize<TResponse>(result.DataAsJson,
             DistributedConfigurators.JsonSerializerOptions);
         return new ResponseContext<TResponse>(response, context.RequesterId, ctx);
     }
