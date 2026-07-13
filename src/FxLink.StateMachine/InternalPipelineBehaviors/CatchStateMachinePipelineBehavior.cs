@@ -39,9 +39,6 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
 
                     break;
             }
-
-            logger.LogError("Error while process message: {@Message} with exception: {@Exception}",
-                context.Message, e.Message);
             throw;
         }
     }

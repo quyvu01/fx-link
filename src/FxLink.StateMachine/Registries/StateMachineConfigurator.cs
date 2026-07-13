@@ -50,21 +50,11 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
         return this;
     }
 
-    public IStateMachineConfigurator AddActivitiesFromAssembly<TAssembly>()
-        => AddActivitiesFromAssembly(typeof(TAssembly).Assembly);
-
-    public IStateMachineConfigurator AddActivitiesFromAssemblies(params Assembly[] assemblies)
-    {
-        assemblies.ForEach(a => AddActivitiesFromAssembly(a));
-        return this;
-    }
-
-    private IStateMachineConfigurator AddActivitiesFromAssembly(Assembly assembly)
+    internal void AddActivitiesFromAssembly(Assembly assembly)
     {
         assembly.DefinedTypes
             .Where(type => typeof(IStateMachineActivity).IsAssignableFrom(type) && type.IsClosedConcreteType())
             .ForEach(type => AddActivity(type));
-        return this;
     }
 
     private void RegisterStateMachineConsumers<TStateMachine>()

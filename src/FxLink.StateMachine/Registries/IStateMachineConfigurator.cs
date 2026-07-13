@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 using FxLink.StateMachine.Abstractions;
 
 namespace FxLink.StateMachine.Registries;
@@ -11,6 +10,4 @@ public interface IStateMachineConfigurator
 
     IStateMachineConfigurator AddActivity<TStateMachineActivity>() where TStateMachineActivity : IStateMachineActivity;
     IStateMachineConfigurator AddActivity(Type stateMachineActivityType);
-    IStateMachineConfigurator AddActivitiesFromAssembly<TAssembly>();
-    IStateMachineConfigurator AddActivitiesFromAssemblies(params Assembly[] assemblies);
 }

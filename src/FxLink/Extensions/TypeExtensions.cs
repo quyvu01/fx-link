@@ -9,6 +9,22 @@ namespace FxLink.Extensions;
 /// </remarks>
 public static class TypeExtensions
 {
-    public static bool IsClosedConcreteType(this Type type) =>
-        type is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false };
+    extension(Type type)
+    {
+        public bool IsClosedConcreteType() =>
+            type is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false };
+
+        public Type GetGenericBaseType(Type genericTypeDefinition)
+        {
+            var current = type;
+            while (current != null && current != typeof(object))
+            {
+                if (current.IsGenericType && current.GetGenericTypeDefinition() == genericTypeDefinition)
+                    return current;
+                current = current.BaseType;
+            }
+
+            return null;
+        }
+    }
 }

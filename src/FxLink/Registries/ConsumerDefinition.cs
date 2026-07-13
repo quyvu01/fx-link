@@ -4,20 +4,30 @@ namespace FxLink.Registries;
 
 internal class ConsumerDefinition<TConsumer> : IConsumerDefinition<TConsumer> where TConsumer : IConsumer
 {
-    // Temporary, not enough
-    internal List<IMessageRetryPolicy> Policies { get; } = [];
+    private IMessageRetryPolicy _retryPolicyForConsumer;
 
-    public void UseMessageRetry<TMessage>(Action<IMessageRetryPolicy> options) where TMessage : class
-    {
-        var retryPolicy = new MessageRetryPolicy();
-        options?.Invoke(retryPolicy);
-        Policies.Add(retryPolicy);
-    }
+    internal IMessageRetryPolicy RetryPolicy => _retryPolicyForConsumer ?? MessageRetryPolicy.DefaultMessageRetryPolicy;
 
     public void UseMessageRetry(Action<IMessageRetryPolicy> options)
     {
         var retryPolicy = new MessageRetryPolicy();
         options?.Invoke(retryPolicy);
-        Policies.Add(retryPolicy);
+        _retryPolicyForConsumer = retryPolicy;
+    }
+}
+
+internal class ConsumerDefinition<TConsumer, TMessage> : IConsumerDefinition<TConsumer, TMessage>
+    where TConsumer : IConsumer where TMessage : class
+{
+    private IMessageRetryPolicy _retryPolicyForMessage;
+
+    internal IMessageRetryPolicy RetryPolicy =>
+        _retryPolicyForMessage ?? MessageRetryPolicy.DefaultMessageRetryPolicy;
+
+    public void UseMessageRetry(Action<IMessageRetryPolicy> options)
+    {
+        var retryPolicy = new MessageRetryPolicy();
+        options?.Invoke(retryPolicy);
+        _retryPolicyForMessage = retryPolicy;
     }
 }
