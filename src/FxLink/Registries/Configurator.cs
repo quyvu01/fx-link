@@ -9,31 +9,23 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FxLink.Registries;
 
-internal class Configurator(IServiceCollection serviceCollection) : IConfigurator
+internal class Configurator(IServiceCollection services) : IConfigurator
 {
-    public IServiceCollection Services { get; } = serviceCollection;
+    public IServiceCollection Services { get; } = services;
     public IMessageKeys MessageKeys { get; } = new MessageKeys();
     internal ISupervisorOptions SupervisorOptions { get; private set; } = new SupervisorOptions();
 
-    public void AddConsumer<TConsumer>(Action<IConsumerDefinition<TConsumer>> options = null)
-        where TConsumer : IConsumer
-    {
-        var consumerDefinition = new ConsumerDefinition<TConsumer>();
-        options?.Invoke(consumerDefinition);
-        AddConsumer(typeof(TConsumer), consumerDefinition);
-    }
+    public void AddConsumer<TConsumer>()
+        where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
+
+    public void AddConsumerDefinition<TConsumerDefinition>() where TConsumerDefinition : IConsumerDefinition =>
+        AddConsumerTypeDefinition(typeof(TConsumerDefinition));
 
     public void AddConsumersFromAssemblies(Assembly assembly)
     {
         var consumerTypes = assembly.DefinedTypes
             .Where(type => typeof(IConsumer).IsAssignableFrom(type) && type.IsClosedConcreteType());
         foreach (var consumerType in consumerTypes) AddConsumer(consumerType);
-    }
-
-
-    public void AddConsumersFromAssemblies(params Assembly[] assemblies)
-    {
-        foreach (var assembly in assemblies) AddConsumersFromAssemblies(assembly);
     }
 
     // Not use in production
@@ -54,7 +46,7 @@ internal class Configurator(IServiceCollection serviceCollection) : IConfigurato
 
 
     // Need to check if we have edge cases here!
-    private void AddConsumer(Type consumerType, IConsumerDefinition consumerDefinition = null)
+    public void AddConsumer(Type consumerType)
     {
         consumerType
             .GetInterfaces()
@@ -66,5 +58,25 @@ internal class Configurator(IServiceCollection serviceCollection) : IConfigurato
                     implementationType: consumerType, ServiceLifetime.Scoped));
                 MessageKeys.AddMessageKey(messageType, consumerType);
             });
+    }
+
+    internal void AddConsumerTypeDefinition(Type consumerDefinition)
+    {
+        if (consumerDefinition.GetGenericBaseType(typeof(AbstractConsumerDefinition<>)) is { } configForConsumer)
+        {
+            var serviceType = typeof(IAbstractConsumerDefinition<>)
+                .MakeGenericType(configForConsumer.GetGenericArguments());
+            Services.TryAddEnumerable(new ServiceDescriptor(serviceType, consumerDefinition,
+                ServiceLifetime.Singleton));
+            return;
+        }
+
+        if (consumerDefinition.GetGenericBaseType(typeof(AbstractConsumerDefinition<,>)) is { } configForMessage)
+        {
+            var serviceType = typeof(IAbstractConsumerDefinition<,>)
+                .MakeGenericType(configForMessage.GetGenericArguments());
+            Services.TryAddEnumerable(new ServiceDescriptor(serviceType, consumerDefinition,
+                ServiceLifetime.Singleton));
+        }
     }
 }

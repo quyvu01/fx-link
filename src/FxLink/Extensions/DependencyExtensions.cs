@@ -1,5 +1,6 @@
 using FxLink.Abstractions;
 using FxLink.Implementations;
+using FxLink.InternalPipelineBehaviors;
 using FxLink.PipelineBehaviors;
 using FxLink.Registries;
 using FxLink.Wrappers;
@@ -21,13 +22,17 @@ public static class DependencyExtensions
         serviceCollection.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));
         serviceCollection.AddSingleton(configurator.SupervisorOptions);
         serviceCollection.AddSingleton<InMemoryResponseProcessor>();
-        
+
         serviceCollection.AddSingleton<IInMemoryResponseSetter>(sp =>
             sp.GetRequiredService<InMemoryResponseProcessor>());
         serviceCollection.AddSingleton<IInMemoryResponseGetter>(sp =>
             sp.GetRequiredService<InMemoryResponseProcessor>());
-        
+
         serviceCollection.AddSingleton(typeof(IRequester<>), typeof(RequesterImpl<>));
+
+        configurator.AddConsumerPipelineBehaviors(c => c
+            .Of(typeof(RetryPipelineBehavior<>))
+        );
 
         return new DistributedConfigurator(serviceCollection);
     }

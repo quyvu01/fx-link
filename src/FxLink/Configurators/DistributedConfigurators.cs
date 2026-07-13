@@ -9,4 +9,7 @@ public static class DistributedConfigurators
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true
     };
+
+    internal static readonly TimeSpan[] DefaultRetryPolicy =
+        [TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(8)];
 }
