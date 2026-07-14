@@ -80,16 +80,46 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             {
                 var consumerType = c.Key as Type;
                 var queueName = consumerType.GetConsumerName();
+                var retryQueue = consumerType.GetRetryConsumer();
+                var deadLetterQueue = consumerType.GetDeadLetterConsumer();
+                // DLX target is static per consumer queue; if a consumer handles more than one
+                // message type, only the first type's main exchange is used as the retry target.
+                var mainExchangeName = c.First().MessageType.GetExchangeName();
+
                 await Channel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
                     autoDelete: false, arguments: null, cancellationToken: cancellationToken);
 
-                var exchangeNames = c.Select(opt => opt.MessageType.GetExchangeName());
+                await Channel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
+                    autoDelete: false, arguments: new Dictionary<string, object>
+                    {
+                        ["x-dead-letter-exchange"] = mainExchangeName,
+                        ["x-dead-letter-routing-key"] = string.Empty
+                    }, cancellationToken: cancellationToken);
 
-                foreach (var exchangeName in exchangeNames)
+                await Channel.QueueDeclareAsync(deadLetterQueue, durable: false, exclusive: false,
+                    autoDelete: false, cancellationToken: cancellationToken);
+
+                foreach (var g in c)
                 {
-                    await Channel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout,
+                    var exchangeName = g.MessageType.GetExchangeName();
+                    var retryExchange = g.MessageType.GetRetryExchangeName();
+                    var deadLetterExchange = g.MessageType.GetDeadLetterExchangeName();
+                    // Declare main exchanges and queues
+                    await Channel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout, durable: false,
                         cancellationToken: cancellationToken);
                     await Channel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,
+                        cancellationToken: cancellationToken);
+
+                    // Declare retry exchanges and queues
+                    await Channel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout, durable: false,
+                        cancellationToken: cancellationToken);
+                    await Channel.QueueBindAsync(retryQueue, retryExchange, string.Empty,
+                        cancellationToken: cancellationToken);
+
+                    // Declare dead letter exchanges and queues
+                    await Channel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Fanout, durable: false,
+                        cancellationToken: cancellationToken);
+                    await Channel.QueueBindAsync(retryQueue, deadLetterExchange, string.Empty,
                         cancellationToken: cancellationToken);
                 }
 

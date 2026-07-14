@@ -10,6 +10,11 @@ internal static class Extensions
 
     extension(Type consumerType)
     {
+        internal string GetRetryExchangeName() => $"{consumerType.GetExchangeName()}.retry";
+        internal string GetDeadLetterExchangeName() => $"{consumerType.GetExchangeName()}.dlq";
+        internal string GetRetryConsumer() => $"{consumerType.GetConsumerName()}.retry";
+        internal string GetDeadLetterConsumer() => $"{consumerType.GetConsumerName()}.dlq";
+
         internal string GetConsumerName()
         {
             ArgumentNullException.ThrowIfNull(consumerType);

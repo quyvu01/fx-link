@@ -10,7 +10,7 @@ public sealed class RabbitMqTestConsumersDefinition : AbstractConsumerDefinition
     {
         consumerDefinition.UseMessageRetry(c =>
         {
-            c.Intervals(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(8));
+            c.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4));
             c.Ignore<TimeoutException>().Ignore<InvalidOperationException>();
         });
     }

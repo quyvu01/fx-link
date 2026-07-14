@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text.Json;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
+using FxLink.Configurators;
 using FxLink.Delegates;
 using FxLink.Registries;
 using FxLink.Statics;
@@ -16,8 +18,6 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
     // Cache is per closed RetryPipelineBehavior<TMessage> (static in generic class = per TMessage instantiation)
     private static readonly ConcurrentDictionary<Type, Func<RetryPipelineBehavior<TMessage>, IMessageRetryPolicy>>
         RetryPolicyDelegateCache = new();
-
-    private static int _retryCount; // Todo: temporary test
 
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
@@ -33,19 +33,24 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
         }
         catch (Exception ex)
         {
-            if (ShouldIgnore(ex, ignoreExceptions))
-                throw;
+            if (ShouldIgnore(ex, ignoreExceptions)) throw;
 
             var retryHandler = serviceProvider.GetService<IRetryPolicyHandling<TMessage>>();
             if (retryHandler is null) throw;
 
-            var attempt = context.RetryCount; // Todo: Just for test, need to implement further...
-            if (_retryCount++ < intervals.Length)
+            var retryCount = GetRetryCountFromHeader(context.Headers);
+            context.Headers[DistributedConfigurators.RetryCountKey] = retryCount + 1;
+            if (retryCount < intervals.Length)
             {
+                context.Headers[DistributedConfigurators.TimeToLiveKey] = intervals[retryCount].TotalMilliseconds;
+                context.Headers[DistributedConfigurators.MessageTypeKey] = DistributedConfigurators.MessageTypeRetry;
                 await retryHandler.HandleRetryPolicyAsync(context, token);
                 return;
             }
-
+            
+            context.Headers[DistributedConfigurators.MessageTypeKey] = DistributedConfigurators.MessageTypeDeadLetter;
+            context.Headers.Remove(DistributedConfigurators.TimeToLiveKey);
+            context.Headers.Remove(DistributedConfigurators.RetryCountKey);
             await retryHandler.HandleDeadLetterAsync(context, token);
         }
     }
@@ -93,5 +98,11 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             return cForConsumer.RetryPolicy;
 
         return MessageRetryPolicy.DefaultMessageRetryPolicy;
+    }
+
+    private static int GetRetryCountFromHeader(Dictionary<string, object> headers)
+    {
+        if (!headers.TryGetValue(DistributedConfigurators.RetryCountKey, out var retryCountAsObject)) return 0;
+        return int.TryParse(JsonSerializer.Serialize(retryCountAsObject), out var retryCount) ? retryCount : 0;
     }
 }

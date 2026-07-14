@@ -19,8 +19,6 @@ public class ConsumerContext<TMessage>(
     public Guid? RequesterId { get; } = requesterId;
     public TMessage Message { get; } = message;
     public string RoutingKey { get; set; }
-    public int RetryCount { get; private set; }
-    public void Retried() => RetryCount += 1;
 
     public async Task ResponseAsync<TResponse>(TResponse message, CancellationToken token = default)
         where TResponse : class

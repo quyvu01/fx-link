@@ -58,7 +58,7 @@ builder.Services.AddFxLink(opts =>
 
     opts.AddConsumerDefinitionsFromAssemblies(typeof(Program).Assembly);
 
-    opts.AddRabbitMq(config => config.Host("localhost", "/"));
+    opts.AddRabbitMq(config => config.Host("localhost", "fxlink"));
 
     opts.AddStateMachines(c =>
     {

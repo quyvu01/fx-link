@@ -65,13 +65,41 @@ internal class RabbitMqClientConnector<TMessage> :
         };
         if (context is IRequestContext) props.ReplyTo = _client.ReplyQueueName;
         props.Headers ??= new Dictionary<string, object>();
+        var messageType = GetMessageType(context);
+        if (messageType == DistributedConfigurators.MessageTypeRetry)
+            props.Expiration = GetTimeToLiveFromHeader(context.Headers).ToString();
         var envelope = new Envelope<TMessage>(message, context);
         var messageSerialize = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
         var messageBytes = Encoding.UTF8.GetBytes(messageSerialize);
-        var exchangeName = context is IResponseContext ? string.Empty : typeof(TMessage).GetExchangeName();
+        var exchangeName = GetExchangeName(context, messageType);
         var routingKey = context is IResponseContext responseContext ? responseContext.RoutingKey : string.Empty;
         if (_client.Channel is not null)
             await _client.Channel.BasicPublishAsync(exchangeName, routingKey: routingKey,
                 mandatory: true, basicProperties: props, body: messageBytes, cancellationToken: token);
+    }
+
+    private static string GetMessageType(IContext context)
+    {
+        if (!context.Headers.TryGetValue(DistributedConfigurators.MessageTypeKey, out var messageTypeObject))
+            return null;
+        var messageTypeJson = JsonSerializer.Serialize(messageTypeObject);
+        return JsonSerializer.Deserialize<string>(messageTypeJson);
+    }
+
+    private static string GetExchangeName(IContext context, string messageType)
+    {
+        if (context is IResponseContext) return string.Empty;
+        return messageType switch
+        {
+            DistributedConfigurators.MessageTypeRetry => typeof(TMessage).GetRetryExchangeName(),
+            DistributedConfigurators.MessageTypeDeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
+            _ => typeof(TMessage).GetExchangeName()
+        };
+    }
+
+    private static long GetTimeToLiveFromHeader(Dictionary<string, object> headers)
+    {
+        if (!headers.TryGetValue(DistributedConfigurators.TimeToLiveKey, out var timeToLiveObject)) return 0;
+        return double.TryParse(JsonSerializer.Serialize(timeToLiveObject), out var timeToLive) ? (long)timeToLive : 0;
     }
 }
