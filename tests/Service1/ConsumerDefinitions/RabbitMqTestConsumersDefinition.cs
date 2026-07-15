@@ -10,22 +10,21 @@ public sealed class RabbitMqTestConsumersDefinition : AbstractConsumerDefinition
     {
         consumerDefinition.UseMessageRetry(c =>
         {
-            c.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4));
+            c.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5));
             c.Ignore<TimeoutException>();
         });
     }
 }
 
 public sealed class RabbitMqTestConsumersDefinitionForMessage :
-    AbstractConsumerDefinition<RabbitMqTestConsumerWithDefinition,
-        RabbitMqTestPublisher>
+    AbstractConsumerDefinition<RabbitMqTestConsumerWithDefinition, RabbitMqTestRetry>
 {
     public override void Configure(IConsumerDefinition<RabbitMqTestConsumerWithDefinition,
-        RabbitMqTestPublisher> consumerDefinition)
+        RabbitMqTestRetry> consumerDefinition)
     {
         consumerDefinition.UseMessageRetry(c =>
         {
-            c.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
+            c.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(1));
         });
     }
 }

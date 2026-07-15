@@ -11,7 +11,7 @@ public class RabbitMqTestConsumerWithDefinition(ILogger<RabbitMqTestConsumerWith
     public async Task ConsumeAsync(IConsumerContext<RabbitMqTestRetry> context, CancellationToken token = default)
     {
         await Task.Yield();
-        logger.LogInformation("test retry with current context: {@Context}", context);
+        logger.LogInformation("test retry with current context: {@Headers}", context.Headers);
         throw new InvalidDataException("Test some invalid exception");
     }
 
