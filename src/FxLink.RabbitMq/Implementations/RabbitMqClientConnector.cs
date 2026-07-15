@@ -58,13 +58,8 @@ internal class RabbitMqClientConnector<TMessage> :
 
     public async Task SendAsync(TMessage message, IContext context, CancellationToken token = default)
     {
-        var props = new BasicProperties
-        {
-            CorrelationId = context.CorrelationId.ToString(),
-            Type = typeof(TMessage).AssemblyQualifiedName,
-        };
+        var props = new BasicProperties { CorrelationId = context.CorrelationId.ToString() };
         if (context is IRequestContext) props.ReplyTo = _client.ReplyQueueName;
-        props.Headers ??= new Dictionary<string, object>();
         var messageType = GetMessageType(context);
         if (messageType == DistributedConfigurators.MessageTypeRetry)
             props.Expiration = GetTimeToLiveFromHeader(context.Headers).ToString();

@@ -81,21 +81,10 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             {
                 var consumerType = c.Key as Type;
                 var queueName = consumerType.GetConsumerName();
-                var retryQueue = consumerType.GetRetryConsumer();
-                var deadLetterQueue = consumerType.GetDeadLetterConsumer();
-                // DLX target is static per consumer queue; if a consumer handles more than one
-                // message type, only the first type's main exchange is used as the retry target.
-                var mainExchangeName = c.First().MessageType.GetExchangeName();
+                var deadLetterQueue = consumerType.GetDeadLetterConsumerName();
 
                 await Channel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
                     autoDelete: false, arguments: null, cancellationToken: cancellationToken);
-
-                await Channel.QueueDeclareAsync(retryQueue, durable: false, exclusive: true,
-                    autoDelete: false, arguments: new Dictionary<string, object>
-                    {
-                        ["x-dead-letter-exchange"] = mainExchangeName,
-                        ["x-dead-letter-routing-key"] = string.Empty
-                    }, cancellationToken: cancellationToken);
 
                 await Channel.QueueDeclareAsync(deadLetterQueue, durable: false, exclusive: false,
                     autoDelete: false, cancellationToken: cancellationToken);
@@ -114,6 +103,14 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     // Declare retry exchanges and queues
                     await Channel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout, durable: false,
                         cancellationToken: cancellationToken);
+                    
+                    var retryQueue = consumerType.GetRetryConsumerName(g.MessageType);
+                    await Channel.QueueDeclareAsync(retryQueue, durable: false, exclusive: true,
+                        autoDelete: false, arguments: new Dictionary<string, object>
+                        {
+                            ["x-dead-letter-exchange"] = exchangeName,
+                            ["x-dead-letter-routing-key"] = string.Empty
+                        }, cancellationToken: cancellationToken);
                     await Channel.QueueBindAsync(retryQueue, retryExchange, string.Empty,
                         cancellationToken: cancellationToken);
 
