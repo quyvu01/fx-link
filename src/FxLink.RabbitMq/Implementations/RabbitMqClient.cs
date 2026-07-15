@@ -105,7 +105,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         cancellationToken: cancellationToken);
                     
                     var retryQueue = consumerType.GetRetryConsumerName(g.MessageType);
-                    await Channel.QueueDeclareAsync(retryQueue, durable: false, exclusive: true,
+                    await Channel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
                         autoDelete: false, arguments: new Dictionary<string, object>
                         {
                             ["x-dead-letter-exchange"] = exchangeName,
