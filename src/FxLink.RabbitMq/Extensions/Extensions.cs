@@ -12,14 +12,17 @@ internal static class Extensions
     {
         internal string GetRetryExchangeName() => $"{consumerType.GetExchangeName()}.retry";
         internal string GetDeadLetterExchangeName() => $"{consumerType.GetExchangeName()}.dlq";
-        internal string GetRetryConsumer() => $"{consumerType.GetConsumerName()}.retry";
-        internal string GetDeadLetterConsumer() => $"{consumerType.GetConsumerName()}.dlq";
+
+        internal string GetRetryConsumerName(Type exchangeType) =>
+            $"{consumerType.GetConsumerName()}.retry.{exchangeType.GetExchangeName().Split('.').LastOrDefault()}";
+
+        internal string GetDeadLetterConsumerName() => $"{consumerType.GetConsumerName()}.dlq";
 
         internal string GetConsumerName()
         {
             ArgumentNullException.ThrowIfNull(consumerType);
             return ConsumerNameCache.GetOrAdd(consumerType,
-                static t => $"{t.Namespace}-{t.Name}".Replace('.', '-').ToLower());
+                static t => $"{t.Namespace}.{t.Name}".ToLower());
         }
 
         internal string GetExchangeName()
@@ -27,11 +30,11 @@ internal static class Extensions
             ArgumentNullException.ThrowIfNull(consumerType);
             return ExchangeNameCache.GetOrAdd(consumerType, static t =>
             {
-                if (!typeof(Fault).IsAssignableFrom(t)) return $"{t!.Namespace}:{GetSafeTypeName(t)}";
+                if (!typeof(Fault).IsAssignableFrom(t)) return $"{t!.Namespace}.{GetSafeTypeName(t)}".ToLower();
                 if (!t.IsGenericType || t.GetGenericTypeDefinition() != typeof(Fault<>))
-                    return $"{t.Namespace}:{nameof(Fault)}";
+                    return $"{t.Namespace}.{nameof(Fault)}".ToLower();
                 var innerMessageType = t.GetGenericArguments()[0];
-                return $"{t.Namespace}:{nameof(Fault)}-{GetSafeTypeName(innerMessageType)}";
+                return $"{t.Namespace}.{nameof(Fault)}.{GetSafeTypeName(innerMessageType)}".ToLower();
             });
         }
     }
