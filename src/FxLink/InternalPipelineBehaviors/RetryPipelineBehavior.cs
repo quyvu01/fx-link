@@ -22,21 +22,21 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
-        var consumerType = ConsumerAmbient.ConsumerType;
-        var retryPolicy = (GetRetryPolicy(consumerType) as MessageRetryPolicy)!;
-        var intervals = retryPolicy.RetryIntervals;
-        var ignoreExceptions = retryPolicy.IgnoreExceptions;
-
         try
         {
             await next.Invoke(token);
         }
         catch (Exception ex)
         {
+            var consumerType = ConsumerAmbient.ConsumerType;
+            var services = ConsumerAmbient.Services;
+            var retryPolicy = (GetRetryPolicy(consumerType) as MessageRetryPolicy)!;
+            var intervals = retryPolicy.RetryIntervals;
+            var ignoreExceptions = retryPolicy.IgnoreExceptions;
             if (ShouldIgnore(ex, ignoreExceptions)) throw;
 
-            var retryHandler = serviceProvider.GetService<IRetryPolicyHandling<TMessage>>();
-            if (retryHandler is null) throw;
+            var publisher = services.GetService<IPublisher>();
+            if (publisher is null) throw;
 
             var retryCount = GetRetryCountFromHeader(context.Headers);
             context.Headers[DistributedConfigurators.RetryCountKey] = retryCount + 1;
@@ -44,14 +44,14 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             {
                 context.Headers[DistributedConfigurators.TimeToLiveKey] = intervals[retryCount].TotalMilliseconds;
                 context.Headers[DistributedConfigurators.MessageTypeKey] = DistributedConfigurators.MessageTypeRetry;
-                await retryHandler.HandleRetryPolicyAsync(context, token);
+                await publisher.PublishAsync(context.Message, new PublisherContext(context), token);
                 return;
             }
-            
+
             context.Headers[DistributedConfigurators.MessageTypeKey] = DistributedConfigurators.MessageTypeDeadLetter;
             context.Headers.Remove(DistributedConfigurators.TimeToLiveKey);
             context.Headers.Remove(DistributedConfigurators.RetryCountKey);
-            await retryHandler.HandleDeadLetterAsync(context, token);
+            await publisher.PublishAsync(context.Message, new PublisherContext(context), token);
         }
     }
 

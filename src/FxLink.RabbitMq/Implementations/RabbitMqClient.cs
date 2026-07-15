@@ -15,6 +15,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
 
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
+    private TaskCompletionSource _tcs = new();
 
     public IConnection Connection { get; private set; }
     public IChannel Channel { get; private set; }
@@ -89,7 +90,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 await Channel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
                     autoDelete: false, arguments: null, cancellationToken: cancellationToken);
 
-                await Channel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
+                await Channel.QueueDeclareAsync(retryQueue, durable: false, exclusive: true,
                     autoDelete: false, arguments: new Dictionary<string, object>
                     {
                         ["x-dead-letter-exchange"] = mainExchangeName,
@@ -119,7 +120,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     // Declare dead letter exchanges and queues
                     await Channel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Fanout, durable: false,
                         cancellationToken: cancellationToken);
-                    await Channel.QueueBindAsync(retryQueue, deadLetterExchange, string.Empty,
+                    await Channel.QueueBindAsync(deadLetterQueue, deadLetterExchange, string.Empty,
                         cancellationToken: cancellationToken);
                 }
 
@@ -134,6 +135,25 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 await Channel.BasicConsumeAsync(queueName, false, consumer, cancellationToken: cancellationToken);
             });
         foreach (var task in tasks) await task;
+        Channel.ChannelShutdownAsync += (_, @event) =>
+        {
+            _tcs.TrySetException(@event.Exception ?? new Exception("Connection or Channel is shutdown!"));
+            return Task.CompletedTask;
+        };
+        Connection.ConnectionShutdownAsync += (_, @event) =>
+        {
+            _tcs.TrySetException(@event.Exception ?? new Exception("Connection or Channel is shutdown!"));
+            return Task.CompletedTask;
+        };
+        try
+        {
+            await _tcs.Task;
+        }
+        catch (Exception)
+        {
+            _tcs = new TaskCompletionSource();
+            throw;
+        }
     }
 
 
