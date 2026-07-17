@@ -13,8 +13,8 @@ namespace FxLink.StateMachine.Registries;
 
 public sealed class StateMachineConfigurator(IServiceCollection services) : IStateMachineConfigurator
 {
-    public IReadOnlyDictionary<Type, List<object>> MessageKeys => _messageKeys;
-    private readonly ConcurrentDictionary<Type, List<object>> _messageKeys = [];
+    public IReadOnlyDictionary<Type, List<Type>> MessageKeys => _messageKeys;
+    private readonly ConcurrentDictionary<Type, List<Type>> _messageKeys = [];
 
     public IStateMachineConfigurator Of<TStateMachine>(Action<IStateMachineSetup> config)
         where TStateMachine : IStateMachine
