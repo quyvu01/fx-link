@@ -62,15 +62,24 @@ internal class RabbitMqClientConnector<TMessage> :
             { CorrelationId = context.CorrelationId.ToString(), Type = typeof(TMessage).AssemblyQualifiedName };
         if (context is IRequestContext) props.ReplyTo = _client.ReplyQueueName;
         var messageType = GetMessageType(context);
-        if (messageType == DistributedConfigurators.MessageTypeRetry)
-            props.Expiration = GetTimeToLiveFromHeader(context.Headers).ToString();
+        switch (messageType)
+        {
+            case DistributedConfigurators.MessageTypeRetry:
+                props.Expiration = GetTimeToLiveFromHeader(context.Headers).ToString();
+                break;
+            case DistributedConfigurators.MessageTypeDelay:
+                props.Headers = new Dictionary<string, object>(context.Headers);
+                props.Headers["x-delay"] = GetDelayTimeFromHeader(context.Headers);
+                break;
+        }
+
         var envelope = new Envelope<TMessage>(message, context);
         var messageSerialize = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
         var messageBytes = Encoding.UTF8.GetBytes(messageSerialize);
         var exchangeName = GetExchangeName(context, messageType);
         var routingKey = context is IResponseContext responseContext ? responseContext.RoutingKey : string.Empty;
-        if (_client.Channel is not null)
-            await _client.Channel.BasicPublishAsync(exchangeName, routingKey: routingKey,
+        if (_client.Channel is { } channel)
+            await channel.BasicPublishAsync(exchangeName, routingKey: routingKey,
                 mandatory: true, basicProperties: props, body: messageBytes, cancellationToken: token);
     }
 
@@ -89,6 +98,7 @@ internal class RabbitMqClientConnector<TMessage> :
         {
             DistributedConfigurators.MessageTypeRetry => typeof(TMessage).GetRetryExchangeName(),
             DistributedConfigurators.MessageTypeDeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
+            DistributedConfigurators.MessageTypeDelay => typeof(TMessage).GetDelayExchangeName(),
             _ => typeof(TMessage).GetExchangeName()
         };
     }
@@ -97,5 +107,11 @@ internal class RabbitMqClientConnector<TMessage> :
     {
         if (!headers.TryGetValue(DistributedConfigurators.TimeToLiveKey, out var timeToLiveObject)) return 0;
         return double.TryParse(JsonSerializer.Serialize(timeToLiveObject), out var timeToLive) ? (long)timeToLive : 0;
+    }
+
+    private static long GetDelayTimeFromHeader(Dictionary<string, object> headers)
+    {
+        if (!headers.TryGetValue(DistributedConfigurators.DelayInMsKey, out var delayInMs)) return 0;
+        return double.TryParse(JsonSerializer.Serialize(delayInMs), out var delay) ? (long)delay : 0;
     }
 }

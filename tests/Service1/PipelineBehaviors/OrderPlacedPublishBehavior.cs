@@ -13,8 +13,7 @@ public sealed class OrderPlacedPublishBehavior(ILogger<OrderPlacedPublishBehavio
     public async Task PublishAsync(OrderPlaced message, IPublisherContext context, PublisherHandlerDelegate next,
         CancellationToken token = default)
     {
-        logger.LogInformation("Publisher pipeline behavior for OrderPlaced: {@Message}, delay: {@Delay}",
-            message, context.Delay);
+        logger.LogInformation("Publisher pipeline behavior for OrderPlaced: {@Message}", message);
         await next.Invoke(token);
     }
 }

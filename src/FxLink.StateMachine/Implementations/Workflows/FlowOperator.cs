@@ -1,11 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
+using FxLink.Configurators;
 using FxLink.Entities;
 using FxLink.Extensions;
 using FxLink.Faults;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
+using FxLink.StateMachine.Configurators;
 using FxLink.StateMachine.Contexts;
 using FxLink.StateMachine.Delegates;
 using FxLink.StateMachine.Exceptions;
@@ -197,9 +199,14 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
             var tokenId = Guid.NewGuid();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             setter.Invoke(context.Instance, tokenId);
-            await publisher.PublishAsync(message,
-                new PublisherContext(context)
-                    { Delay = delay, ScheduledMessageId = tokenId, MessageKey = schedule.Received.Name }, ct);
+            var headers = new Dictionary<string, object>(context.Headers)
+            {
+                [DistributedConfigurators.MessageTypeKey] = DistributedConfigurators.MessageTypeDelay,
+                [DistributedConfigurators.DelayInMsKey] = delay.TotalMilliseconds,
+                [DistributedConfigurators.ScheduleMessageKey] = tokenId.ToString(),
+                [StateMachineConfigurators.MessageRoutingKey] = schedule.Received.Name,
+            };
+            await publisher.PublishAsync(message, new PublisherContext(context.CorrelationId, headers), ct);
         }
     }
 
@@ -215,8 +222,12 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
             var publisher = ConsumerAmbient.Services.GetRequiredService<IPublisher>();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             var tokenId = scheduleConfigurator.TokenIdProvider.Compile().Invoke(context.Instance);
+            var headers = new Dictionary<string, object>(context.Headers)
+            {
+                [StateMachineConfigurators.MessageRoutingKey] = schedule.Received.Name
+            };
             await publisher.PublishAsync(new DiscardMessagePublished<T>(tokenId),
-                new PublisherContext(context) { MessageKey = schedule.Received.Name }, ct);
+                new PublisherContext(context.CorrelationId, headers), ct);
             setter.Invoke(context.Instance, null); // Set the token Id to null
         }
     }
@@ -270,8 +281,12 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
                 {
                     var responseContext = await requester.RequestAsync<TResponse>(message, requestContext, ct);
                     var server = services.GetRequiredService<IConsumerConnector<TResponse>>();
+                    var headers = new Dictionary<string, object>(context.Headers)
+                    {
+                        [StateMachineConfigurators.MessageRoutingKey] = request.Completed.Name
+                    };
                     var ctx = new ConsumerContext<TResponse>(responseContext.Message,
-                        responseContext.RequesterId, responseContext) { MessageKey = request.Completed.Name };
+                        responseContext.RequesterId, responseContext.CorrelationId, headers);
                     await server.ConsumeAsync(ctx, consumerType, ct);
                 }
                 catch (TimeoutException)

@@ -11,7 +11,7 @@ public static class DefinitionConfiguratorExtensions
         public void AddConsumerDefinitionsFromAssemblies(Assembly assembly)
         {
             var consumerDefinitions = assembly.DefinedTypes
-                .Where(type => typeof(IAbstractConsumerDefinition)
+                .Where(type => typeof(IConsumerDefinition)
                     .IsAssignableFrom(type) && type.IsClosedConcreteType());
             foreach (var consumerType in consumerDefinitions)
                 ((Configurator)configuration).AddConsumerTypeDefinition(consumerType);

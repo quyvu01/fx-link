@@ -9,19 +9,21 @@ using FxLink.Delegates;
 using FxLink.Registries;
 using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace FxLink.InternalPipelineBehaviors;
 
 internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider serviceProvider)
     : IConsumerPipelineBehavior<TMessage> where TMessage : class
 {
-    // Cache is per closed RetryPipelineBehavior<TMessage> (static in generic class = per TMessage instantiation)
     private static readonly ConcurrentDictionary<Type, Func<RetryPipelineBehavior<TMessage>, IMessageRetryPolicy>>
         RetryPolicyDelegateCache = new();
 
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
+        var services = ConsumerAmbient.Services;
+        var logger = services.GetService<ILogger<RetryPipelineBehavior<TMessage>>>();
         try
         {
             await next.Invoke(token);
@@ -29,28 +31,54 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
         catch (Exception ex)
         {
             var consumerType = ConsumerAmbient.ConsumerType;
-            var services = ConsumerAmbient.Services;
             var retryPolicy = (GetRetryPolicy(consumerType) as MessageRetryPolicy)!;
             var intervals = retryPolicy.RetryIntervals;
             var ignoreExceptions = retryPolicy.IgnoreExceptions;
-            if (ShouldIgnore(ex, ignoreExceptions)) throw;
 
             var publisher = services.GetService<IPublisher>();
             if (publisher is null) throw;
 
-            var retryCount = GetRetryCountFromHeader(context.Headers);
-            context.Headers[DistributedConfigurators.RetryCountKey] = retryCount + 1;
-            if (retryCount < intervals.Length)
+            if (ShouldIgnore(ex, ignoreExceptions))
             {
-                context.Headers[DistributedConfigurators.TimeToLiveKey] = intervals[retryCount].TotalMilliseconds;
-                context.Headers[DistributedConfigurators.MessageTypeKey] = DistributedConfigurators.MessageTypeRetry;
+                context.Headers[DistributedConfigurators.MessageTypeKey] =
+                    DistributedConfigurators.MessageTypeDeadLetter;
+                context.Headers.Remove(DistributedConfigurators.TimeToLiveKey);
+                context.Headers.Remove(DistributedConfigurators.RetryCountKey);
+                logger?.LogError(
+                    "Message has been moved to dead letter queue due the exception ignore: {@Message} with exception: {@Exception}",
+                    context.Message, new { ex.Message, ex.StackTrace });
                 await publisher.PublishAsync(context.Message, new PublisherContext(context), token);
                 return;
             }
 
-            context.Headers[DistributedConfigurators.MessageTypeKey] = DistributedConfigurators.MessageTypeDeadLetter;
-            context.Headers.Remove(DistributedConfigurators.TimeToLiveKey);
-            context.Headers.Remove(DistributedConfigurators.RetryCountKey);
+            var retryCount = GetRetryCountFromHeader(context.Headers);
+
+            Action headerAction = (retryCount < intervals.Length) switch
+            {
+                true => () =>
+                {
+                    var nextRetry = intervals[retryCount];
+                    context.Headers[DistributedConfigurators.RetryCountKey] = retryCount + 1;
+                    context.Headers[DistributedConfigurators.TimeToLiveKey] = nextRetry.TotalMilliseconds;
+                    context.Headers[DistributedConfigurators.MessageTypeKey] =
+                        DistributedConfigurators.MessageTypeRetry;
+                    logger?.LogWarning(
+                        "Message: {@Message} processed failed with exception: {@Exception}. Retry will be processed after: {@TimeSpan}",
+                        context.Message, new { ex.Message, ex.StackTrace }, nextRetry);
+                },
+                _ => () =>
+                {
+                    context.Headers[DistributedConfigurators.MessageTypeKey] =
+                        DistributedConfigurators.MessageTypeDeadLetter;
+                    context.Headers.Remove(DistributedConfigurators.TimeToLiveKey);
+                    context.Headers.Remove(DistributedConfigurators.RetryCountKey);
+                    logger?.LogError(
+                        "Message: {@Message} processed failed with exception: {@Exception} after {@Times} times. Message has been moved to dead letter queue!",
+                        context.Message, new { ex.Message, ex.StackTrace }, intervals.Length);
+                }
+            };
+            headerAction.Invoke();
+
             await publisher.PublishAsync(context.Message, new PublisherContext(context), token);
         }
     }
@@ -64,7 +92,8 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
 
     private IMessageRetryPolicy GetRetryPolicy(Type consumerType)
     {
-        var getter = RetryPolicyDelegateCache.GetOrAdd(consumerType, BuildGetRetryPolicyDelegate);
+        var getter = RetryPolicyDelegateCache
+            .GetOrAdd(consumerType, BuildGetRetryPolicyDelegate);
         return getter(this);
     }
 
@@ -89,13 +118,11 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
 
     private IMessageRetryPolicy GetRetryPolicy<TConsumer>() where TConsumer : IConsumer
     {
-        var retryPolicyForMessage = serviceProvider.GetService<IAbstractConsumerDefinition<TConsumer, TMessage>>();
-        if (retryPolicyForMessage is { ConsumerDefinition: ConsumerDefinition<TConsumer, TMessage> cForMessage })
-            return cForMessage.RetryPolicy;
-
-        var retryPolicyForConsumer = serviceProvider.GetService<IAbstractConsumerDefinition<TConsumer>>();
-        if (retryPolicyForConsumer is { ConsumerDefinition: ConsumerDefinition<TConsumer> cForConsumer })
-            return cForConsumer.RetryPolicy;
+        var retryPolicyForConsumer = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
+        if (retryPolicyForConsumer is { ConsumerConfigurator: ConsumerConfigurator<TConsumer> cForConsumer })
+            return !cForConsumer.MessageRetryPolicies.TryGetValue(typeof(TMessage), out var messageRetryPolicy)
+                ? cForConsumer.RetryPolicy
+                : messageRetryPolicy;
 
         return MessageRetryPolicy.DefaultMessageRetryPolicy;
     }

@@ -39,6 +39,7 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
 
                     break;
             }
+            logger.LogError(e.Message);
             throw;
         }
     }

@@ -3,14 +3,15 @@ using FxLink.Abstractions;
 
 namespace FxLink.Registries;
 
-public interface IConsumerDefinition;
+public interface IConsumerConfigurator;
 
-public interface IConsumerDefinition<TConsumer> : IConsumerDefinition where TConsumer : IConsumer
+public interface IConsumerConfigurator<TConsumer> : IConsumerConfigurator
+    where TConsumer : IConsumer
 {
     void UseMessageRetry([NotNull] Action<IMessageRetryPolicy> options);
 }
 
-public interface IConsumerDefinition<TConsumer, TMessage> : IConsumerDefinition
+public interface IConsumerConfigurator<TConsumer, TMessage> : IConsumerConfigurator
     where TConsumer : IConsumer where TMessage : class
 {
     void UseMessageRetry([NotNull] Action<IMessageRetryPolicy> options);

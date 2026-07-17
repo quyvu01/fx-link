@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using FxLink.Abstractions.Contexts;
+using FxLink.Configurators;
 using FxLink.Entities;
 
 namespace FxLink.InMemory;
@@ -17,13 +18,13 @@ internal class InMemoryInMemoryMessage<TMessage>
 
     private void PushToDelayChannel(MessageData<TMessage> item, TimeSpan delay) => _ = Task.Run(async () =>
     {
-        var token = item.Context switch
+        var token = CancellationToken.None;
+        if (item.Context is IPublisherContext &&
+            item.Context.Headers.TryGetValue(DistributedConfigurators.ScheduleMessageKey, out var messageId))
         {
-            IPublisherContext p => p is { ScheduledMessageId: { } scheduledMessageId }
-                ? _dispatcher.AcquiredToken(scheduledMessageId, delay)
-                : CancellationToken.None,
-            _ => CancellationToken.None
-        };
+            token = _dispatcher.AcquiredToken(Guid.Parse(messageId.ToString()!), delay);
+        }
+
         await Task.Delay(delay, token);
         await _channel.Writer.WriteAsync(item, CancellationToken.None);
     });
@@ -37,10 +38,20 @@ internal class InMemoryInMemoryMessage<TMessage>
             {
                 await _inboundRing.WaitAsync();
                 if (!_inboundMessages.TryDequeue(out var messageData)) continue;
-                if (messageData.Context is IPublisherContext { Delay: { } delay } && delay > TimeSpan.Zero)
+                if (messageData.Context is IPublisherContext publisherContext)
                 {
-                    PushToDelayChannel(messageData, delay);
-                    continue;
+                    var headers = publisherContext.Headers;
+                    if (headers.TryGetValue(DistributedConfigurators.MessageTypeKey,
+                            out var messageKeyTypeObj) &&
+                        messageKeyTypeObj.Equals(DistributedConfigurators.MessageTypeDelay))
+                    {
+                        if (headers.TryGetValue(DistributedConfigurators.DelayInMsKey, out var delayObject) &&
+                            double.TryParse(delayObject.ToString(), out var delay))
+                        {
+                            PushToDelayChannel(messageData, TimeSpan.FromMilliseconds(delay));
+                            continue;
+                        }
+                    }
                 }
 
                 _processingMessages.Enqueue(messageData);

@@ -12,12 +12,13 @@ internal static class Extensions
     {
         internal string GetRetryExchangeName() => $"{consumerType.GetExchangeName()}.retry";
         internal string GetDeadLetterExchangeName() => $"{consumerType.GetExchangeName()}.dlq";
+        internal string GetDelayExchangeName() => $"{consumerType.GetExchangeName()}.delay";
 
         internal string GetRetryConsumerName(Type exchangeType) =>
             $"{consumerType.GetConsumerName()}.retry.{exchangeType.GetExchangeName().Split('.').LastOrDefault()}";
 
         internal string GetDeadLetterConsumerName() => $"{consumerType.GetConsumerName()}.dlq";
-
+        
         internal string GetConsumerName()
         {
             ArgumentNullException.ThrowIfNull(consumerType);

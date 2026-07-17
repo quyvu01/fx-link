@@ -88,12 +88,16 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                 await Channel.QueueDeclareAsync(deadLetterQueue, durable: false, exclusive: false,
                     autoDelete: false, cancellationToken: cancellationToken);
+                
 
                 foreach (var g in c)
                 {
                     var exchangeName = g.MessageType.GetExchangeName();
                     var retryExchange = g.MessageType.GetRetryExchangeName();
                     var deadLetterExchange = g.MessageType.GetDeadLetterExchangeName();
+                    var delayExchange = g.MessageType.GetDelayExchangeName();
+
+
                     // Declare main exchanges and queues
                     await Channel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout, durable: false,
                         cancellationToken: cancellationToken);
@@ -103,7 +107,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     // Declare retry exchanges and queues
                     await Channel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout, durable: false,
                         cancellationToken: cancellationToken);
-                    
+
                     var retryQueue = consumerType.GetRetryConsumerName(g.MessageType);
                     await Channel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
                         autoDelete: false, arguments: new Dictionary<string, object>
@@ -118,6 +122,18 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     await Channel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Fanout, durable: false,
                         cancellationToken: cancellationToken);
                     await Channel.QueueBindAsync(deadLetterQueue, deadLetterExchange, string.Empty,
+                        cancellationToken: cancellationToken);
+
+                    // Declare delay exchanges and queues
+                    const string pluginExchangeType = "x-delayed-message";
+                    
+                    await Channel.ExchangeDeclareAsync(delayExchange, pluginExchangeType, durable: false,
+                        arguments: new Dictionary<string, object>
+                        {
+                            ["x-delayed-type"] = ExchangeType.Fanout
+                        }, cancellationToken: cancellationToken);
+
+                    await Channel.QueueBindAsync(queueName, delayExchange, string.Empty,
                         cancellationToken: cancellationToken);
                 }
 
