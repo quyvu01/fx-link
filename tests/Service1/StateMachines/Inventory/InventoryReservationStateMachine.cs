@@ -18,6 +18,7 @@ public sealed class InventoryReservationStateMachine : StateMachine<InventoryRes
     public IEvent<ReserveInventory> ReserveInventoryEvent { get; private set; }
     public IEvent<ReleaseInventory> ReleaseInventoryEvent { get; private set; }
     public IEvent<ConfirmInventory> ConfirmInventoryEvent { get; private set; }
+    public IEvent<CancelSchedule> CancelScheduleEvent { get; private set; }
     public ISchedule<InventorySchedule> InventorySchedule { get; private set; }
 
     public InventoryReservationStateMachine(ILogger<InventoryReservationStateMachine> logger)
@@ -45,9 +46,11 @@ public sealed class InventoryReservationStateMachine : StateMachine<InventoryRes
             }));
         });
 
+        Event(CancelScheduleEvent, cfg => cfg.CorrelationId(x => x.Message.OrderId));
+
         Schedule(InventorySchedule, cfg =>
         {
-            cfg.Delay = TimeSpan.FromSeconds(5);
+            cfg.Delay = TimeSpan.FromSeconds(15);
             cfg.Received = x => x.CorrelationId(k => k.Message.OrderId);
             cfg.TokenIdProvider = i => i.TokenId;
         });
@@ -69,7 +72,10 @@ public sealed class InventoryReservationStateMachine : StateMachine<InventoryRes
                 .Then(ctx => logger.LogInformation("Releasing reservation: {@Message}", ctx.Message))
                 .Complete(),
             When(InventorySchedule.Received)
-                .Then(ctx => logger.LogInformation("[InventorySchedule.Received] received: {@Message}", ctx.Message))
+                .Then(ctx => logger.LogInformation("[InventorySchedule.Received] received: {@Message}", ctx.Message)),
+            When(CancelScheduleEvent)
+                .Then(ctx => logger.LogInformation("[CancelScheduleEvent] received: {@Message}", ctx.Message))
+                .Unschedule(InventorySchedule)
         );
 
         During(Reserved, When(ConfirmInventoryEvent)

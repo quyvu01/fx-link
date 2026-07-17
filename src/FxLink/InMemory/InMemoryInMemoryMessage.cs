@@ -70,12 +70,6 @@ internal class InMemoryInMemoryMessage<TMessage>
 
     public Task PushMessageAsync(TMessage message, IContext context, CancellationToken token = default)
     {
-        if (message is DiscardMessagePublished { ScheduledMessageId: { } scheduledMessageId })
-        {
-            _dispatcher.CancelToken(scheduledMessageId);
-            return Task.CompletedTask;
-        }
-
         _inboundMessages.Enqueue(new MessageData<TMessage>(message, context, token));
         _inboundRing.Release();
         return Task.CompletedTask;

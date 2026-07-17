@@ -43,6 +43,9 @@ namespace Service1.Migrations
                     b.Property<string>("State")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("TokenId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("CorrelationId");
 
                     b.ToTable("InventoryReservations");

@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
-using FxLink.Entities;
 using FxLink.Extensions;
 using FxLink.Faults;
 using FxLink.StateMachine.Abstractions;
@@ -213,21 +212,14 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
     public IFlowOperator<TInstance, TMessage> Unschedule<T>([NotNull] ISchedule<T> schedule) where T : class
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        return ThenAsync(ActionAsync);
+        return Then(ActionAsync);
 
-        async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
+        // We don't have the mechanism to cancel the event that published to message. So just need to remove the TokenId and handle it on gateway
+        void ActionAsync(IStateMachineContext<TInstance, TMessage> context)
         {
             if (!stateMachine.InternalActivityConfigurators.TryGetValue(schedule, out var configurator) ||
                 configurator is not IScheduleConfigurator<TInstance, T> scheduleConfigurator) return;
-            var publisher = ConsumerAmbient.Services.GetRequiredService<IPublisher>();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
-            var tokenId = scheduleConfigurator.TokenIdProvider.Compile().Invoke(context.Instance);
-            var headers = new Dictionary<string, object>(context.Headers)
-            {
-                [StateMachineConfigurators.MessageRoutingKey] = schedule.Received.Name
-            };
-            await publisher.PublishAsync(new DiscardMessagePublished<T>(tokenId),
-                new PublisherContext(context.CorrelationId, headers), ct);
             setter.Invoke(context.Instance, null); // Set the token Id to null
         }
     }
