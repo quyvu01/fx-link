@@ -18,6 +18,7 @@ public sealed class InventoryReservationStateMachine : StateMachine<InventoryRes
     public IEvent<ReserveInventory> ReserveInventoryEvent { get; private set; }
     public IEvent<ReleaseInventory> ReleaseInventoryEvent { get; private set; }
     public IEvent<ConfirmInventory> ConfirmInventoryEvent { get; private set; }
+    public ISchedule<InventorySchedule> InventorySchedule { get; private set; }
 
     public InventoryReservationStateMachine(ILogger<InventoryReservationStateMachine> logger)
     {
@@ -44,6 +45,13 @@ public sealed class InventoryReservationStateMachine : StateMachine<InventoryRes
             }));
         });
 
+        Schedule(InventorySchedule, cfg =>
+        {
+            cfg.Delay = TimeSpan.FromSeconds(5);
+            cfg.Received = x => x.CorrelationId(k => k.Message.OrderId);
+            cfg.TokenIdProvider = i => i.TokenId;
+        });
+
         Initially(When(ReserveInventoryEvent)
             .Then(context =>
             {
@@ -53,12 +61,15 @@ public sealed class InventoryReservationStateMachine : StateMachine<InventoryRes
                 context.Instance.ReservedAt = DateTime.UtcNow;
                 logger.LogInformation("Inventory reserved: {@Message}", context.Message);
             })
+            .Schedule(InventorySchedule, x => new InventorySchedule { OrderId = x.Message.OrderId })
             .TransitionTo(Reserved)
         );
 
         During(Reserved, When(ReleaseInventoryEvent)
-            .Then(ctx => logger.LogInformation("Releasing reservation: {@Message}", ctx.Message))
-            .Complete()
+                .Then(ctx => logger.LogInformation("Releasing reservation: {@Message}", ctx.Message))
+                .Complete(),
+            When(InventorySchedule.Received)
+                .Then(ctx => logger.LogInformation("[InventorySchedule.Received] received: {@Message}", ctx.Message))
         );
 
         During(Reserved, When(ConfirmInventoryEvent)

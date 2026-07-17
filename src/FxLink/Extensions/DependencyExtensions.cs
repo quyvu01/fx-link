@@ -33,6 +33,9 @@ public static class DependencyExtensions
         configurator.AddConsumerPipelineBehaviors(c => c
             .Of(typeof(RetryPipelineBehavior<>))
         );
+        
+        configurator.AddPublisherPipelineBehaviors(c => c
+            .Of(typeof(PublisherErrorPipelineBehavior<>)));
 
         return new DistributedConfigurator(serviceCollection);
     }

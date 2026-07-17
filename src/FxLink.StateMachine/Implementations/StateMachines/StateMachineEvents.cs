@@ -1,6 +1,8 @@
+using System.Text.Json;
 using FxLink.Abstractions.Contexts;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
+using FxLink.StateMachine.Configurators;
 using FxLink.StateMachine.Contexts;
 using FxLink.StateMachine.Exceptions;
 using FxLink.StateMachine.Extensions;
@@ -18,7 +20,12 @@ public abstract partial class StateMachine<TInstance>
     {
         var @event = new Event<TMessage>();
         // Here, we will resolve the activity
-        if (context.MessageKey is { } messageKey) @event.SetName(messageKey);
+        if (context.Headers.TryGetValue(StateMachineConfigurators.MessageRoutingKey, out var messageRoutingKey))
+        {
+            var messageKey = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(messageRoutingKey));
+            @event.SetName(messageKey);
+        }
+
         var activityConfigurator = _messageConfigurators
             .FirstOrDefault(a => a.Key.Equals(@event));
 

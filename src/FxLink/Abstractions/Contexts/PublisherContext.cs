@@ -6,7 +6,7 @@ public sealed class PublisherContext(Guid correlationId, Dictionary<string, obje
     public PublisherContext(IContext context) : this(context.CorrelationId, context.Headers)
     {
     }
-
-    public TimeSpan? Delay { get; set; }
-    public Guid? ScheduledMessageId { get; set; }
+    //
+    // public TimeSpan? Delay { get; set; }
+    // public Guid? ScheduledMessageId { get; set; }
 }

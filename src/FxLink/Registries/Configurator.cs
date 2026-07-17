@@ -18,7 +18,8 @@ internal class Configurator(IServiceCollection services) : IConfigurator
     public void AddConsumer<TConsumer>()
         where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
-    public void AddConsumerDefinition<TConsumerDefinition>() where TConsumerDefinition : IConsumerDefinition =>
+    public void AddConsumerDefinition<TConsumerDefinition>()
+        where TConsumerDefinition : IConsumerConfigurator =>
         AddConsumerTypeDefinition(typeof(TConsumerDefinition));
 
     public void AddConsumersFromAssemblies(Assembly assembly)
@@ -62,21 +63,10 @@ internal class Configurator(IServiceCollection services) : IConfigurator
 
     internal void AddConsumerTypeDefinition(Type consumerDefinition)
     {
-        if (consumerDefinition.GetGenericBaseType(typeof(AbstractConsumerDefinition<>)) is { } configForConsumer)
-        {
-            var serviceType = typeof(IAbstractConsumerDefinition<>)
-                .MakeGenericType(configForConsumer.GetGenericArguments());
-            Services.TryAddEnumerable(new ServiceDescriptor(serviceType, consumerDefinition,
-                ServiceLifetime.Singleton));
-            return;
-        }
-
-        if (consumerDefinition.GetGenericBaseType(typeof(AbstractConsumerDefinition<,>)) is { } configForMessage)
-        {
-            var serviceType = typeof(IAbstractConsumerDefinition<,>)
-                .MakeGenericType(configForMessage.GetGenericArguments());
-            Services.TryAddEnumerable(new ServiceDescriptor(serviceType, consumerDefinition,
-                ServiceLifetime.Singleton));
-        }
+        if (consumerDefinition.GetGenericBaseType(typeof(ConsumerDefinition<>)) is not { } configForConsumer) return;
+        var serviceType = typeof(IConsumerDefinition<>)
+            .MakeGenericType(configForConsumer.GetGenericArguments());
+        Services.TryAddEnumerable(new ServiceDescriptor(serviceType, consumerDefinition,
+            ServiceLifetime.Singleton));
     }
 }

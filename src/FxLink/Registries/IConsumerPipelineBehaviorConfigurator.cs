@@ -23,7 +23,6 @@ public sealed class ConsumerPipelineBehaviorConfigurator(IServiceCollection serv
         where TPipelineBehavior : IConsumerPipelineBehavior
         => Of(typeof(TPipelineBehavior), serviceLifetime);
 
-    // Todo: Need to check more edge case, especial Generic type
     public IConsumerPipelineBehaviorConfigurator Of(Type runtimePipelineType,
         ServiceLifetime serviceLifetime = ServiceLifetime.Scoped)
     {

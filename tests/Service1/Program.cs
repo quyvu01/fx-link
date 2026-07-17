@@ -2,6 +2,7 @@ using System.Data;
 using System.Reflection;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
+using FxLink.Configurators;
 using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.StateMachine.EntityFrameworkCore.Extensions;
@@ -75,12 +76,13 @@ builder.Services.AddFxLink(opts =>
 
         c.Of<InventoryReservationStateMachine>(cfg =>
         {
-            cfg.EntityFrameworkRepository(config =>
-            {
-                config.SetIsolationLevel(IsolationLevel.ReadCommitted);
-                config.UseConcurrencyMode(x => x.Pessimistic(SqlDialect.PostgreSql));
-                config.DbContextFactory(sp => sp.GetRequiredService<AppDbContext>());
-            });
+            cfg.InMemoryRepository();
+            // cfg.EntityFrameworkRepository(config =>
+            // {
+            //     config.SetIsolationLevel(IsolationLevel.ReadCommitted);
+            //     config.UseConcurrencyMode(x => x.Pessimistic(SqlDialect.PostgreSql));
+            //     config.DbContextFactory(sp => sp.GetRequiredService<AppDbContext>());
+            // });
         });
     });
 });
@@ -105,8 +107,12 @@ app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logge
     {
         var orderId = Guid.NewGuid();
         // IPublisherContext.Delay used directly (Schedule(...) is the state-machine sugar for this).
+        var headers = new Dictionary<string, object>()
+        {
+            [DistributedConfigurators.DelayInMsKey] = TimeSpan.FromSeconds(3).TotalMilliseconds
+        };
         await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow },
-            new PublisherContext(Guid.NewGuid(), []) { Delay = TimeSpan.FromSeconds(3) });
+            new PublisherContext(Guid.NewGuid(), headers));
         logger.LogInformation("Order placed: {@OrderId}", orderId);
         return "Order placed";
     })

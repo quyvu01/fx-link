@@ -23,7 +23,6 @@ public sealed class PublisherPipelineBehaviorConfigurator(IServiceCollection ser
         where TPipelineBehavior : IPublisherPipelineBehavior
         => Of(typeof(TPipelineBehavior), serviceLifetime);
 
-    // Todo: Need to check more edge case, especial Generic type
     public IPublisherPipelineBehaviorConfigurator Of(Type runtimePipelineType,
         ServiceLifetime serviceLifetime = ServiceLifetime.Scoped)
     {
