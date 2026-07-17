@@ -79,7 +79,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             .GroupBy(a => a.ConsumerType)
             .Select(async c =>
             {
-                var consumerType = c.Key as Type;
+                var consumerType = c.Key;
                 var queueName = consumerType.GetConsumerName();
                 var deadLetterQueue = consumerType.GetDeadLetterConsumerName();
 

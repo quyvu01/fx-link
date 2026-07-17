@@ -1,9 +1,10 @@
+using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.StateMachine.Registries;
 
 namespace FxLink.StateMachine.Abstractions;
 
-public interface IStateMachine
+public interface IStateMachine : IConsumer
 {
     IState Initial { get; }
     IState Completed { get; }

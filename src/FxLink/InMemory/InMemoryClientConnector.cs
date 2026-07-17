@@ -28,7 +28,7 @@ internal sealed class InMemoryClientConnector<TMessage> :
                     var consumerTypes = messageKeys.GetKeysByMessageType(typeof(TMessage));
                     var consumerContext = new ConsumerContext<TMessage>(message.Message, requesterId, message.Context);
                     var tasks = consumerTypes.Select(async c =>
-                        await server.ConsumeAsync(consumerContext, c as Type, message.Token));
+                        await server.ConsumeAsync(consumerContext, c, message.Token));
                     await Task.WhenAll(tasks);
                 });
                 if (message.Context is IResponseContext responseContext)
