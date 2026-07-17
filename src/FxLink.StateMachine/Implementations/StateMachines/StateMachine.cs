@@ -25,6 +25,7 @@ public abstract partial class StateMachine<TInstance> :
     private readonly Dictionary<IActivity, IActivityConfigurator> _internalActivityConfigurators = [];
     private readonly Dictionary<IEvent, IActivityConfigurator> _messageConfigurators = [];
     private readonly ConcurrentDictionary<IState, List<IFlow>> _stateMapFlows = [];
+    private readonly Dictionary<IEvent, IActivityConfigurator> _innerMessageConfigurators = [];
     private bool _removeInstanceWhenCompleted;
 
     protected StateMachine()
@@ -57,6 +58,7 @@ public abstract partial class StateMachine<TInstance> :
         if (!_internalActivityConfigurators.TryAdd(schedule, config))
             throw new StateMachineException.ActivityAlreadyConfigured(typeof(TMessage));
         Event(schedule.Received, ev => config.Received.Invoke(ev));
+        _innerMessageConfigurators.TryAdd(schedule.Received, config);
     }
 
     protected void Request<TRequest, TResponse>([NotNull] IRequest<TRequest, TResponse> request,

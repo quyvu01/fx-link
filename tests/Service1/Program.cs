@@ -76,13 +76,13 @@ builder.Services.AddFxLink(opts =>
 
         c.Of<InventoryReservationStateMachine>(cfg =>
         {
-            cfg.InMemoryRepository();
-            // cfg.EntityFrameworkRepository(config =>
-            // {
-            //     config.SetIsolationLevel(IsolationLevel.ReadCommitted);
-            //     config.UseConcurrencyMode(x => x.Pessimistic(SqlDialect.PostgreSql));
-            //     config.DbContextFactory(sp => sp.GetRequiredService<AppDbContext>());
-            // });
+            // cfg.InMemoryRepository();
+            cfg.EntityFrameworkRepository(config =>
+            {
+                config.SetIsolationLevel(IsolationLevel.ReadCommitted);
+                config.UseConcurrencyMode(x => x.Pessimistic(SqlDialect.PostgreSql));
+                config.DbContextFactory(sp => sp.GetRequiredService<AppDbContext>());
+            });
         });
     });
 });
@@ -210,6 +210,15 @@ app.MapPost("/inventory/confirm", async (IPublisher publisher, Guid orderId) =>
     })
     .WithTags("Inventory")
     .WithSummary("Confirm a reservation (missing instance -> ExecuteAsync())")
+    .WithOpenApi();
+
+app.MapPost("/inventory/cancel-schedule", async (IPublisher publisher, Guid orderId) =>
+    {
+        await publisher.PublishAsync(new CancelSchedule { OrderId = orderId });
+        return "Inventory Schedule cancelled!";
+    })
+    .WithTags("Inventory")
+    .WithSummary("Reserve inventory for an order (creates the reservation instance)")
     .WithOpenApi();
 
 app.MapPost("/rabbitmq/test-publish", async (IPublisher publisher) =>

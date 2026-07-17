@@ -23,7 +23,15 @@ public static class ExpressionExtensions
     }
 
     private static readonly ConcurrentDictionary<Type, Delegate> SetterCache = new();
+    private static readonly ConcurrentDictionary<Type, Delegate> GetterCache = new();
 
     public static Action<T, TProp> GetSetter<T, TProp>(this Expression<Func<T, TProp>> expr) =>
         (Action<T, TProp>)SetterCache.GetOrAdd(typeof(T), _ => CreateSetter(expr));
+
+    private static Func<T, TProp> CreateGetter<T, TProp>(Expression<Func<T, TProp>> propertyExpression) =>
+        propertyExpression.Compile();
+
+
+    public static Func<T, TProp> GetGetter<T, TProp>(this Expression<Func<T, TProp>> expr) =>
+        (Func<T, TProp>)GetterCache.GetOrAdd(typeof(T), _ => CreateGetter(expr));
 }

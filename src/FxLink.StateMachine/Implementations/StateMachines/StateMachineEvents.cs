@@ -1,5 +1,7 @@
 using System.Text.Json;
 using FxLink.Abstractions.Contexts;
+using FxLink.Configurators;
+using FxLink.Extensions;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
 using FxLink.StateMachine.Configurators;
@@ -26,10 +28,18 @@ public abstract partial class StateMachine<TInstance>
             @event.SetName(messageKey);
         }
 
+        var messageType = context.Headers
+                .TryGetValue(DistributedConfigurators.MessageTypeKey, out var messageTypeAsObj) switch
+            {
+                true => JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(messageTypeAsObj)),
+                _ => null
+            };
+
+        var isMessageDelaying = messageType == DistributedConfigurators.MessageTypeDelay;
+
         var activityConfigurator = _messageConfigurators
             .FirstOrDefault(a => a.Key.Equals(@event));
 
-        // Temporary move to this scope, I will write the schedule then merge again.
         if (activityConfigurator.Value is not EventConfigurator<TInstance, TMessage> configurator) return;
 
         var services = ConsumerAmbient.Services;
@@ -59,6 +69,7 @@ public abstract partial class StateMachine<TInstance>
         var instance = await machineInstanceRepository.GetInstanceAsync(predicate, token);
         if (instance is null)
         {
+            if (isMessageDelaying) return; // Completed?
             if (statesWithFlows.All(x => x.State != Initial))
             {
                 var missingInstanceAction = configurator.MissingInstanceBehavior;
@@ -81,6 +92,17 @@ public abstract partial class StateMachine<TInstance>
         var flow = statesWithFlows.FirstOrDefault(x => (State)x.State == new State(instance.State)).FlowOperator;
         if (flow is null)
             throw new StateMachineException.EventNotDeclaredForState(typeof(TMessage), instance.State);
+
+        if (_innerMessageConfigurators.TryGetValue(@event, out var c) &&
+            c is IScheduleConfigurator<TInstance, TMessage> scheduleConfigurator)
+        {
+            var tokenGetter = scheduleConfigurator.TokenIdProvider.GetGetter();
+            var tokenId = tokenGetter.Invoke(instance);
+            if (tokenId is null) return; // It means that we've unschedule the event
+            // Then, if this is the schedule received event, we have to set tokenId to null as well.
+            var tokenIdSetter = scheduleConfigurator.TokenIdProvider.GetSetter();
+            tokenIdSetter.Invoke(instance, null);
+        }
 
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
             (instance, context.Message, context.RequesterId, context);
