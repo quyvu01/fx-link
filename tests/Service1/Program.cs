@@ -106,13 +106,8 @@ if (app.Environment.IsDevelopment())
 app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logger) =>
     {
         var orderId = Guid.NewGuid();
-        // IPublisherContext.Delay used directly (Schedule(...) is the state-machine sugar for this).
-        var headers = new Dictionary<string, object>()
-        {
-            [DistributedConfigurators.DelayInMsKey] = TimeSpan.FromSeconds(3).TotalMilliseconds
-        };
         await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow },
-            new PublisherContext(Guid.NewGuid(), headers));
+            new PublisherContext(Guid.NewGuid(), []));
         logger.LogInformation("Order placed: {@OrderId}", orderId);
         return "Order placed";
     })

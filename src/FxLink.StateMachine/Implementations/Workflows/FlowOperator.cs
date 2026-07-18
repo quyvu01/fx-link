@@ -200,9 +200,9 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
             setter.Invoke(context.Instance, tokenId);
             var headers = new Dictionary<string, object>(context.Headers)
             {
-                [DistributedConfigurators.MessageTypeKey] = DistributedConfigurators.MessageTypeDelay,
-                [DistributedConfigurators.DelayInMsKey] = delay.TotalMilliseconds,
-                [DistributedConfigurators.ScheduleMessageKey] = tokenId.ToString(),
+                [DistributedConfigurators.Headers.MessageTypeKey] = DistributedConfigurators.MessageTypes.Delay,
+                [DistributedConfigurators.Headers.DelayInMsKey] = delay.TotalMilliseconds,
+                [DistributedConfigurators.Headers.ScheduleMessageKey] = tokenId.ToString(),
                 [StateMachineConfigurators.MessageRoutingKey] = schedule.Received.Name,
             };
             await publisher.PublishAsync(message, new PublisherContext(context.CorrelationId, headers), ct);

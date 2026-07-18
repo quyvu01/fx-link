@@ -20,7 +20,7 @@ internal class InMemoryInMemoryMessage<TMessage>
     {
         var token = CancellationToken.None;
         if (item.Context is IPublisherContext &&
-            item.Context.Headers.TryGetValue(DistributedConfigurators.ScheduleMessageKey, out var messageId))
+            item.Context.Headers.TryGetValue(DistributedConfigurators.Headers.ScheduleMessageKey, out var messageId))
         {
             token = _dispatcher.AcquiredToken(Guid.Parse(messageId.ToString()!), delay);
         }
@@ -41,11 +41,11 @@ internal class InMemoryInMemoryMessage<TMessage>
                 if (messageData.Context is IPublisherContext publisherContext)
                 {
                     var headers = publisherContext.Headers;
-                    if (headers.TryGetValue(DistributedConfigurators.MessageTypeKey,
+                    if (headers.TryGetValue(DistributedConfigurators.Headers.MessageTypeKey,
                             out var messageKeyTypeObj) &&
-                        messageKeyTypeObj.Equals(DistributedConfigurators.MessageTypeDelay))
+                        messageKeyTypeObj.Equals(DistributedConfigurators.MessageTypes.Delay))
                     {
-                        if (headers.TryGetValue(DistributedConfigurators.DelayInMsKey, out var delayObject) &&
+                        if (headers.TryGetValue(DistributedConfigurators.Headers.DelayInMsKey, out var delayObject) &&
                             double.TryParse(delayObject.ToString(), out var delay))
                         {
                             PushToDelayChannel(messageData, TimeSpan.FromMilliseconds(delay));
