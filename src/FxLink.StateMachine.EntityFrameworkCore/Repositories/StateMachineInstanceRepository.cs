@@ -1,28 +1,28 @@
 using System.Data;
 using System.Linq.Expressions;
 using FxLink.StateMachine.Abstractions;
-using FxLink.StateMachine.EntityFrameworkCore.Delegates;
 using FxLink.StateMachine.EntityFrameworkCore.Exceptions;
 using FxLink.StateMachine.EntityFrameworkCore.Registries;
+using FxLink.StateMachine.EntityFrameworkCore.Wrappers;
 using FxLink.StateMachine.Helpers;
 using FxLink.StateMachine.Implementations.StateMachines;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.EntityFrameworkCore.Repositories;
 
-public sealed class StateMachineInstanceRepository<TInstance> :
+internal sealed class StateMachineInstanceRepository<TInstance> :
     IStateMachineInstanceRepository<TInstance> where TInstance : class, IStateMachineInstance
 {
     private readonly DbContext _dbContext;
     private readonly DbSet<TInstance> _collections;
     private readonly StateMachineEntityFrameworkOptions _options;
 
-    public StateMachineInstanceRepository(GetStateMachineInstance getStateMachineInstance,
-        StateMachineEntityFrameworkOptions options)
+    public StateMachineInstanceRepository(IServiceProvider serviceProvider)
     {
-        _dbContext = getStateMachineInstance.Invoke();
+        _dbContext = serviceProvider.GetRequiredKeyedService<DbContextWrapped>(typeof(TInstance)).DbContext;
         _collections = _dbContext.Set<TInstance>();
-        _options = options;
+        _options = serviceProvider.GetRequiredKeyedService<StateMachineEntityFrameworkOptions>(typeof(TInstance));
     }
 
     public async Task<TInstance> GetInstanceAsync(Expression<Func<TInstance, bool>> filter,
