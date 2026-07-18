@@ -22,7 +22,7 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
         ArgumentNullException.ThrowIfNull(config);
         services.AddSingleton(typeof(TStateMachine));
         RegisterStateMachineConsumers<TStateMachine>();
-        var stateMachineSetup = new StateMachineSetup(services);
+        var stateMachineSetup = new StateMachineSetup(services, typeof(TStateMachine));
         config(stateMachineSetup);
         return this;
     }

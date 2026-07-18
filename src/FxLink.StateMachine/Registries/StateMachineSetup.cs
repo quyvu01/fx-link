@@ -4,8 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Registries;
 
-public sealed class StateMachineSetup(IServiceCollection services) : IStateMachineSetup
+internal sealed class StateMachineSetup(IServiceCollection services, Type stateMachineType) : IStateMachineSetup
 {
+    public Type StateMachineType { get; } = stateMachineType;
     public IServiceCollection Services => services;
 
     public void InMemoryRepository()

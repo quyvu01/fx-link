@@ -14,11 +14,12 @@ public static class DependencyExtensions
     {
         ArgumentNullException.ThrowIfNull(stateMachineSetup);
         ArgumentNullException.ThrowIfNull(options);
-        var configurator = new StateMachineEntityFrameworkConfigurator(stateMachineSetup.Services);
+        var services = stateMachineSetup.Services;
+        var configurator = new StateMachineEntityFrameworkConfigurator(stateMachineSetup, services);
         options.Invoke(configurator);
         configurator.ValidateItSelf();
-        stateMachineSetup.Services.AddSingleton(configurator.ToOptions());
-        stateMachineSetup.Services.AddScoped(typeof(IStateMachineInstanceRepository<>),
-            typeof(StateMachineInstanceRepository<>));
+        services.AddScoped(typeof(IStateMachineInstanceRepository<>), typeof(StateMachineInstanceRepository<>));
+        stateMachineSetup.Services.AddKeyedSingleton<StateMachineEntityFrameworkOptions>(
+            configurator.StateMachineInstanceType, configurator.ToOptions());
     }
 }
