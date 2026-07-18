@@ -64,10 +64,10 @@ internal class RabbitMqClientConnector<TMessage> :
         var messageType = GetMessageType(context);
         switch (messageType)
         {
-            case DistributedConfigurators.MessageTypeRetry:
+            case DistributedConfigurators.MessageTypes.Retry:
                 props.Expiration = GetTimeToLiveFromHeader(context.Headers).ToString();
                 break;
-            case DistributedConfigurators.MessageTypeDelay:
+            case DistributedConfigurators.MessageTypes.Delay:
                 props.Headers = new Dictionary<string, object>(context.Headers);
                 props.Headers["x-delay"] = GetDelayTimeFromHeader(context.Headers);
                 break;
@@ -85,7 +85,7 @@ internal class RabbitMqClientConnector<TMessage> :
 
     private static string GetMessageType(IContext context)
     {
-        if (!context.Headers.TryGetValue(DistributedConfigurators.MessageTypeKey, out var messageTypeObject))
+        if (!context.Headers.TryGetValue(DistributedConfigurators.Headers.MessageTypeKey, out var messageTypeObject))
             return null;
         var messageTypeJson = JsonSerializer.Serialize(messageTypeObject);
         return JsonSerializer.Deserialize<string>(messageTypeJson);
@@ -96,22 +96,22 @@ internal class RabbitMqClientConnector<TMessage> :
         if (context is IResponseContext) return string.Empty;
         return messageType switch
         {
-            DistributedConfigurators.MessageTypeRetry => typeof(TMessage).GetRetryExchangeName(),
-            DistributedConfigurators.MessageTypeDeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
-            DistributedConfigurators.MessageTypeDelay => typeof(TMessage).GetDelayExchangeName(),
+            DistributedConfigurators.MessageTypes.Retry => typeof(TMessage).GetRetryExchangeName(),
+            DistributedConfigurators.MessageTypes.DeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
+            DistributedConfigurators.MessageTypes.Delay => typeof(TMessage).GetDelayExchangeName(),
             _ => typeof(TMessage).GetExchangeName()
         };
     }
 
     private static long GetTimeToLiveFromHeader(Dictionary<string, object> headers)
     {
-        if (!headers.TryGetValue(DistributedConfigurators.TimeToLiveKey, out var timeToLiveObject)) return 0;
+        if (!headers.TryGetValue(DistributedConfigurators.Headers.TimeToLiveKey, out var timeToLiveObject)) return 0;
         return double.TryParse(JsonSerializer.Serialize(timeToLiveObject), out var timeToLive) ? (long)timeToLive : 0;
     }
 
     private static long GetDelayTimeFromHeader(Dictionary<string, object> headers)
     {
-        if (!headers.TryGetValue(DistributedConfigurators.DelayInMsKey, out var delayInMs)) return 0;
+        if (!headers.TryGetValue(DistributedConfigurators.Headers.DelayInMsKey, out var delayInMs)) return 0;
         return double.TryParse(JsonSerializer.Serialize(delayInMs), out var delay) ? (long)delay : 0;
     }
 }

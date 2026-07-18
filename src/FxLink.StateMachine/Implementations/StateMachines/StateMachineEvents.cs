@@ -29,13 +29,13 @@ public abstract partial class StateMachine<TInstance>
         }
 
         var messageType = context.Headers
-                .TryGetValue(DistributedConfigurators.MessageTypeKey, out var messageTypeAsObj) switch
+                .TryGetValue(DistributedConfigurators.Headers.MessageTypeKey, out var messageTypeAsObj) switch
             {
                 true => JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(messageTypeAsObj)),
                 _ => null
             };
 
-        var isMessageDelaying = messageType == DistributedConfigurators.MessageTypeDelay;
+        var isMessageDelaying = messageType == DistributedConfigurators.MessageTypes.Delay;
 
         var activityConfigurator = _messageConfigurators
             .FirstOrDefault(a => a.Key.Equals(@event));
