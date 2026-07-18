@@ -106,8 +106,7 @@ if (app.Environment.IsDevelopment())
 app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logger) =>
     {
         var orderId = Guid.NewGuid();
-        await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow },
-            new PublisherContext(Guid.NewGuid(), []));
+        await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow });
         logger.LogInformation("Order placed: {@OrderId}", orderId);
         return "Order placed";
     })
@@ -118,7 +117,7 @@ app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logge
 app.MapGet("/orders/result", async (IRequester<OrderResult> requester, Guid orderId, CancellationToken token) =>
     {
         var result = await requester.RequestAsync<OrderResultResponse>(new OrderResult { OrderId = orderId },
-            new RequestContext(Guid.NewGuid(), []) { Timeout = TimeSpan.FromSeconds(5) }, token);
+            RequestContext.New(timeout: TimeSpan.FromSeconds(5)), token);
         return result;
     })
     .WithTags("Plain pub/sub")

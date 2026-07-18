@@ -21,6 +21,11 @@
     </ItemGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="FxLink.RabbitMq"/>
+        <InternalsVisibleTo Include="FxLink.StateMachine"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <None Include="..\..\FxLink.png">
             <Pack>True</Pack>
             <PackagePath/>

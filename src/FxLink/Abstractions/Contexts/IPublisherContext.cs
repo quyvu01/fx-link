@@ -1,7 +1,3 @@
 namespace FxLink.Abstractions.Contexts;
 
-public interface IPublisherContext : IContext
-{
-    // TimeSpan? Delay { get; set; }
-    // Guid? ScheduledMessageId { get; set; }
-}
+public interface IPublisherContext : IContext;

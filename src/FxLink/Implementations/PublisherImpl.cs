@@ -17,5 +17,5 @@ internal sealed class PublisherImpl(IServiceProvider serviceProvider) : IPublish
     }
 
     public Task PublishAsync<TMessage>(TMessage message, CancellationToken token = default) where TMessage : class =>
-        PublishAsync(message, new PublisherContext(Guid.NewGuid(), []), token);
+        PublishAsync(message, PublisherContext.New(), token);
 }
