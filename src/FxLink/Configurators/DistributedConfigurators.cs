@@ -20,6 +20,7 @@ public static class DistributedConfigurators
         public const string DelayInMsKey = "x-delay-ms";
         public const string ScheduleMessageKey = "x-schedule-message";
         public const string MessageTypeKey = "x-message-type";
+        public const string ReplyToKey = "x-reply-to";
 
         public const string ExceptionTypeKey = "x-exception-type";
         public const string ExceptionMessageKey = "x-exception-message";

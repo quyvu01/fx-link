@@ -6,5 +6,4 @@ public interface IConsumerContext<out TMessage> : IConsumerContext where TMessag
 {
     Guid? RequesterId { get; }
     TMessage Message { get; }
-    string RoutingKey { get; }
 }

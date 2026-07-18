@@ -24,7 +24,6 @@ internal record StateMachineActivityContext<TInstance, TMessage>(
 
     public void TranslationTo(string state) => TranslationToAction = () => state;
 
-    public string MessageKey { get; set; }
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
 }
@@ -48,7 +47,6 @@ internal record StateMachineActivityContext<TInstance>(
 
     public void TranslationTo(string state) => TranslationToAction = () => state;
 
-    public string MessageKey { get; set; }
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
 }

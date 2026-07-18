@@ -2,7 +2,6 @@ using System.Data;
 using System.Reflection;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
-using FxLink.Configurators;
 using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.StateMachine.EntityFrameworkCore.Extensions;
@@ -11,6 +10,7 @@ using FxLink.StateMachine.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using Service1.Consumers;
 using Service1.Databases;
 using Service1.Dtos.Inventory;
 using Service1.Dtos.Orders;
@@ -239,6 +239,14 @@ app.MapPost("/rabbitmq/test-retry", async (IPublisher publisher) =>
         await publisher.PublishAsync(new RabbitMqTestRetry
             { TestData = $"Test at: {DateTime.UtcNow:dd/MM/yyyy HH:mm:ss}" });
         return "RabbitMq test retry with publish";
+    })
+    .WithTags("Rabbitmq")
+    .WithOpenApi();
+
+app.MapPost("/rabbitmq/get-person", async (IRequester<GetPerson> requester) =>
+    {
+        var response = await requester.RequestAsync<PersonResponse>(new GetPerson { PersonId = "123" });
+        return response;
     })
     .WithTags("Rabbitmq")
     .WithOpenApi();

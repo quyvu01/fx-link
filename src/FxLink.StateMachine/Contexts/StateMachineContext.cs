@@ -19,7 +19,6 @@ internal record StateMachineContext<TInstance, TMessage>(
     }
 
     public Guid? RequesterId { get; } = RequesterId;
-    public string MessageKey { get; set; }
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
 }
@@ -38,7 +37,6 @@ internal record StateMachineContext<TInstance>(
     }
 
     public Guid? RequesterId { get; } = RequesterId;
-    public string MessageKey { get; set; }
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
 }
