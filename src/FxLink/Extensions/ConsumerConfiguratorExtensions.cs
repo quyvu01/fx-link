@@ -21,9 +21,6 @@ public static class ConsumerConfiguratorExtensions
             throw new FxLinkException.ConsumerConfiguratorMustBeGeneric(configuratorType);
         var consumerType = configuratorType.GetGenericArguments().First();
         var messageType = typeof(TMessage);
-        if (!typeof(IConsumer<>).MakeGenericType(messageType).IsAssignableFrom(consumerType))
-            throw new FxLinkException.ConsumerMessageTypeMismatch(consumerType, messageType);
-
         var method = UseMessageRetryMethodCache.GetOrAdd((consumerType, messageType), BuildUseMessageRetryMethod);
         method.Invoke(null, [configurator, options]);
     }
@@ -37,7 +34,7 @@ public static class ConsumerConfiguratorExtensions
 
     private static void UseMessageRetryForConsumerMessage<TConsumer, TMessage>(
         IConsumerConfigurator<TConsumer> configurator, Action<IMessageRetryPolicy> options)
-        where TConsumer : IConsumer<TMessage> where TMessage : class
+        where TConsumer : IConsumer where TMessage : class
     {
         var messageConfigurator = new ConsumerConfigurator<TConsumer, TMessage>();
         messageConfigurator.UseMessageRetry(options);
