@@ -34,8 +34,11 @@ internal class RabbitMqClientConnector<TMessage> :
 
             using var scope = services.CreateScope();
             var serverConnector = scope.ServiceProvider.GetRequiredService<IConsumerConnector<TMessage>>();
+            var headers = envelope.Context.Headers;
+            if (e.BasicProperties.ReplyTo is { Length: > 0 } replyTo)
+                headers[DistributedConfigurators.Headers.ReplyToKey] = replyTo;
             var consumerContext = new ConsumerContext<TMessage>(envelope.Message, envelope.Context.RequesterId,
-                envelope.Context.CorrelationId, envelope.Context.Headers) { RoutingKey = e.BasicProperties.ReplyTo };
+                envelope.Context.CorrelationId, headers);
             await serverConnector.ConsumeAsync(consumerContext, consumerType, ct);
             var channel = ((AsyncEventingBasicConsumer)sender).Channel;
             await channel.BasicAckAsync(e.DeliveryTag, true, ct);
@@ -77,7 +80,11 @@ internal class RabbitMqClientConnector<TMessage> :
         var messageSerialize = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
         var messageBytes = Encoding.UTF8.GetBytes(messageSerialize);
         var exchangeName = GetExchangeName(context, messageType);
-        var routingKey = context is IResponseContext responseContext ? responseContext.RoutingKey : string.Empty;
+        var routingKey = string.Empty;
+        if (context is IResponseContext responseContext && responseContext.Headers
+                .TryGetValue(DistributedConfigurators.Headers.ReplyToKey, out var replyToAsObject))
+            routingKey = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(replyToAsObject));
+
         if (_client.Channel is { } channel)
             await channel.BasicPublishAsync(exchangeName, routingKey: routingKey,
                 mandatory: true, basicProperties: props, body: messageBytes, cancellationToken: token);

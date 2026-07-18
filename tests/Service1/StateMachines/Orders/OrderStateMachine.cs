@@ -130,7 +130,7 @@ public sealed class OrderStateMachine : StateMachine<OrderStateMachineInstance>
             .IfElse(ctx => ctx.Message.CancelledTime > DateTime.UtcNow.Subtract(TimeSpan.FromDays(1)),
                 succeed => succeed
                     .TransitionTo(OrderSucceed)
-                    .Publish(xtc => new OrderCancelled())
+                    .Publish(_ => new OrderCancelled())
                 , otherwise => otherwise
                     .TransitionTo(OrderCancelled)
                     .Publish(_ => new OrderPlaced())
