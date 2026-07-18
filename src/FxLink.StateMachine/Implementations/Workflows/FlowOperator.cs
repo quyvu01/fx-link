@@ -195,7 +195,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
             var message = await messageFactoryAsync.Invoke(context, ct);
             var delay = scheduleConfigurator.Delay ?? scheduleConfigurator.DelayProvider.Invoke(context);
             var publisher = ConsumerAmbient.Services.GetRequiredService<IPublisher>();
-            var tokenId = Guid.NewGuid();
+            var tokenId = Id.New();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             setter.Invoke(context.Instance, tokenId);
             var headers = new Dictionary<string, object>(context.Headers)

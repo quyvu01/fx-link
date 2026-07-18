@@ -32,5 +32,5 @@ internal class RequesterImpl<TMessage>(
     public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message,
         CancellationToken token = default)
         where TResponse : class
-        => RequestAsync<TResponse>(message, new RequestContext(Guid.NewGuid(), []), token);
+        => RequestAsync<TResponse>(message, RequestContext.New(), token);
 }

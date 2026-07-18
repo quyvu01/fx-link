@@ -16,7 +16,7 @@ internal record StateMachineActivityContext<TInstance, TMessage>(
     internal Func<string> TranslationToAction { get; private set; }
 
     public StateMachineActivityContext(TInstance Instance, TMessage Message, Guid? RequesterId, IContext context) :
-        this(Instance, Message, RequesterId, context.CorrelationId, context.Headers)
+        this(Instance, Message, RequesterId, context.CorrelationId, new Dictionary<string, object>(context.Headers))
     {
     }
 
@@ -39,7 +39,7 @@ internal record StateMachineActivityContext<TInstance>(
     internal Func<string> TranslationToAction { get; private set; }
 
     internal StateMachineActivityContext(TInstance Instance, Guid? RequesterId, IContext context) :
-        this(Instance, RequesterId, context.CorrelationId, context.Headers)
+        this(Instance, RequesterId, context.CorrelationId, new Dictionary<string, object>(context.Headers))
     {
     }
 

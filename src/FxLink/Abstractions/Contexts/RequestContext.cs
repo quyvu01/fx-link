@@ -1,13 +1,30 @@
+using FxLink.Statics;
+
 namespace FxLink.Abstractions.Contexts;
 
-public sealed class RequestContext(Guid correlationId, Dictionary<string, object> headers)
-    : AbstractContext(correlationId, headers), IRequestContext
+public sealed class RequestContext : AbstractContext, IRequestContext
 {
-    public Guid RequesterId { get; internal set; } = Guid.NewGuid();
+    internal RequestContext(Guid correlationId, Dictionary<string, object> headers)
+        : base(correlationId, headers)
+    {
+    }
+
+    public RequestContext(IContext context)
+        : this(context.CorrelationId, new Dictionary<string, object>(context.Headers))
+    {
+    }
+
+    public Guid RequesterId { get; internal set; } = Id.New();
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan? TimeToLive { get; set; } = TimeSpan.FromSeconds(30);
 
-    public RequestContext(IContext context) : this(context.CorrelationId, context.Headers)
+    public static RequestContext New(TimeSpan? timeout = null, TimeSpan? timeToLive = null,
+        IDictionary<string, object> headers = null)
     {
+        var headerCloned = new Dictionary<string, object>(headers ?? new Dictionary<string, object>());
+        var context = new RequestContext(Id.New(), headerCloned);
+        if (timeout is { } t) context.Timeout = t;
+        if (timeToLive is { } ttl) context.TimeToLive = ttl;
+        return context;
     }
 }
