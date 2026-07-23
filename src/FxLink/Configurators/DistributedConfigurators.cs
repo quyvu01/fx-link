@@ -16,7 +16,6 @@ public static class DistributedConfigurators
     public static class Headers
     {
         public const string RetryCountKey = "x-retry-count";
-        public const string TimeToLiveKey = "x-retry-ttl";
         public const string DelayInMsKey = "x-delay-ms";
         public const string ScheduleMessageKey = "x-schedule-message";
         public const string MessageTypeKey = "x-message-type";
@@ -29,7 +28,6 @@ public static class DistributedConfigurators
 
     public static class MessageTypes
     {
-        public const string Retry = "message-retry";
         public const string DeadLetter = "message-dead-letter";
         public const string Delay = "message-delay";
     }

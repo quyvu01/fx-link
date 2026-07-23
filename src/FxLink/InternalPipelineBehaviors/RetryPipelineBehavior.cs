@@ -42,11 +42,11 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             {
                 context.Headers[DistributedConfigurators.Headers.MessageTypeKey] =
                     DistributedConfigurators.MessageTypes.DeadLetter;
-                context.Headers.Remove(DistributedConfigurators.Headers.TimeToLiveKey);
-                context.Headers.Remove(DistributedConfigurators.Headers.RetryCountKey);
-                context.Headers[DistributedConfigurators.Headers.ExceptionTypeKey] = ex.GetType().FullName ?? ex.GetType().Name;
+                context.Headers[DistributedConfigurators.Headers.ExceptionTypeKey] =
+                    ex.GetType().FullName ?? ex.GetType().Name;
                 context.Headers[DistributedConfigurators.Headers.ExceptionMessageKey] = ex.Message;
-                context.Headers[DistributedConfigurators.Headers.ExceptionStackTraceKey] = ex.StackTrace ?? string.Empty;
+                context.Headers[DistributedConfigurators.Headers.ExceptionStackTraceKey] =
+                    ex.StackTrace ?? string.Empty;
                 logger?.LogError(
                     "Message has been moved to dead letter queue due the exception ignore: {@Message} with exception: {@Exception}",
                     context.Message, new { ex.Message, ex.StackTrace });
@@ -56,34 +56,29 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
 
             var retryCount = GetRetryCountFromHeader(context.Headers);
 
-            Action headerAction = (retryCount < intervals.Length) switch
+            if (retryCount < intervals.Length)
             {
-                true => () =>
-                {
-                    var nextRetry = intervals[retryCount];
-                    context.Headers[DistributedConfigurators.Headers.RetryCountKey] = retryCount + 1;
-                    context.Headers[DistributedConfigurators.Headers.TimeToLiveKey] = nextRetry.TotalMilliseconds;
-                    context.Headers[DistributedConfigurators.Headers.MessageTypeKey] =
-                        DistributedConfigurators.MessageTypes.Retry;
-                    logger?.LogWarning(
-                        "Message: {@Message} processed failed with exception: {@Exception}. Retry will be processed after: {@TimeSpan}",
-                        context.Message, new { ex.Message, ex.StackTrace }, nextRetry);
-                },
-                _ => () =>
-                {
-                    context.Headers[DistributedConfigurators.Headers.MessageTypeKey] =
-                        DistributedConfigurators.MessageTypes.DeadLetter;
-                    context.Headers.Remove(DistributedConfigurators.Headers.TimeToLiveKey);
-                    context.Headers.Remove(DistributedConfigurators.Headers.RetryCountKey);
-                    context.Headers[DistributedConfigurators.Headers.ExceptionTypeKey] = ex.GetType().FullName ?? ex.GetType().Name;
-                    context.Headers[DistributedConfigurators.Headers.ExceptionMessageKey] = ex.Message;
-                    context.Headers[DistributedConfigurators.Headers.ExceptionStackTraceKey] = ex.StackTrace ?? string.Empty;
-                    logger?.LogError(
-                        "Message: {@Message} processed failed with exception: {@Exception} after {@Times} times. Message has been moved to dead letter queue!",
-                        context.Message, new { ex.Message, ex.StackTrace }, intervals.Length);
-                }
-            };
-            headerAction.Invoke();
+                var interval = intervals[retryCount];
+                logger?.LogWarning(
+                    "Message: {@Message} processed failed with exception: {@Exception}. Retry will be processed after: {@Internal}",
+                    context.Message, new { ex.Message, ex.StackTrace }, interval);
+                await Task.Delay(interval, token);
+                var connector = services.GetRequiredService<IConsumerConnector<TMessage>>();
+                context.Headers[DistributedConfigurators.Headers.RetryCountKey] = retryCount + 1;
+                await connector.ConsumeAsync(context, consumerType, token);
+                return;
+            }
+
+            context.Headers[DistributedConfigurators.Headers.MessageTypeKey] =
+                DistributedConfigurators.MessageTypes.DeadLetter;
+            context.Headers[DistributedConfigurators.Headers.ExceptionTypeKey] =
+                ex.GetType().FullName ?? ex.GetType().Name;
+            context.Headers[DistributedConfigurators.Headers.ExceptionMessageKey] = ex.Message;
+            context.Headers[DistributedConfigurators.Headers.ExceptionStackTraceKey] =
+                ex.StackTrace ?? string.Empty;
+            logger?.LogError(
+                "Message: {@Message} processed failed with exception: {@Exception} after {@Times} times. Message has been moved to dead letter queue!",
+                context.Message, new { ex.Message, ex.StackTrace }, intervals.Length);
 
             await publisher.PublishAsync(context.Message, new PublisherContext(context), token);
         }
