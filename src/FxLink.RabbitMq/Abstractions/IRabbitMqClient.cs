@@ -1,12 +1,12 @@
 using FxLink.RabbitMq.Delegates;
-using RabbitMQ.Client;
+using FxLink.RabbitMq.Entities;
 
 namespace FxLink.RabbitMq.Abstractions;
 
 internal interface IRabbitMqClient
 {
-    IConnection Connection { get; }
-    IChannel Channel { get; }
+    Task PublishMessageAsync(MessagePublisher message, CancellationToken token = default);
+    Task DeclareExchangeAsync(string exchangeName, CancellationToken token = default);
     void MessageConsumed(MessageReceivedAsync messageReceivedAsync);
     void MessageRequesterConsumer(MessageRequestReceivedAsync messageReceivedAsync);
     string ReplyQueueName { get; }

@@ -1,5 +1,4 @@
 using FxLink.RabbitMq.Abstractions;
-using FxLink.RabbitMq.Implementations;
 
 namespace FxLink.RabbitMq.Registries;
 
