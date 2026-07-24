@@ -62,10 +62,13 @@ public abstract partial class StateMachine<TInstance>
         if (statesWithFlows is not { Count: > 0 })
             throw new StateMachineException.NoFlowMatchesEvent(typeof(IEvent<TMessage>));
 
-        var correlationId = configurator.TryGetCorrelationId(context);
+        var predicate = configurator.GetPredicate(context);
+        // If the configurator just have the CorrelationBy, then we have the get the correlationId from instance
+        var correlationId = configurator.GetCorrelationId(context) ??
+                            await machineInstanceRepository.GetCorrelationIdAsync(predicate, token);
+        
         await using var scope = await machineInstanceRepository.BeginScopeAsync(correlationId, token: token);
 
-        var predicate = configurator.GetPredicate(context);
         var instance = await machineInstanceRepository.GetInstanceAsync(predicate, token);
         if (instance is null)
         {

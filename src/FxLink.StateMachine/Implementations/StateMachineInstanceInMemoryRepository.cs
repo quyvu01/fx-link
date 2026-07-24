@@ -24,7 +24,16 @@ internal sealed class StateMachineInstanceInMemoryRepository<TInstance> : IState
             .FirstOrDefault(filter.Compile());
         return Task.FromResult(instance);
     }
-    
+
+    public Task<Guid?> GetCorrelationIdAsync(Expression<Func<TInstance, bool>> filter,
+        CancellationToken token = default)
+    {
+        var instance = _instances
+            .Values
+            .FirstOrDefault(filter.Compile());
+        return Task.FromResult(instance?.CorrelationId);
+    }
+
     public Task<TInstance> CreateInstanceAsync(Guid correlationId, CancellationToken token = default)
     {
         var newInstance = InstanceUltilities.CreateInstance<TInstance>();

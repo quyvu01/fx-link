@@ -27,7 +27,7 @@ internal sealed class EventConfigurator<TInstance, TMessage> :
 
     // Unlike CorrelationSelector, this does not throw: CorrelationBy() alone (matching an existing
     // instance without SelectId()) leaves no way to resolve a correlation id ahead of the DB read.
-    internal Guid? TryGetCorrelationId(IConsumerContext<TMessage> context) =>
+    internal Guid? GetCorrelationId(IConsumerContext<TMessage> context) =>
         _correlationIdSelector?.GetGetter().Invoke(context);
 
     public IEventConfigurator<TInstance, TMessage> CorrelationId(

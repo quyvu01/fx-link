@@ -257,6 +257,18 @@ public class ServerSupervisor(ISupervisorOptions options, ILogger<ServerSupervis
         switch (_options.Strategy)
         {
             case SupervisionStrategy.OneForOne:
+                // StartAsync may have thrown for a reason unrelated to the connection itself
+                // (e.g. a bad declare) while the connection/channels were still live — stop first
+                // so a restart never leaves the previous connection/channels orphaned on the broker.
+                try
+                {
+                    await state.Server.StopAsync();
+                }
+                catch
+                {
+                    // Ignore stop errors, consistent with the other strategies below.
+                }
+
                 StartServer(state);
                 break;
 

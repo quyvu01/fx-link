@@ -32,6 +32,17 @@ internal sealed class StateMachineInstanceRepository<TInstance> :
         return result;
     }
 
+    public async Task<Guid?> GetCorrelationIdAsync(Expression<Func<TInstance, bool>> filter,
+        CancellationToken token = default)
+    {
+        var result = await _collections
+            .AsNoTracking()
+            .Where(filter)
+            .Select(x => new { x.CorrelationId })
+            .FirstOrDefaultAsync(token);
+        return result?.CorrelationId;
+    }
+
     public async Task<TInstance> CreateInstanceAsync(Guid correlationId, CancellationToken token = default)
     {
         var newInstance = InstanceUltilities.CreateInstance<TInstance>();
