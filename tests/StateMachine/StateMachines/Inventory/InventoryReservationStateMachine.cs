@@ -104,7 +104,8 @@ public sealed class InventoryReservationStateMachine : StateMachine<InventoryRes
         {
             opts.TimeToLive = TimeSpan.FromSeconds(5);
             opts.Timeout = TimeSpan.FromSeconds(10);
-            opts.Completed = ev => ev.CorrelationBy((ins, ctx) => ins.OrderId == ctx.Message.OrderId);
+            opts.Completed = ev => ev
+                .CorrelationBy((ins, ctx) => ins.OrderId == ctx.Message.OrderId);
             opts.Failed = ev => ev.CorrelationId(x => x.Message.Message.OrderId);
             opts.TimeoutExpired = ev => ev.CorrelationId(x => x.Message.Message.OrderId);
         });

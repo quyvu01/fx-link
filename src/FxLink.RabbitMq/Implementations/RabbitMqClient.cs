@@ -1,8 +1,8 @@
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 using FxLink.Abstractions;
 using FxLink.RabbitMq.Abstractions;
 using FxLink.RabbitMq.Constants;
-using FxLink.RabbitMq.Delegates;
 using FxLink.RabbitMq.Entities;
 using FxLink.RabbitMq.Extensions;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,23 +17,21 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     private readonly IRabbitMqConfiguration _rabbitMqConfiguration =
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
 
+    private readonly ConcurrentDictionary<string, Lazy<Task>> _declaredExchanges = new();
+
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
     private readonly ILogger<RabbitMqClient> _logger = serviceProvider.GetRequiredService<ILogger<RabbitMqClient>>();
-    
-    private TaskCompletionSource _tcs = new();
 
     private IConnection _connection;
 
     private Channel<IChannel> _channelPool;
-
-    private MessageReceivedAsync _messageReceivedAsync;
-    private MessageRequestReceivedAsync _messageRequesterConsumerAsync;
 
     public async Task PublishMessageAsync(MessagePublisher message, CancellationToken token = default)
     {
         var channel = await _channelPool.Reader.ReadAsync(token);
         try
         {
+            if (message.ExchangeName is { Length: > 0 } exchangeName) await EnsureExchangeDeclaredAsync(exchangeName);
             await channel.BasicPublishAsync(message.ExchangeName, message.RoutingKey, mandatory: message.Mandatory,
                 basicProperties: message.Props, message.MessageBody, token);
         }
@@ -75,12 +73,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         return channel;
     }
 
-    public void MessageConsumed(MessageReceivedAsync messageReceivedAsync) =>
-        _messageReceivedAsync += messageReceivedAsync;
-
-    public void MessageRequesterConsumer(MessageRequestReceivedAsync messageReceivedAsync) =>
-        _messageRequesterConsumerAsync += messageReceivedAsync;
-
     public string ReplyQueueName { get; private set; }
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -100,21 +92,63 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         };
 
         _connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // AutomaticRecoveryEnabled reconnects transparently and retries indefinitely on its own —
+        // an ordinary connection drop is not a failure the supervisor needs to know about. These
+        // handlers are purely observational; StartAsync must keep running through them (see the
+        // Task.Delay wait at the bottom of this method).
+        _connection.ConnectionShutdownAsync += (_, args) =>
+        {
+            _logger.LogWarning(
+                "RabbitMQ connection shut down (ReplyText={ReplyText}); AutomaticRecoveryEnabled will attempt to reconnect.",
+                args.ReplyText);
+            return Task.CompletedTask;
+        };
+        _connection.RecoverySucceededAsync += (_, _) =>
+        {
+            _logger.LogInformation("RabbitMQ connection recovered successfully.");
+            return Task.CompletedTask;
+        };
+        _connection.ConnectionRecoveryErrorAsync += (_, args) =>
+        {
+            _logger.LogWarning(args.Exception, "RabbitMQ connection recovery attempt failed; will retry.");
+            return Task.CompletedTask;
+        };
+
+        // ReplyQueueName is server-named (declared with an empty name). On automatic connection
+        // recovery, RabbitMQ.Client redeclares it and the broker assigns a brand-new name — the
+        // old one is gone. Without this handler, ReplyQueueName would stay stuck on the old,
+        // now-nonexistent name forever, and every response publish would NO_ROUTE from that point
+        // on, since no queue by that name exists anymore.
+        _connection.QueueNameChangedAfterRecoveryAsync += (_, args) =>
+        {
+            if (args.NameBefore != ReplyQueueName) return Task.CompletedTask;
+            _logger.LogInformation(
+                "Reply queue name changed after connection recovery: {OldName} -> {NewName}",
+                args.NameBefore, args.NameAfter);
+            ReplyQueueName = args.NameAfter;
+            return Task.CompletedTask;
+        };
+
         await ChannelsInitializeAsync();
 
         var replyChannel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
-        var queueDeclareResult = await replyChannel.QueueDeclareAsync(cancellationToken: cancellationToken);
-        ReplyQueueName = queueDeclareResult.QueueName;
-        var requestConsumer = new AsyncEventingBasicConsumer(replyChannel);
-        requestConsumer.ReceivedAsync += async (sender, ea) =>
+        var replyQueue = await replyChannel.QueueDeclareAsync(durable: false, exclusive: true,
+            autoDelete: false, arguments: null, cancellationToken: cancellationToken);
+        ReplyQueueName = replyQueue.QueueName;
+        var replyConsumer = new AsyncEventingBasicConsumer(replyChannel);
+        replyConsumer.ReceivedAsync += async (sender, ea) =>
         {
-            if (_messageRequesterConsumerAsync is not { } handlerAsync) return;
-            var tasks = handlerAsync.GetInvocationList()
-                .Cast<MessageRequestReceivedAsync>()
-                .Select(h => h.Invoke(sender, ea, cancellationToken));
-            await Task.WhenAll(tasks);
+            if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
+            var msgType = Type.GetType(messageType);
+            if (msgType is null) return;
+            var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(typeof(IClientConnector<>)
+                .MakeGenericType(msgType));
+            await connector.ProcessResponseMessageAsync(ea);
+            var channel = ((AsyncEventingBasicConsumer)sender).Channel;
+            await channel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
         };
-        await replyChannel.BasicConsumeAsync(ReplyQueueName, false, requestConsumer, cancellationToken);
+        await replyChannel.BasicConsumeAsync(ReplyQueueName, false, replyConsumer, cancellationToken);
 
         var messageKeys = _messageKeys.GetMessageKeys();
 
@@ -122,10 +156,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         // consumes, so its MessageConsumed handler gets wired up even if this process never
         // publishes/requests that type itself (publish-side resolution is otherwise lazy).
         foreach (var messageType in messageKeys.Keys)
-        {
-            var connectorType = typeof(IClientConnector<>).MakeGenericType(messageType);
-            serviceProvider.GetRequiredService(connectorType);
-        }
+            serviceProvider.GetRequiredService(typeof(IClientConnector<>).MakeGenericType(messageType));
 
         var tasks = messageKeys
             .Select(x => x.Value.Select(k => new
@@ -157,6 +188,22 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     await declareChannel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,
                         cancellationToken: cancellationToken);
 
+                    var retryExchange = g.MessageType.GetRetryExchangeName();
+
+                    // Declare retry exchanges and queues
+                    await declareChannel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout,
+                        durable: false, cancellationToken: cancellationToken);
+
+                    var retryQueue = consumerType.GetRetryConsumerName(g.MessageType);
+                    await declareChannel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
+                        autoDelete: false, arguments: new Dictionary<string, object>
+                        {
+                            ["x-dead-letter-exchange"] = exchangeName,
+                            ["x-dead-letter-routing-key"] = string.Empty
+                        }, cancellationToken: cancellationToken);
+                    await declareChannel.QueueBindAsync(retryQueue, retryExchange, string.Empty,
+                        cancellationToken: cancellationToken);
+
                     var deadLetterExchange = g.MessageType.GetDeadLetterExchangeName();
 
                     // Declare dead letter exchanges and queues
@@ -166,9 +213,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     await declareChannel.QueueBindAsync(deadLetterQueue, deadLetterExchange, string.Empty,
                         cancellationToken: cancellationToken);
 
-                    // Delay topology only applies when a delay provider is configured (via e.g.
-                    // UseRabbitMqDelayScheduler()) AND that provider needs RabbitMQ topology at
-                    // all (a Quartz/Hangfire/Redis-backed provider wouldn't implement this).
                     var delayMessageProvider = serviceProvider.GetService<IDelayMessageProvider>();
                     if (delayMessageProvider is IRabbitMqDelayTopology delayTopology)
                         await delayTopology.DeclareTopologyAsync(declareChannel, g.MessageType, queueName,
@@ -177,38 +221,27 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                 var receivedEndpointChannel = await _connection
                     .CreateChannelAsync(cancellationToken: cancellationToken);
-
-                foreach (var _ in c)
+                var consumer = new AsyncEventingBasicConsumer(receivedEndpointChannel);
+                consumer.ReceivedAsync += async (sender, ea) =>
                 {
-                    var consumer = new AsyncEventingBasicConsumer(receivedEndpointChannel);
-                    consumer.ReceivedAsync += async (sender, ea) =>
-                    {
-                        if (_messageReceivedAsync is not { } handlerAsync) return;
-                        var tasks = handlerAsync.GetInvocationList().Cast<MessageReceivedAsync>()
-                            .Select(h => h.Invoke(sender, ea, consumerType, cancellationToken));
-                        await Task.WhenAll(tasks);
-                    };
+                    if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
+                    var msgType = Type.GetType(messageType);
+                    if (msgType is null) return;
+                    var connector = (AbstractRabbitMqConnector)serviceProvider
+                        .GetRequiredService(typeof(IClientConnector<>).MakeGenericType(msgType));
+                    await connector.ProcessMessageReceivedAsync(ea, consumerType);
+                    var channel = ((AsyncEventingBasicConsumer)sender).Channel;
+                    await channel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
+                };
 
-                    await receivedEndpointChannel.BasicConsumeAsync(queueName, false, consumer,
-                        cancellationToken: cancellationToken);
-                }
+                await receivedEndpointChannel.BasicConsumeAsync(queueName, false, consumer,
+                    cancellationToken: cancellationToken);
             });
-        foreach (var task in tasks) await task;
+        await Task.WhenAll(tasks);
 
-        _connection.ConnectionShutdownAsync += (_, @event) =>
-        {
-            _tcs.TrySetException(@event.Exception ?? new Exception("Connection or Channel is shutdown!"));
-            return Task.CompletedTask;
-        };
-        try
-        {
-            await _tcs.Task;
-        }
-        catch (Exception)
-        {
-            _tcs = new TaskCompletionSource();
-            throw;
-        }
+        // Run until StopAsync/host shutdown cancels this token. Deliberately not tied to
+        // ConnectionShutdownAsync — see the handler registered above for why.
+        await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
 
@@ -227,5 +260,15 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             var channel = await CreatePublishChannelAsync();
             await _channelPool.Writer.WriteAsync(channel);
         }
+    }
+
+    private Task EnsureExchangeDeclaredAsync(string exchangeName)
+    {
+        var lazy = _declaredExchanges.GetOrAdd(exchangeName,
+            name => new Lazy<Task>(() => DeclareExchangeAsync(name)));
+        // Don't let a transient failure permanently poison this exchange for the process
+        // lifetime — drop the cached attempt so the next publish retries the declaration.
+        if (lazy.Value.IsFaulted) _declaredExchanges.TryRemove(exchangeName, out _);
+        return lazy.Value;
     }
 }

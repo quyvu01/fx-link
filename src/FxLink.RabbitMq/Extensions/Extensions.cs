@@ -10,10 +10,14 @@ internal static class Extensions
 
     extension(Type consumerType)
     {
-        internal string GetDeadLetterExchangeName() => $"{consumerType.GetExchangeName()}.dlq";
+        internal string GetRetryExchangeName() => $"{consumerType.GetExchangeName()}.retry";
+        internal string GetDeadLetterExchangeName() => $"{consumerType.GetExchangeName()}.deadletter";
         internal string GetDelayExchangeName() => $"{consumerType.GetExchangeName()}.delay";
 
-        internal string GetDeadLetterConsumerName() => $"{consumerType.GetConsumerName()}.dlq";
+        internal string GetRetryConsumerName(Type exchangeType) =>
+            $"{consumerType.GetConsumerName()}.retry.{exchangeType.GetExchangeName().Split('.').LastOrDefault()}";
+
+        internal string GetDeadLetterConsumerName() => $"{consumerType.GetConsumerName()}.deadletter";
         
         internal string GetConsumerName()
         {
