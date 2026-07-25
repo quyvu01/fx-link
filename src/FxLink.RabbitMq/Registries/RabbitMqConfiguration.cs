@@ -9,7 +9,8 @@ internal sealed class RabbitMqConfiguration(
     int rabbitMqPort,
     string rabbitMqUserName,
     string rabbitMqPassword,
-    SslOption sslOption)
+    SslOption sslOption,
+    int publishChannelPoolSize)
     : IRabbitMqConfiguration
 {
     public string RabbitMqHost { get; } = rabbitMqHost;
@@ -18,4 +19,5 @@ internal sealed class RabbitMqConfiguration(
     public string RabbitMqUserName { get; } = rabbitMqUserName;
     public string RabbitMqPassword { get; } = rabbitMqPassword;
     public SslOption SslOption { get; } = sslOption;
+    public int PublishChannelPoolSize { get; } = publishChannelPoolSize;
 }

@@ -252,7 +252,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
     private async Task ChannelsInitializeAsync()
     {
-        var poolSize = Math.Min(Environment.ProcessorCount, 8); // Todo, update poolSize later
+        var poolSize = _rabbitMqConfiguration.PublishChannelPoolSize;
         var options = new BoundedChannelOptions(poolSize) { FullMode = BoundedChannelFullMode.Wait };
         _channelPool = Channel.CreateBounded<IChannel>(options);
         for (var i = 0; i < poolSize; i++)

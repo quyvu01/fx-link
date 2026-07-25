@@ -10,4 +10,5 @@ internal interface IRabbitMqConfiguration
     string RabbitMqUserName { get; }
     string RabbitMqPassword { get; }
     SslOption SslOption { get; }
+    int PublishChannelPoolSize { get; }
 }
