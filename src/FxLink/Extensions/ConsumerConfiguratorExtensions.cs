@@ -39,6 +39,6 @@ public static class ConsumerConfiguratorExtensions
         var messageConfigurator = new ConsumerConfigurator<TConsumer, TMessage>();
         messageConfigurator.UseMessageRetry(options);
         var consumerConfigurator = (ConsumerConfigurator<TConsumer>)configurator;
-        consumerConfigurator.MessageRetryPolicies[typeof(TMessage)] = messageConfigurator.RetryPolicy;
+        consumerConfigurator.AddConfigurator(typeof(TMessage), messageConfigurator.RetryPolicy);
     }
 }

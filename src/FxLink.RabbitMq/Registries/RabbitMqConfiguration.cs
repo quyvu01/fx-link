@@ -1,4 +1,3 @@
-using FxLink.RabbitMq.Abstractions;
 using RabbitMQ.Client;
 
 namespace FxLink.RabbitMq.Registries;
@@ -10,7 +9,8 @@ internal sealed class RabbitMqConfiguration(
     string rabbitMqUserName,
     string rabbitMqPassword,
     SslOption sslOption,
-    int publishChannelPoolSize)
+    int publishChannelPoolSize,
+    ushort prefetchCount)
     : IRabbitMqConfiguration
 {
     public string RabbitMqHost { get; } = rabbitMqHost;
@@ -20,4 +20,5 @@ internal sealed class RabbitMqConfiguration(
     public string RabbitMqPassword { get; } = rabbitMqPassword;
     public SslOption SslOption { get; } = sslOption;
     public int PublishChannelPoolSize { get; } = publishChannelPoolSize;
+    public ushort PrefetchCount { get; } = prefetchCount;
 }

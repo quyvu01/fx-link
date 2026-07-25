@@ -38,7 +38,11 @@ builder.Services.AddFxLink(opts =>
 
     opts.AddConsumerDefinitionsFromAssemblies(typeof(Program).Assembly);
 
-    opts.AddRabbitMq(config => config.Host("localhost", "fxlink"));
+    opts.AddRabbitMq(config =>
+    {
+        config.Host("localhost", "fxlink");
+        config.PrefetchCount(2);
+    });
 });
 
 var app = builder.Build();
@@ -55,7 +59,7 @@ app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logge
     {
         var orderId = Guid.NewGuid();
         await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow });
-        logger.LogInformation("Order placed: {@OrderId}", orderId);
+        // logger.LogInformation("Order placed: {@OrderId}", orderId);
         return "Order placed";
     })
     .WithTags("Plain pub/sub")

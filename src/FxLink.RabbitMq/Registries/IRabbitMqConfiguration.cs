@@ -1,6 +1,6 @@
 using RabbitMQ.Client;
 
-namespace FxLink.RabbitMq.Abstractions;
+namespace FxLink.RabbitMq.Registries;
 
 internal interface IRabbitMqConfiguration
 {
@@ -11,4 +11,5 @@ internal interface IRabbitMqConfiguration
     string RabbitMqPassword { get; }
     SslOption SslOption { get; }
     int PublishChannelPoolSize { get; }
+    ushort PrefetchCount { get; }
 }
