@@ -1,6 +1,5 @@
 using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
-using Microsoft.Extensions.Hosting;
 using Serilog;
 
 // Plain generic host, no ASP.NET Core: Payment only reacts to messages, it has no HTTP surface.

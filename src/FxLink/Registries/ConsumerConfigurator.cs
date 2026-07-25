@@ -1,18 +1,35 @@
+using System.Collections.Concurrent;
 using FxLink.Abstractions;
 
 namespace FxLink.Registries;
 
-internal class ConsumerConfigurator<TConsumer> : IConsumerConfigurator<TConsumer> where TConsumer : IConsumer
+internal class ConsumerConfigurator<TConsumer> :
+    IMessageConfiguratorBehavior,
+    IConsumerConfigurator<TConsumer> where TConsumer : IConsumer
 {
-    private IMessageRetryPolicy _retryPolicyForConsumer;
+    private readonly ConcurrentDictionary<Type, List<IMessageConfigurator>> _messageConfigurators = [];
 
-    internal IMessageRetryPolicy RetryPolicy => _retryPolicyForConsumer ?? MessageRetryPolicy.DefaultMessageRetryPolicy;
-    internal readonly Dictionary<Type, IMessageRetryPolicy> MessageRetryPolicies = [];
     public void UseMessageRetry(Action<IMessageRetryPolicy> options)
     {
         var retryPolicy = new MessageRetryPolicy();
         options?.Invoke(retryPolicy);
-        _retryPolicyForConsumer = retryPolicy;
+        AddConfigurator(typeof(TConsumer), retryPolicy);
+    }
+
+    public void AddConfigurator(Type targetType, IMessageConfigurator configurator)
+    {
+        var configurators = _messageConfigurators.GetOrAdd(targetType, _ => []);
+        configurators.Add(configurator);
+    }
+
+    public IMessageConfigurator[] GetConfigurators(Type targetType) =>
+        [.. _messageConfigurators.GetValueOrDefault(targetType, [])];
+
+    public TMessageConfigurator GetConfigurator<TMessageConfigurator>(Type targetType)
+        where TMessageConfigurator : IMessageConfigurator
+    {
+        var configurators = _messageConfigurators.GetValueOrDefault(targetType, []);
+        return configurators.OfType<TMessageConfigurator>().LastOrDefault();
     }
 }
 

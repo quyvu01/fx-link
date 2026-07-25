@@ -7,9 +7,9 @@ namespace Order.Consumers;
 // Plain pub/sub demo: no state machine involved, just IPublisher -> IConsumer.
 public sealed class OrderConsumers(ILogger<OrderConsumers> logger) : IConsumer<OrderPlaced>
 {
-    public Task ConsumeAsync(IConsumerContext<OrderPlaced> context, CancellationToken token = default)
+    public async Task ConsumeAsync(IConsumerContext<OrderPlaced> context, CancellationToken token = default)
     {
         logger.LogInformation("Order placed: {@Order}", context.Message);
-        return Task.CompletedTask;
+        await Task.Delay(TimeSpan.FromSeconds(5), token);
     }
 }

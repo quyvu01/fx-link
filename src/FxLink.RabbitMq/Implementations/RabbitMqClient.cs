@@ -1,10 +1,13 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Threading.Channels;
 using FxLink.Abstractions;
 using FxLink.RabbitMq.Abstractions;
 using FxLink.RabbitMq.Constants;
 using FxLink.RabbitMq.Entities;
 using FxLink.RabbitMq.Extensions;
+using FxLink.RabbitMq.Registries;
+using FxLink.Registries;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
@@ -17,8 +20,10 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     private readonly IRabbitMqConfiguration _rabbitMqConfiguration =
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
 
-    private readonly ConcurrentDictionary<string, Lazy<Task>> _declaredExchanges = new();
+    private static readonly ConcurrentDictionary<Type, MethodInfo> GetPrefetchCountInternalMethodCache = [];
 
+    private readonly ConcurrentDictionary<string, Lazy<Task>> _declaredExchanges = [];
+    private readonly ConcurrentDictionary<string, Type> _clientConnectors = [];
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
     private readonly ILogger<RabbitMqClient> _logger = serviceProvider.GetRequiredService<ILogger<RabbitMqClient>>();
 
@@ -140,10 +145,13 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         replyConsumer.ReceivedAsync += async (sender, ea) =>
         {
             if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-            var msgType = Type.GetType(messageType);
-            if (msgType is null) return;
-            var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(typeof(IClientConnector<>)
-                .MakeGenericType(msgType));
+            var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+            {
+                var msgType = Type.GetType(type);
+                return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
+            });
+            if (connectorType is null) return;
+            var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(connectorType);
             await connector.ProcessResponseMessageAsync(ea);
             var channel = ((AsyncEventingBasicConsumer)sender).Channel;
             await channel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
@@ -151,12 +159,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         await replyChannel.BasicConsumeAsync(ReplyQueueName, false, replyConsumer, cancellationToken);
 
         var messageKeys = _messageKeys.GetMessageKeys();
-
-        // Force IClientConnector<TMessage> to be constructed for every message type this process
-        // consumes, so its MessageConsumed handler gets wired up even if this process never
-        // publishes/requests that type itself (publish-side resolution is otherwise lazy).
-        foreach (var messageType in messageKeys.Keys)
-            serviceProvider.GetRequiredService(typeof(IClientConnector<>).MakeGenericType(messageType));
 
         var tasks = messageKeys
             .Select(x => x.Value.Select(k => new
@@ -221,14 +223,26 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                 var receivedEndpointChannel = await _connection
                     .CreateChannelAsync(cancellationToken: cancellationToken);
+
+                // One channel/queue is shared by every message type bound to this consumer, so only
+                // one prefetch value can actually apply — take the strictest (lowest) one configured
+                // across those message types rather than letting a later g silently win.
+                var prefetchCount = GetPrefetchCountDefinition(consumerType).PrefetchCount;
+
+                await receivedEndpointChannel.BasicQosAsync(prefetchSize: 0, prefetchCount: prefetchCount,
+                    global: false, cancellationToken);
+
                 var consumer = new AsyncEventingBasicConsumer(receivedEndpointChannel);
                 consumer.ReceivedAsync += async (sender, ea) =>
                 {
                     if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-                    var msgType = Type.GetType(messageType);
-                    if (msgType is null) return;
-                    var connector = (AbstractRabbitMqConnector)serviceProvider
-                        .GetRequiredService(typeof(IClientConnector<>).MakeGenericType(msgType));
+                    var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+                    {
+                        var msgType = Type.GetType(type);
+                        return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
+                    });
+                    if (connectorType is null) return;
+                    var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(connectorType);
                     await connector.ProcessMessageReceivedAsync(ea, consumerType);
                     var channel = ((AsyncEventingBasicConsumer)sender).Channel;
                     await channel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
@@ -270,5 +284,38 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         // lifetime — drop the cached attempt so the next publish retries the declaration.
         if (lazy.Value.IsFaulted) _declaredExchanges.TryRemove(exchangeName, out _);
         return lazy.Value;
+    }
+
+    private IPrefetchCountDefinition GetPrefetchCountDefinition(Type consumerType)
+    {
+        var method = GetPrefetchCountInternalMethodCache.GetOrAdd(consumerType, BuildGetPrefetchCountInternalMethod);
+        return (IPrefetchCountDefinition)method.Invoke(this, null);
+    }
+
+    private static MethodInfo BuildGetPrefetchCountInternalMethod(Type consumerType)
+    {
+        var openMethod = typeof(RabbitMqClient).GetMethod(
+            nameof(GetPrefetchCountInternal), BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return openMethod.MakeGenericMethod(consumerType);
+    }
+
+    private IPrefetchCountDefinition GetPrefetchCountInternal<TConsumer>() where TConsumer : IConsumer
+    {
+        try
+        {
+            var configurator = serviceProvider.GetService<IConsumerConfigurator<TConsumer>>();
+            if (configurator is null) return new PrefetchCountDefinition(_rabbitMqConfiguration.PrefetchCount);
+            var consumerConfigurator = (ConsumerConfigurator<TConsumer>)configurator!;
+            var consumerPrefetchCountConfig = consumerConfigurator
+                .GetConfigurator<IPrefetchCountDefinition>(typeof(TConsumer));
+            if (consumerPrefetchCountConfig is not null) return consumerPrefetchCountConfig;
+            return new PrefetchCountDefinition(_rabbitMqConfiguration.PrefetchCount);
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning("Failed to load prefetch count: {@Exception}, return default instead!",
+                new { e.Message, e.StackTrace });
+            return new PrefetchCountDefinition(_rabbitMqConfiguration.PrefetchCount);
+        }
     }
 }

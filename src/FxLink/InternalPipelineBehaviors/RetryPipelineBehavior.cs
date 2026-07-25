@@ -125,11 +125,20 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
 
     private IMessageRetryPolicy GetRetryPolicy<TConsumer>() where TConsumer : IConsumer
     {
-        var retryPolicyForConsumer = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
-        if (retryPolicyForConsumer is { ConsumerConfigurator: ConsumerConfigurator<TConsumer> cForConsumer })
-            return !cForConsumer.MessageRetryPolicies.TryGetValue(typeof(TMessage), out var messageRetryPolicy)
-                ? cForConsumer.RetryPolicy
-                : messageRetryPolicy;
+        var consumerDefinition = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
+        switch (consumerDefinition)
+        {
+            case null:
+                return MessageRetryPolicy.DefaultMessageRetryPolicy;
+            case { ConsumerConfigurator: ConsumerConfigurator<TConsumer> cForConsumer }:
+            {
+                var messageRetryConfig = cForConsumer.GetConfigurator<IMessageRetryPolicy>(typeof(TMessage));
+                if (messageRetryConfig is not null) return messageRetryConfig;
+                var consumerRetryConfig = cForConsumer.GetConfigurator<IMessageRetryPolicy>(typeof(TConsumer));
+                if (consumerRetryConfig is not null) return consumerRetryConfig;
+                break;
+            }
+        }
 
         return MessageRetryPolicy.DefaultMessageRetryPolicy;
     }
