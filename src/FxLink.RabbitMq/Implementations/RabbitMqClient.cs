@@ -8,6 +8,7 @@ using FxLink.RabbitMq.Entities;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RabbitMq.Registries;
 using FxLink.Registries;
+using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
@@ -137,26 +138,38 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
         await ChannelsInitializeAsync();
 
-        var replyChannel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
-        var replyQueue = await replyChannel.QueueDeclareAsync(durable: false, exclusive: true,
-            autoDelete: false, arguments: null, cancellationToken: cancellationToken);
-        ReplyQueueName = replyQueue.QueueName;
-        var replyConsumer = new AsyncEventingBasicConsumer(replyChannel);
-        replyConsumer.ReceivedAsync += async (sender, ea) =>
-        {
-            if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-            var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+        // Recyclable: AutomaticRecoveryEnabled only recovers when the *connection* drops. A channel
+        // can also be closed on its own (broker-side protocol error, ...) while the connection stays
+        // up, and nothing would ever reopen it. Recycle<T> makes that self-healing instead — every
+        // time the reply channel is needed, GetChannelAsync() transparently hands back a live one,
+        // re-running the queue-declare + consumer setup if the previous one died.
+        var replyChannelRecycle = new Recycle<RecyclableChannel>(() => new RecyclableChannel(_connection,
+            async channel =>
             {
-                var msgType = Type.GetType(type);
-                return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-            });
-            if (connectorType is null) return;
-            var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(connectorType);
-            await connector.ProcessResponseMessageAsync(ea);
-            var channel = ((AsyncEventingBasicConsumer)sender).Channel;
-            await channel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
-        };
-        await replyChannel.BasicConsumeAsync(ReplyQueueName, false, replyConsumer, cancellationToken);
+                var replyQueue = await channel.QueueDeclareAsync(durable: false, exclusive: true,
+                    autoDelete: false, arguments: null, cancellationToken: cancellationToken);
+                ReplyQueueName = replyQueue.QueueName;
+                var replyConsumer = new AsyncEventingBasicConsumer(channel);
+                replyConsumer.ReceivedAsync += async (sender, ea) =>
+                {
+                    if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
+                    var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+                    {
+                        var msgType = Type.GetType(type);
+                        return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
+                    });
+                    if (connectorType is null) return;
+                    var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(connectorType);
+                    await connector.ProcessResponseMessageAsync(ea);
+                    var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
+                    await ackChannel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
+                };
+                await channel.BasicConsumeAsync(ReplyQueueName, false, replyConsumer,
+                    cancellationToken: cancellationToken);
+            }, cancellationToken));
+
+        await replyChannelRecycle.Current.GetChannelAsync();
+        _ = MonitorRecycleAsync(replyChannelRecycle, cancellationToken);
 
         var messageKeys = _messageKeys.GetMessageKeys();
 
@@ -170,105 +183,152 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             .Select(async c =>
             {
                 var consumerType = c.Key;
+                var messageTypes = c.Select(g => g.MessageType).ToArray();
                 var queueName = consumerType.GetConsumerName();
                 var deadLetterQueue = consumerType.GetDeadLetterConsumerName();
 
-                await using var declareChannel = await _connection
-                    .CreateChannelAsync(cancellationToken: cancellationToken);
-                await declareChannel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
-                    autoDelete: false, arguments: null, cancellationToken: cancellationToken);
-
-                await declareChannel.QueueDeclareAsync(deadLetterQueue, durable: false, exclusive: false,
-                    autoDelete: false, cancellationToken: cancellationToken);
-
-                foreach (var g in c)
+                // Topology declare uses its own short-lived scratch channel (same reasoning as
+                // DeclareExchangeAsync): a declare failure must not risk taking down the long-lived
+                // consuming channel below. Idempotent, so it's safe to rerun every time the
+                // consumer channel is (re)created — see the setup callback further down.
+                async Task DeclareTopologyAsync()
                 {
-                    var exchangeName = g.MessageType.GetExchangeName();
-                    // Declare main exchanges and queues
-                    await declareChannel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout,
-                        durable: false, cancellationToken: cancellationToken);
-                    await declareChannel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,
-                        cancellationToken: cancellationToken);
+                    await using var declareChannel = await _connection
+                        .CreateChannelAsync(cancellationToken: cancellationToken);
+                    await declareChannel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
+                        autoDelete: false, arguments: null, cancellationToken: cancellationToken);
 
-                    var retryExchange = g.MessageType.GetRetryExchangeName();
+                    await declareChannel.QueueDeclareAsync(deadLetterQueue, durable: false, exclusive: false,
+                        autoDelete: false, cancellationToken: cancellationToken);
 
-                    // Declare retry exchanges and queues
-                    await declareChannel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout,
-                        durable: false, cancellationToken: cancellationToken);
+                    foreach (var messageType in messageTypes)
+                    {
+                        var exchangeName = messageType.GetExchangeName();
+                        // Declare main exchanges and queues
+                        await declareChannel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout,
+                            durable: false, cancellationToken: cancellationToken);
+                        await declareChannel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,
+                            cancellationToken: cancellationToken);
 
-                    var retryQueue = consumerType.GetRetryConsumerName(g.MessageType);
-                    await declareChannel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
-                        autoDelete: false, arguments: new Dictionary<string, object>
-                        {
-                            ["x-dead-letter-exchange"] = exchangeName,
-                            ["x-dead-letter-routing-key"] = string.Empty
-                        }, cancellationToken: cancellationToken);
-                    await declareChannel.QueueBindAsync(retryQueue, retryExchange, string.Empty,
-                        cancellationToken: cancellationToken);
+                        var retryExchange = messageType.GetRetryExchangeName();
 
-                    var deadLetterExchange = g.MessageType.GetDeadLetterExchangeName();
+                        // Declare retry exchanges and queues
+                        await declareChannel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout,
+                            durable: false, cancellationToken: cancellationToken);
 
-                    // Declare dead letter exchanges and queues
-                    await declareChannel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Fanout,
-                        durable: false, cancellationToken: cancellationToken);
+                        var retryQueue = consumerType.GetRetryConsumerName(messageType);
+                        await declareChannel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
+                            autoDelete: false, arguments: new Dictionary<string, object>
+                            {
+                                ["x-dead-letter-exchange"] = exchangeName,
+                                ["x-dead-letter-routing-key"] = string.Empty
+                            }, cancellationToken: cancellationToken);
+                        await declareChannel.QueueBindAsync(retryQueue, retryExchange, string.Empty,
+                            cancellationToken: cancellationToken);
 
-                    await declareChannel.QueueBindAsync(deadLetterQueue, deadLetterExchange, string.Empty,
-                        cancellationToken: cancellationToken);
+                        var deadLetterExchange = messageType.GetDeadLetterExchangeName();
 
-                    var delayMessageProvider = serviceProvider.GetService<IDelayMessageProvider>();
-                    if (delayMessageProvider is IRabbitMqDelayTopology delayTopology)
-                        await delayTopology.DeclareTopologyAsync(declareChannel, g.MessageType, queueName,
-                            cancellationToken);
+                        // Declare dead letter exchanges and queues
+                        await declareChannel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Fanout,
+                            durable: false, cancellationToken: cancellationToken);
+
+                        await declareChannel.QueueBindAsync(deadLetterQueue, deadLetterExchange, string.Empty,
+                            cancellationToken: cancellationToken);
+
+                        var delayMessageProvider = serviceProvider.GetService<IDelayMessageProvider>();
+                        if (delayMessageProvider is IRabbitMqDelayTopology delayTopology)
+                            await delayTopology.DeclareTopologyAsync(declareChannel, messageType, queueName,
+                                cancellationToken);
+                    }
                 }
 
+                await DeclareTopologyAsync();
+
                 var prefetchCount = GetPrefetchCountDefinition(consumerType).PrefetchCount;
+                var createChannelOptions = new CreateChannelOptions(
+                    publisherConfirmationsEnabled: false,
+                    publisherConfirmationTrackingEnabled: false,
+                    consumerDispatchConcurrency: prefetchCount);
 
-                var receivedEndpointChannel = await _connection
-                    .CreateChannelAsync(new CreateChannelOptions(
-                        publisherConfirmationsEnabled: false,
-                        publisherConfirmationTrackingEnabled: false,
-                        consumerDispatchConcurrency: prefetchCount), cancellationToken: cancellationToken);
-
-                await receivedEndpointChannel.BasicQosAsync(prefetchSize: 0, prefetchCount: prefetchCount,
-                    global: false, cancellationToken);
-
-                var consumer = new AsyncEventingBasicConsumer(receivedEndpointChannel);
-                consumer.ReceivedAsync += async (sender, ea) =>
-                {
-                    if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-                    var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+                // Recyclable, same reasoning as the reply channel above: AutomaticRecoveryEnabled only
+                // covers connection drops, not this specific channel getting closed on its own. Every
+                // time it's (re)created, re-verify topology and resubscribe from scratch.
+                var consumerChannelRecycle = new Recycle<RecyclableChannel>(() => new RecyclableChannel(_connection,
+                    async channel =>
                     {
-                        var msgType = Type.GetType(type);
-                        return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-                    });
-                    if (connectorType is null) return;
-                    var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(connectorType);
-                    var channel = ((AsyncEventingBasicConsumer)sender).Channel;
-                    try
-                    {
-                        await connector.ProcessMessageReceivedAsync(ea, consumerType);
-                    }
-                    catch (Exception ex)
-                    {
-                        // RetryPipelineBehavior already owns retry/dead-letter handling and never rethrows in                                                                                                                                                                                                                            
-                        // the normal case — reaching here means that mechanism itself failed (e.g. IPublisher                                                                                                                                                                                                                            
-                        // missing, publish channel down). Ack anyway to avoid an uncontrolled redelivery loop;                                                                                                                                                                                                                           
-                        // the failure is only visible via this log.                                                                                                                                                                                                                                                                      
-                        _logger.LogCritical(ex, "Unhandled exception escaped the consumer pipeline for {MessageType}",
-                            messageType);
-                    }
+                        await DeclareTopologyAsync();
 
-                    await channel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
-                };
+                        await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: prefetchCount,
+                            global: false, cancellationToken);
 
-                await receivedEndpointChannel.BasicConsumeAsync(queueName, false, consumer,
-                    cancellationToken: cancellationToken);
+                        var consumer = new AsyncEventingBasicConsumer(channel);
+                        consumer.ReceivedAsync += async (sender, ea) =>
+                        {
+                            if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
+                            var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+                            {
+                                var msgType = Type.GetType(type);
+                                return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
+                            });
+                            if (connectorType is null) return;
+                            var connector = (AbstractRabbitMqConnector)serviceProvider
+                                .GetRequiredService(connectorType);
+                            var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
+                            try
+                            {
+                                await connector.ProcessMessageReceivedAsync(ea, consumerType);
+                            }
+                            catch (Exception ex)
+                            {
+                                // RetryPipelineBehavior already owns retry/dead-letter handling and never
+                                // rethrows in the normal case — reaching here means that mechanism itself
+                                // failed (e.g. IPublisher missing, publish channel down). Ack anyway to
+                                // avoid an uncontrolled redelivery loop; the failure is only visible via
+                                // this log.
+                                _logger.LogCritical(ex,
+                                    "Unhandled exception escaped the consumer pipeline for {MessageType}",
+                                    messageType);
+                            }
+
+                            await ackChannel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
+                        };
+
+                        await channel.BasicConsumeAsync(queueName, false, consumer,
+                            cancellationToken: cancellationToken);
+                    }, cancellationToken, createChannelOptions));
+
+                await consumerChannelRecycle.Current.GetChannelAsync();
+                _ = MonitorRecycleAsync(consumerChannelRecycle, cancellationToken);
             });
         await Task.WhenAll(tasks);
 
         // Run until StopAsync/host shutdown cancels this token. Deliberately not tied to
         // ConnectionShutdownAsync — see the handler registered above for why.
         await Task.Delay(Timeout.Infinite, cancellationToken);
+    }
+
+    // Reply channel and consumer channels are consume-only: nothing calls GetChannelAsync() again on
+    // its own once BasicConsumeAsync is set up, so nobody would ever notice (or act on) Stopping
+    // firing. This loop is what turns any Recycle<RecyclableChannel> into an actual self-healing
+    // consumer: wait for the current one to die, eagerly pull the replacement (which lazily
+    // recreates + reruns topology-declare/consume setup), then go wait on whatever is current now.
+    private static async Task MonitorRecycleAsync(Recycle<RecyclableChannel> recycle,
+        CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var dying = recycle.Current;
+            await dying.Stopping;
+            if (cancellationToken.IsCancellationRequested) return;
+
+            // Recycle<T> swaps Current to a fresh, not-yet-created instance from its own
+            // continuation on this same Stopping task — spin until that's visible here too
+            // (single reference write racing another continuation, resolves in a tick or two).
+            RecyclableChannel next;
+            while (ReferenceEquals(next = recycle.Current, dying)) await Task.Yield();
+
+            await next.GetChannelAsync();
+        }
     }
 
 
