@@ -221,13 +221,13 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                             cancellationToken);
                 }
 
-                var receivedEndpointChannel = await _connection
-                    .CreateChannelAsync(cancellationToken: cancellationToken);
-
-                // One channel/queue is shared by every message type bound to this consumer, so only
-                // one prefetch value can actually apply — take the strictest (lowest) one configured
-                // across those message types rather than letting a later g silently win.
                 var prefetchCount = GetPrefetchCountDefinition(consumerType).PrefetchCount;
+
+                var receivedEndpointChannel = await _connection
+                    .CreateChannelAsync(new CreateChannelOptions(
+                        publisherConfirmationsEnabled: false,
+                        publisherConfirmationTrackingEnabled: false,
+                        consumerDispatchConcurrency: prefetchCount), cancellationToken: cancellationToken);
 
                 await receivedEndpointChannel.BasicQosAsync(prefetchSize: 0, prefetchCount: prefetchCount,
                     global: false, cancellationToken);
@@ -243,8 +243,21 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     });
                     if (connectorType is null) return;
                     var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(connectorType);
-                    await connector.ProcessMessageReceivedAsync(ea, consumerType);
                     var channel = ((AsyncEventingBasicConsumer)sender).Channel;
+                    try
+                    {
+                        await connector.ProcessMessageReceivedAsync(ea, consumerType);
+                    }
+                    catch (Exception ex)
+                    {
+                        // RetryPipelineBehavior already owns retry/dead-letter handling and never rethrows in                                                                                                                                                                                                                            
+                        // the normal case — reaching here means that mechanism itself failed (e.g. IPublisher                                                                                                                                                                                                                            
+                        // missing, publish channel down). Ack anyway to avoid an uncontrolled redelivery loop;                                                                                                                                                                                                                           
+                        // the failure is only visible via this log.                                                                                                                                                                                                                                                                      
+                        _logger.LogCritical(ex, "Unhandled exception escaped the consumer pipeline for {MessageType}",
+                            messageType);
+                    }
+
                     await channel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
                 };
 

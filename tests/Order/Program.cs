@@ -59,7 +59,7 @@ app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logge
     {
         var orderId = Guid.NewGuid();
         await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow });
-        // logger.LogInformation("Order placed: {@OrderId}", orderId);
+        logger.LogInformation("[API/Publisher] Order placed: {@OrderId}", orderId);
         return "Order placed";
     })
     .WithTags("Plain pub/sub")
