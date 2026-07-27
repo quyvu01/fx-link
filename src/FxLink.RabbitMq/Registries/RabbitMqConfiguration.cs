@@ -15,7 +15,7 @@ internal sealed class RabbitMqConfiguration(
     : IRabbitMqConfiguration
 {
     public string RabbitMqHost { get; } = rabbitMqHost;
-    public string RabbitVirtualHost { get; } = rabbitVirtualHost;
+    public string RabbitMqVirtualHost { get; } = rabbitVirtualHost;
     public int RabbitMqPort { get; } = rabbitMqPort;
     public string RabbitMqUserName { get; } = rabbitMqUserName;
     public string RabbitMqPassword { get; } = rabbitMqPassword;

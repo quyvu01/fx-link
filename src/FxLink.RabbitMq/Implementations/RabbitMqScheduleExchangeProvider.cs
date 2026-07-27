@@ -47,8 +47,8 @@ internal sealed class RabbitMqScheduleExchangeProvider(IRabbitMqClient client) :
             routingKey = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(replyToAsObject));
 
         var envelope = new Envelope<TMessage>(message, context);
-        var messageSerialize = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
-        var messageBytes = Encoding.UTF8.GetBytes(messageSerialize);
+        var serializedMessage = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
+        var messageBytes = Encoding.UTF8.GetBytes(serializedMessage);
 
         var delayExchange = typeof(TMessage).GetDelayExchangeName();
         // mandatory: false — the delayed-message-exchange plugin always reports NO_ROUTE for a

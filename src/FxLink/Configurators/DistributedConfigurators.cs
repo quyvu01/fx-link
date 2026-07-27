@@ -19,7 +19,7 @@ public static class DistributedConfigurators
         public const string TimeToLiveKey = "x-retry-ttl";
         public const string DelayInMsKey = "x-delay-ms";
         public const string ScheduleMessageKey = "x-schedule-message";
-        public const string MessageTypeKey = "x-message-type";
+        public const string MessageKindKey = "x-message-type";
         public const string ReplyToKey = "x-reply-to";
 
         public const string ExceptionTypeKey = "x-exception-type";
@@ -27,7 +27,7 @@ public static class DistributedConfigurators
         public const string ExceptionStackTraceKey = "x-exception-stacktrace";
     }
 
-    public static class MessageTypes
+    public static class MessageKinds
     {
         public const string Retry = "message-retry";
         public const string DeadLetter = "message-dead-letter";

@@ -24,7 +24,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     private static readonly ConcurrentDictionary<Type, MethodInfo> GetConsumerDispatchInternalMethodCache = [];
 
     private readonly ConcurrentDictionary<string, Lazy<Task>> _declaredExchanges = [];
-    private readonly ConcurrentDictionary<string, Type> _clientConnectors = [];
+    private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = [];
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
     private readonly ILogger<RabbitMqClient> _logger = serviceProvider.GetRequiredService<ILogger<RabbitMqClient>>();
 
@@ -88,7 +88,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         var connectionFactory = new ConnectionFactory
         {
             HostName = _rabbitMqConfiguration.RabbitMqHost,
-            VirtualHost = _rabbitMqConfiguration.RabbitVirtualHost,
+            VirtualHost = _rabbitMqConfiguration.RabbitMqVirtualHost,
             Port = _rabbitMqConfiguration.RabbitMqPort,
             Ssl = _rabbitMqConfiguration.SslOption ?? new SslOption(),
             UserName = userName,
@@ -153,7 +153,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 replyConsumer.ReceivedAsync += async (sender, ea) =>
                 {
                     if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-                    var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+                    var connectorType = _connectorTypeCache.GetOrAdd(messageType, static type =>
                     {
                         var msgType = Type.GetType(type);
                         return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
@@ -205,13 +205,13 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                 await DeclareTopologyAsync();
 
-                var definition = GetConsumerDispatchDefinition(consumerType);
-                var prefetchCount = definition.PrefetchCount;
-                var concurrentLimit = definition.ConcurrentMessageLimit;
+                var dispatchDefinition = GetConsumerDispatchDefinition(consumerType);
+                var prefetchCount = dispatchDefinition.PrefetchCount;
+                var concurrentMessageLimit = dispatchDefinition.ConcurrentMessageLimit;
                 var createChannelOptions = new CreateChannelOptions(
                     publisherConfirmationsEnabled: false,
                     publisherConfirmationTrackingEnabled: false,
-                    consumerDispatchConcurrency: concurrentLimit);
+                    consumerDispatchConcurrency: concurrentMessageLimit);
 
                 // Recyclable, same reasoning as the reply channel above: AutomaticRecoveryEnabled only
                 // covers connection drops, not this specific channel getting closed on its own. Every
@@ -228,7 +228,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         consumer.ReceivedAsync += async (sender, ea) =>
                         {
                             if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-                            var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+                            var connectorType = _connectorTypeCache.GetOrAdd(messageType, static type =>
                             {
                                 var msgType = Type.GetType(type);
                                 return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);

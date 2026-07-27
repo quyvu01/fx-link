@@ -41,9 +41,9 @@ internal class InMemoryInMemoryMessage<TMessage>
                 if (messageData.Context is IPublisherContext publisherContext)
                 {
                     var headers = publisherContext.Headers;
-                    if (headers.TryGetValue(DistributedConfigurators.Headers.MessageTypeKey,
+                    if (headers.TryGetValue(DistributedConfigurators.Headers.MessageKindKey,
                             out var messageKeyTypeObj) &&
-                        messageKeyTypeObj.Equals(DistributedConfigurators.MessageTypes.Delay))
+                        messageKeyTypeObj.Equals(DistributedConfigurators.MessageKinds.Delay))
                     {
                         if (headers.TryGetValue(DistributedConfigurators.Headers.DelayInMsKey, out var delayObject) &&
                             double.TryParse(delayObject.ToString(), out var delay))

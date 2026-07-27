@@ -30,9 +30,9 @@ internal class RabbitMqClientConnector<TMessage>(
 
     public async Task SendAsync(TMessage message, IContext context, CancellationToken token = default)
     {
-        var messageType = GetMessageType(context);
+        var messageKind = GetMessageKind(context);
 
-        if (messageType == DistributedConfigurators.MessageTypes.Delay)
+        if (messageKind == DistributedConfigurators.MessageKinds.Delay)
         {
             if (_delayMessageProvider is null)
                 throw new InvalidOperationException(
@@ -47,36 +47,36 @@ internal class RabbitMqClientConnector<TMessage>(
         var props = new BasicProperties
             { CorrelationId = context.CorrelationId.ToString(), Type = typeof(TMessage).AssemblyQualifiedName };
         if (context is IRequestContext) props.ReplyTo = client.ReplyQueueName;
-        if (messageType == DistributedConfigurators.MessageTypes.Retry)
+        if (messageKind == DistributedConfigurators.MessageKinds.Retry)
             props.Expiration = GetTimeToLiveFromHeader(context.Headers).ToString();
 
         var envelope = new Envelope<TMessage>(message, context);
-        var messageSerialize = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
-        var messageBytes = Encoding.UTF8.GetBytes(messageSerialize);
+        var serializedMessage = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
+        var messageBytes = Encoding.UTF8.GetBytes(serializedMessage);
         var routingKey = string.Empty;
         if (context is IResponseContext responseContext && responseContext.Headers
                 .TryGetValue(DistributedConfigurators.Headers.ReplyToKey, out var replyToAsObject))
             routingKey = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(replyToAsObject));
 
-        var exchangeName = GetExchangeName(context, messageType);
+        var exchangeName = GetExchangeName(context, messageKind);
         await client.PublishMessageAsync(new MessagePublisher(exchangeName, routingKey, props, messageBytes), token);
     }
 
-    private static string GetMessageType(IContext context)
+    private static string GetMessageKind(IContext context)
     {
-        if (!context.Headers.TryGetValue(DistributedConfigurators.Headers.MessageTypeKey, out var messageTypeObject))
+        if (!context.Headers.TryGetValue(DistributedConfigurators.Headers.MessageKindKey, out var messageKindObject))
             return null;
-        var messageTypeJson = JsonSerializer.Serialize(messageTypeObject);
-        return JsonSerializer.Deserialize<string>(messageTypeJson);
+        var messageKindJson = JsonSerializer.Serialize(messageKindObject);
+        return JsonSerializer.Deserialize<string>(messageKindJson);
     }
 
-    private static string GetExchangeName(IContext context, string messageType)
+    private static string GetExchangeName(IContext context, string messageKind)
     {
         if (context is IResponseContext) return string.Empty;
-        return messageType switch
+        return messageKind switch
         {
-            DistributedConfigurators.MessageTypes.Retry => typeof(TMessage).GetRetryExchangeName(),
-            DistributedConfigurators.MessageTypes.DeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
+            DistributedConfigurators.MessageKinds.Retry => typeof(TMessage).GetRetryExchangeName(),
+            DistributedConfigurators.MessageKinds.DeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
             _ => typeof(TMessage).GetExchangeName()
         };
     }
