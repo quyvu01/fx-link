@@ -13,4 +13,5 @@ public interface IRabbitMqConfigurator
     void PublishChannelPoolSize(int poolSize);
 
     void PrefetchCount(ushort count);
+    void ConcurrentMessageLimit(ushort limitCount);
 }

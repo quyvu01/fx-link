@@ -12,4 +12,5 @@ internal interface IRabbitMqConfiguration
     SslOption SslOption { get; }
     int PublishChannelPoolSize { get; }
     ushort PrefetchCount { get; }
+    ushort ConcurrentMessageLimit { get; }
 }
