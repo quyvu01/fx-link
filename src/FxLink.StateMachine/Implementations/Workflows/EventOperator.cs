@@ -16,20 +16,20 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Implementations.Workflows;
 
-internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event, IStateMachine stateMachine)
-    : IFlowOperator<TInstance, TMessage>
+internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event, IStateMachine stateMachine)
+    : IEventOperator<TInstance, TMessage>
     where TInstance : IStateMachineInstance where TMessage : class
 {
     public IEvent<TMessage> Event { get; } = @event;
     private readonly List<AsyncOperatorAction<TInstance, TMessage>> _asyncActions = [];
 
-    public async Task ExecuteFlowAsync(IStateMachineContext<TInstance, TMessage> context,
+    public async Task ExecuteAsync(IStateMachineContext<TInstance, TMessage> context,
         CancellationToken token = default)
     {
         foreach (var asyncAction in _asyncActions) await asyncAction.Invoke(context, token);
     }
 
-    public IFlowOperator<TInstance, TMessage> Then([NotNull] OperatorAction<TInstance, TMessage> action)
+    public IEventOperator<TInstance, TMessage> Then([NotNull] OperatorAction<TInstance, TMessage> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         return ThenAsync(ActionAsAsync);
@@ -41,14 +41,14 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> ThenAsync([NotNull] AsyncOperatorAction<TInstance, TMessage> asyncAction)
+    public IEventOperator<TInstance, TMessage> ThenAsync([NotNull] AsyncOperatorAction<TInstance, TMessage> asyncAction)
     {
         ArgumentNullException.ThrowIfNull(asyncAction);
         _asyncActions.Add(asyncAction);
         return this;
     }
 
-    public IFlowOperator<TInstance, TMessage> TransitionTo([NotNull] IState state)
+    public IEventOperator<TInstance, TMessage> TransitionTo([NotNull] IState state)
     {
         ArgumentNullException.ThrowIfNull(state);
         return !stateMachine.States.Contains(state)
@@ -61,18 +61,18 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> Complete() => TransitionTo(stateMachine.Completed);
+    public IEventOperator<TInstance, TMessage> Complete() => TransitionTo(stateMachine.Completed);
 
-    public IFlowOperator<TInstance, TMessage> If([NotNull] OperatorCondition<TInstance, TMessage> condition,
+    public IEventOperator<TInstance, TMessage> If([NotNull] OperatorCondition<TInstance, TMessage> condition,
         [NotNull] ActivityOperatorCallback<TInstance, TMessage> callback) =>
         IfElse(condition, callback, x => x);
 
-    public IFlowOperator<TInstance, TMessage> IfAsync(
+    public IEventOperator<TInstance, TMessage> IfAsync(
         [NotNull] AsyncOperatorCondition<TInstance, TMessage> condition,
         ActivityOperatorCallback<TInstance, TMessage> callback) =>
         IfElseAsync(condition, callback, x => x);
 
-    public IFlowOperator<TInstance, TMessage> IfElse([NotNull] OperatorCondition<TInstance, TMessage> condition,
+    public IEventOperator<TInstance, TMessage> IfElse([NotNull] OperatorCondition<TInstance, TMessage> condition,
         [NotNull] ActivityOperatorCallback<TInstance, TMessage> succeedCallback,
         [NotNull] ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback)
     {
@@ -89,7 +89,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> IfElseAsync(
+    public IEventOperator<TInstance, TMessage> IfElseAsync(
         [NotNull] AsyncOperatorCondition<TInstance, TMessage> condition,
         [NotNull] ActivityOperatorCallback<TInstance, TMessage> succeedCallback,
         [NotNull] ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback)
@@ -102,13 +102,13 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var conditionResult = await condition.Invoke(context, ct);
-            var @operator = new FlowOperator<TInstance, TMessage>(Event, stateMachine);
-            var newFlow = conditionResult ? succeedCallback.Invoke(@operator) : otherwiseCallback.Invoke(@operator);
-            await newFlow.ExecuteFlowAsync(context, ct);
+            var @operator = new EventOperator<TInstance, TMessage>(Event, stateMachine);
+            var newOperator = conditionResult ? succeedCallback.Invoke(@operator) : otherwiseCallback.Invoke(@operator);
+            await newOperator.ExecuteAsync(context, ct);
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> Publish<T>(
+    public IEventOperator<TInstance, TMessage> Publish<T>(
         [NotNull] MessageOperatorFactory<TInstance, TMessage, T> messageFactory) where T : class
     {
         ArgumentNullException.ThrowIfNull(messageFactory);
@@ -121,7 +121,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> PublishAsync<T>(
+    public IEventOperator<TInstance, TMessage> PublishAsync<T>(
         [NotNull] MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
         ArgumentNullException.ThrowIfNull(messageFactoryAsync);
@@ -136,7 +136,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> Response<T>(
+    public IEventOperator<TInstance, TMessage> Response<T>(
         [NotNull] MessageOperatorFactory<TInstance, TMessage, T> messageFactory)
         where T : class
     {
@@ -150,7 +150,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> ResponseAsync<T>(
+    public IEventOperator<TInstance, TMessage> ResponseAsync<T>(
         [NotNull] MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
         ArgumentNullException.ThrowIfNull(messageFactoryAsync);
@@ -165,7 +165,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> Schedule<T>([NotNull] ISchedule<T> schedule,
+    public IEventOperator<TInstance, TMessage> Schedule<T>([NotNull] ISchedule<T> schedule,
         [NotNull] MessageOperatorFactory<TInstance, TMessage, T> messageFactory) where T : class
     {
         ArgumentNullException.ThrowIfNull(schedule);
@@ -179,7 +179,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> ScheduleAsync<T>([NotNull] ISchedule<T> schedule,
+    public IEventOperator<TInstance, TMessage> ScheduleAsync<T>([NotNull] ISchedule<T> schedule,
         [NotNull] MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
         ArgumentNullException.ThrowIfNull(schedule);
@@ -209,7 +209,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> Unschedule<T>([NotNull] ISchedule<T> schedule) where T : class
+    public IEventOperator<TInstance, TMessage> Unschedule<T>([NotNull] ISchedule<T> schedule) where T : class
     {
         ArgumentNullException.ThrowIfNull(schedule);
         return Then(ActionAsync);
@@ -224,7 +224,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> Request<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+    public IEventOperator<TInstance, TMessage> Request<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
         MessageOperatorFactory<TInstance, TMessage, TRequest> messageFactory)
         where TRequest : class where TResponse : class
     {
@@ -239,7 +239,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+    public IEventOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
         MessageOperatorFactoryAsync<TInstance, TMessage, TRequest> messageFactoryAsync)
         where TRequest : class where TResponse : class
     {
@@ -308,7 +308,7 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         }
     }
 
-    public IFlowOperator<TInstance, TMessage> Activity(StateMchineOperatorActivity<TInstance, TMessage> activity)
+    public IEventOperator<TInstance, TMessage> Activity(StateMchineOperatorActivity<TInstance, TMessage> activity)
     {
         ArgumentNullException.ThrowIfNull(activity);
         return ThenAsync(ActionAsync);
@@ -364,8 +364,8 @@ internal sealed class FlowOperator<TInstance, TMessage>(IEvent<TMessage> @event,
         IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
     {
         if (transitionAction is null) return;
-        var newFlow = new FlowOperator<TInstance, TMessage>(Event, stateMachine);
-        newFlow.TransitionTo(new State(transitionAction.Invoke()));
-        await newFlow.ExecuteFlowAsync(context, ct);
+        var newOperator = new EventOperator<TInstance, TMessage>(Event, stateMachine);
+        newOperator.TransitionTo(new State(transitionAction.Invoke()));
+        await newOperator.ExecuteAsync(context, ct);
     }
 }

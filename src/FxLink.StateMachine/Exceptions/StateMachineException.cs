@@ -27,9 +27,9 @@ public static class StateMachineException
     public sealed class MessageTypeAlreadyConfigured(Type messageType)
         : DistributedException($"Message type: {messageType.FullName} cannot be duplicated on StateMachine");
 
-    /// <summary>An incoming event does not match any flow declared via Initially(...)/During(...).</summary>
-    public sealed class NoFlowMatchesEvent(Type eventType)
-        : DistributedException($"{eventType.FullName} did not match any flow!");
+    /// <summary>An incoming event does not match any event operator declared via Initially(...)/During(...).</summary>
+    public sealed class NoEventOperatorMatchesEvent(Type eventType)
+        : DistributedException($"{eventType.FullName} did not match any event operator!");
 
     /// <summary>
     /// An event arrived for a correlation id with no existing instance, and no OnMissingInstance(...)
