@@ -8,6 +8,7 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
     private RabbitMqCredential Credential { get; } = new();
     private int _poolSizeValue = Math.Min(Environment.ProcessorCount, 8);
     private ushort _prefetchCount = (ushort)Math.Min(Environment.ProcessorCount * 2, 16);
+    private ushort _concurrentMessageLimit = (ushort)Math.Min(Environment.ProcessorCount * 2, 16);
 
     public void Host(string host, string virtualHost, int port = 5672, Action<RabbitMqCredential> configure = null)
     {
@@ -25,9 +26,10 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
         _poolSizeValue = poolSize;
     }
 
-    public void PrefetchCount(ushort count) => _prefetchCount = count;
+    public void PrefetchCount(ushort prefetchCount) => _prefetchCount = prefetchCount;
+    public void ConcurrentMessageLimit(ushort limitCount) => _concurrentMessageLimit = limitCount;
 
     internal IRabbitMqConfiguration ToConfiguration() => new RabbitMqConfiguration(_hostValue, _virtualHostValue,
         _portValue, Credential.UserNameValue, Credential.PasswordValue, Credential.SslOptionValue, _poolSizeValue,
-        _prefetchCount);
+        _prefetchCount, _concurrentMessageLimit);
 }

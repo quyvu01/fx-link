@@ -18,8 +18,8 @@ internal sealed class RecyclableChannel : IRecyclable
     private readonly TaskCompletionSource _stopping = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Lazy<Task<IChannel>> _channelTask;
 
-    public RecyclableChannel(IConnection connection, Func<IChannel, Task> setupAsync, CancellationToken cancellationToken,
-        CreateChannelOptions createChannelOptions = null)
+    public RecyclableChannel(IConnection connection, Func<IChannel, Task> setupAsync,
+        CreateChannelOptions createChannelOptions = null, CancellationToken cancellationToken = default)
     {
         _connection = connection;
         _setupAsync = setupAsync;

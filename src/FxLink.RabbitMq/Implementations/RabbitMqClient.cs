@@ -21,7 +21,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     private readonly IRabbitMqConfiguration _rabbitMqConfiguration =
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
 
-    private static readonly ConcurrentDictionary<Type, MethodInfo> GetPrefetchCountInternalMethodCache = [];
+    private static readonly ConcurrentDictionary<Type, MethodInfo> GetConsumerDispatchInternalMethodCache = [];
 
     private readonly ConcurrentDictionary<string, Lazy<Task>> _declaredExchanges = [];
     private readonly ConcurrentDictionary<string, Type> _clientConnectors = [];
@@ -159,14 +159,30 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
                     });
                     if (connectorType is null) return;
-                    var connector = (AbstractRabbitMqConnector)serviceProvider.GetRequiredService(connectorType);
-                    await connector.ProcessResponseMessageAsync(ea);
+                    var connector = (AbstractRabbitMqConnector)serviceProvider
+                        .GetRequiredService(connectorType);
                     var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
+                    try
+                    {
+                        await connector.ProcessResponseMessageAsync(ea);
+                    }
+                    catch (Exception ex)
+                    {
+                        // RetryPipelineBehavior already owns retry/dead-letter handling and never
+                        // rethrows in the normal case — reaching here means that mechanism itself
+                        // failed (e.g. IPublisher missing, publish channel down). Ack anyway to
+                        // avoid an uncontrolled redelivery loop; the failure is only visible via
+                        // this log.
+                        _logger.LogCritical(ex,
+                            "Unhandled exception escaped the consumer pipeline for {MessageType}",
+                            messageType);
+                    }
+
                     await ackChannel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
                 };
                 await channel.BasicConsumeAsync(ReplyQueueName, false, replyConsumer,
                     cancellationToken: cancellationToken);
-            }, cancellationToken));
+            }, null, cancellationToken));
 
         await replyChannelRecycle.Current.GetChannelAsync();
         _ = MonitorRecycleAsync(replyChannelRecycle, cancellationToken);
@@ -186,6 +202,67 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 var messageTypes = c.Select(g => g.MessageType).ToArray();
                 var queueName = consumerType.GetConsumerName();
                 var deadLetterQueue = consumerType.GetDeadLetterConsumerName();
+
+                await DeclareTopologyAsync();
+
+                var definition = GetConsumerDispatchDefinition(consumerType);
+                var prefetchCount = definition.PrefetchCount;
+                var concurrentLimit = definition.ConcurrentMessageLimit;
+                var createChannelOptions = new CreateChannelOptions(
+                    publisherConfirmationsEnabled: false,
+                    publisherConfirmationTrackingEnabled: false,
+                    consumerDispatchConcurrency: concurrentLimit);
+
+                // Recyclable, same reasoning as the reply channel above: AutomaticRecoveryEnabled only
+                // covers connection drops, not this specific channel getting closed on its own. Every
+                // time it's (re)created, re-verify topology and resubscribe from scratch.
+                var consumerChannelRecycle = new Recycle<RecyclableChannel>(() => new RecyclableChannel(_connection,
+                    async channel =>
+                    {
+                        await DeclareTopologyAsync();
+
+                        await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: prefetchCount,
+                            global: false, cancellationToken);
+
+                        var consumer = new AsyncEventingBasicConsumer(channel);
+                        consumer.ReceivedAsync += async (sender, ea) =>
+                        {
+                            if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
+                            var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
+                            {
+                                var msgType = Type.GetType(type);
+                                return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
+                            });
+                            if (connectorType is null) return;
+                            var connector = (AbstractRabbitMqConnector)serviceProvider
+                                .GetRequiredService(connectorType);
+                            var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
+                            try
+                            {
+                                await connector.ProcessMessageReceivedAsync(ea, consumerType);
+                            }
+                            catch (Exception ex)
+                            {
+                                // RetryPipelineBehavior already owns retry/dead-letter handling and never
+                                // rethrows in the normal case — reaching here means that mechanism itself
+                                // failed (e.g. IPublisher missing, publish channel down). Ack anyway to
+                                // avoid an uncontrolled redelivery loop; the failure is only visible via
+                                // this log.
+                                _logger.LogCritical(ex,
+                                    "Unhandled exception escaped the consumer pipeline for {MessageType}",
+                                    messageType);
+                            }
+
+                            await ackChannel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
+                        };
+
+                        await channel.BasicConsumeAsync(queueName, false, consumer,
+                            cancellationToken: cancellationToken);
+                    }, createChannelOptions, cancellationToken));
+
+                await consumerChannelRecycle.Current.GetChannelAsync();
+                _ = MonitorRecycleAsync(consumerChannelRecycle, cancellationToken);
+                return;
 
                 // Topology declare uses its own short-lived scratch channel (same reasoning as
                 // DeclareExchangeAsync): a declare failure must not risk taking down the long-lived
@@ -241,64 +318,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                                 cancellationToken);
                     }
                 }
-
-                await DeclareTopologyAsync();
-
-                var prefetchCount = GetPrefetchCountDefinition(consumerType).PrefetchCount;
-                var createChannelOptions = new CreateChannelOptions(
-                    publisherConfirmationsEnabled: false,
-                    publisherConfirmationTrackingEnabled: false,
-                    consumerDispatchConcurrency: prefetchCount);
-
-                // Recyclable, same reasoning as the reply channel above: AutomaticRecoveryEnabled only
-                // covers connection drops, not this specific channel getting closed on its own. Every
-                // time it's (re)created, re-verify topology and resubscribe from scratch.
-                var consumerChannelRecycle = new Recycle<RecyclableChannel>(() => new RecyclableChannel(_connection,
-                    async channel =>
-                    {
-                        await DeclareTopologyAsync();
-
-                        await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: prefetchCount,
-                            global: false, cancellationToken);
-
-                        var consumer = new AsyncEventingBasicConsumer(channel);
-                        consumer.ReceivedAsync += async (sender, ea) =>
-                        {
-                            if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-                            var connectorType = _clientConnectors.GetOrAdd(messageType, static type =>
-                            {
-                                var msgType = Type.GetType(type);
-                                return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-                            });
-                            if (connectorType is null) return;
-                            var connector = (AbstractRabbitMqConnector)serviceProvider
-                                .GetRequiredService(connectorType);
-                            var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
-                            try
-                            {
-                                await connector.ProcessMessageReceivedAsync(ea, consumerType);
-                            }
-                            catch (Exception ex)
-                            {
-                                // RetryPipelineBehavior already owns retry/dead-letter handling and never
-                                // rethrows in the normal case — reaching here means that mechanism itself
-                                // failed (e.g. IPublisher missing, publish channel down). Ack anyway to
-                                // avoid an uncontrolled redelivery loop; the failure is only visible via
-                                // this log.
-                                _logger.LogCritical(ex,
-                                    "Unhandled exception escaped the consumer pipeline for {MessageType}",
-                                    messageType);
-                            }
-
-                            await ackChannel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
-                        };
-
-                        await channel.BasicConsumeAsync(queueName, false, consumer,
-                            cancellationToken: cancellationToken);
-                    }, cancellationToken, createChannelOptions));
-
-                await consumerChannelRecycle.Current.GetChannelAsync();
-                _ = MonitorRecycleAsync(consumerChannelRecycle, cancellationToken);
             });
         await Task.WhenAll(tasks);
 
@@ -359,36 +378,36 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         return lazy.Value;
     }
 
-    private IPrefetchCountDefinition GetPrefetchCountDefinition(Type consumerType)
+    private IConsumerDispatchDefinition GetConsumerDispatchDefinition(Type consumerType)
     {
-        var method = GetPrefetchCountInternalMethodCache.GetOrAdd(consumerType, BuildGetPrefetchCountInternalMethod);
-        return (IPrefetchCountDefinition)method.Invoke(this, null);
+        var method = GetConsumerDispatchInternalMethodCache.GetOrAdd(consumerType, BuildGetConsumerDispatchInternalMethod);
+        return (IConsumerDispatchDefinition)method.Invoke(this, null);
     }
 
-    private static MethodInfo BuildGetPrefetchCountInternalMethod(Type consumerType)
+    private static MethodInfo BuildGetConsumerDispatchInternalMethod(Type consumerType)
     {
         var openMethod = typeof(RabbitMqClient).GetMethod(
-            nameof(GetPrefetchCountInternal), BindingFlags.NonPublic | BindingFlags.Instance)!;
+            nameof(GetConsumerDispatchInternal), BindingFlags.NonPublic | BindingFlags.Instance)!;
         return openMethod.MakeGenericMethod(consumerType);
     }
 
-    private IPrefetchCountDefinition GetPrefetchCountInternal<TConsumer>() where TConsumer : IConsumer
+    private IConsumerDispatchDefinition GetConsumerDispatchInternal<TConsumer>() where TConsumer : IConsumer
     {
         try
         {
             var configurator = serviceProvider.GetService<IConsumerConfigurator<TConsumer>>();
-            if (configurator is null) return new PrefetchCountDefinition(_rabbitMqConfiguration.PrefetchCount);
+            if (configurator is null) return ConsumerDispatchDefinition.FromConfiguration(_rabbitMqConfiguration);
             var consumerConfigurator = (ConsumerConfigurator<TConsumer>)configurator!;
-            var consumerPrefetchCountConfig = consumerConfigurator
-                .GetConfigurator<IPrefetchCountDefinition>(typeof(TConsumer));
-            if (consumerPrefetchCountConfig is not null) return consumerPrefetchCountConfig;
-            return new PrefetchCountDefinition(_rabbitMqConfiguration.PrefetchCount);
+            var consumerDispatchConfig = consumerConfigurator
+                .GetConfigurator<IConsumerDispatchDefinition>(typeof(TConsumer));
+            if (consumerDispatchConfig is not null) return consumerDispatchConfig;
+            return ConsumerDispatchDefinition.FromConfiguration(_rabbitMqConfiguration);
         }
         catch (Exception e)
         {
-            _logger.LogWarning("Failed to load prefetch count: {@Exception}, return default instead!",
+            _logger.LogWarning("Failed to load consumer dispatch settings: {@Exception}, return default instead!",
                 new { e.Message, e.StackTrace });
-            return new PrefetchCountDefinition(_rabbitMqConfiguration.PrefetchCount);
+            return ConsumerDispatchDefinition.FromConfiguration(_rabbitMqConfiguration);
         }
     }
 }

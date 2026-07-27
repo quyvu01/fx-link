@@ -24,7 +24,7 @@ public sealed class Recycle<T> where T : class, IRecyclable
     {
         Volatile.Write(ref _current, new Lazy<T>(() =>
         {
-            var instance = _factory();
+            var instance = _factory.Invoke();
 
             // Only hook Stopping once the instance actually exists — mirrors MassTransit's
             // Recycle<T>, which registers on supervisor.Stopping right after creating it.
