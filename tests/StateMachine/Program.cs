@@ -59,7 +59,7 @@ builder.Services.AddFxLink(opts =>
     {
         config.Host("localhost", "fxlink");
     });
-    opts.UseRabbitMqDelayScheduler(); // required by StateMachine's Schedule(...) (InventorySchedule)
+    opts.UseRabbitMqDelayScheduler();
     
     opts.AddStateMachines(c =>
     {
