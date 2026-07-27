@@ -6,7 +6,7 @@ using StateMachine.StateMachines.Inventory.Activities;
 namespace StateMachine.StateMachines.Inventory;
 
 // EF Core-backed, Pessimistic concurrency (see Program.cs). The one state machine in this sample -
-// covers the full FlowOperator DSL: Then/ThenAsync, If/IfAsync/IfElse/IfElseAsync,
+// covers the full EventOperator DSL: Then/ThenAsync, If/IfAsync/IfElse/IfElseAsync,
 // TransitionTo/Complete, Publish/PublishAsync, Response/ResponseAsync, Schedule/Unschedule,
 // Request/RequestAsync (Completed/Failed/TimeoutExpired), Activity (both OfType and
 // OfInstanceType), DuringAny, every OnMissingInstance variant (Discard/Execute/ExecuteAsync/Fault),

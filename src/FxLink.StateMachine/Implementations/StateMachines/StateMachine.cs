@@ -10,7 +10,7 @@ using FxLink.StateMachine.Registries;
 namespace FxLink.StateMachine.Implementations.StateMachines;
 
 public abstract partial class StateMachine<TInstance> :
-    IFlowDefinition<TInstance>,
+    IEventDefinition<TInstance>,
     IStateMachine
     where TInstance : IStateMachineInstance
 {
@@ -24,7 +24,7 @@ public abstract partial class StateMachine<TInstance> :
 
     private readonly Dictionary<IActivity, IActivityConfigurator> _internalActivityConfigurators = [];
     private readonly Dictionary<IEvent, IActivityConfigurator> _messageConfigurators = [];
-    private readonly ConcurrentDictionary<IState, List<IFlow>> _stateMapFlows = [];
+    private readonly ConcurrentDictionary<IState, List<IEventOperator>> _stateMapEventOperators = [];
     private readonly Dictionary<IEvent, IActivityConfigurator> _innerMessageConfigurators = [];
     private bool _removeInstanceWhenCompleted;
 
@@ -78,30 +78,32 @@ public abstract partial class StateMachine<TInstance> :
     }
 
 
-    // Starting flow chains.
-    protected void Initially(params IFlow[] flows) => BindingFlowsState(Initial, flows);
+    // Starting event-operator chains.
+    protected void Initially(params IEventOperator[] operators) => BindEventOperatorsToState(Initial, operators);
 
-    protected void During(IState state, params IFlow[] flows) => BindingFlowsState(state, flows);
+    protected void During(IState state, params IEventOperator[] operators) =>
+        BindEventOperatorsToState(state, operators);
 
-    protected void During(IState state1, IState state2, params IFlow[] flows)
-        => During([state1, state2], flows);
+    protected void During(IState state1, IState state2, params IEventOperator[] operators)
+        => During([state1, state2], operators);
 
-    protected void During(IState state1, IState state2, IState state3, params IFlow[] flows)
-        => During([state1, state2, state3], flows);
+    protected void During(IState state1, IState state2, IState state3, params IEventOperator[] operators)
+        => During([state1, state2, state3], operators);
 
-    protected void During(IState state1, IState state2, IState state3, IState state4, params IFlow[] flows)
-        => During([state1, state2, state3, state4], flows);
+    protected void During(IState state1, IState state2, IState state3, IState state4,
+        params IEventOperator[] operators)
+        => During([state1, state2, state3, state4], operators);
 
-    protected void During(IEnumerable<IState> states, params IFlow[] flows) =>
-        states.ForEach(state => BindingFlowsState(state, flows));
+    protected void During(IEnumerable<IState> states, params IEventOperator[] operators) =>
+        states.ForEach(state => BindEventOperatorsToState(state, operators));
 
-    protected void DuringAny(params IFlow[] flows) => During(States, flows);
+    protected void DuringAny(params IEventOperator[] operators) => During(States, operators);
 
     protected void RemoveInstanceWhenCompleted() => _removeInstanceWhenCompleted = true;
 
-    public IFlowOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class =>
-        new FlowOperator<TInstance, TMessage>(@event, this);
+    public IEventOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class =>
+        new EventOperator<TInstance, TMessage>(@event, this);
 
-    private void BindingFlowsState(IState state, IFlow[] flows) =>
-        _stateMapFlows.GetOrAdd(state, _ => []).AddRange(flows);
+    private void BindEventOperatorsToState(IState state, IEventOperator[] operators) =>
+        _stateMapEventOperators.GetOrAdd(state, _ => []).AddRange(operators);
 }

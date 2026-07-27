@@ -46,21 +46,21 @@ public abstract partial class StateMachine<TInstance>
         var machineInstanceRepository = services.GetRequiredService<IStateMachineInstanceRepository<TInstance>>();
 
 
-        var statesWithFlows = _stateMapFlows
-            .Aggregate(new List<(IState State, IFlowOperator<TInstance, TMessage> FlowOperator)>(),
+        var statesWithOperators = _stateMapEventOperators
+            .Aggregate(new List<(IState State, IEventOperator<TInstance, TMessage> EventOperator)>(),
                 (acc, next) =>
                 {
-                    var flows = next.Value
-                        .OfType<IFlowOperator<TInstance, TMessage>>()
+                    var operators = next.Value
+                        .OfType<IEventOperator<TInstance, TMessage>>()
                         .ToArray();
-                    var matchedFlow = flows.FirstOrDefault(f => f.Event.Equals(@event));
-                    if (matchedFlow is null) return acc;
-                    acc.Add((next.Key, matchedFlow));
+                    var matchedOperator = operators.FirstOrDefault(f => f.Event.Equals(@event));
+                    if (matchedOperator is null) return acc;
+                    acc.Add((next.Key, matchedOperator));
                     return acc;
                 });
 
-        if (statesWithFlows is not { Count: > 0 })
-            throw new StateMachineException.NoFlowMatchesEvent(typeof(IEvent<TMessage>));
+        if (statesWithOperators is not { Count: > 0 })
+            throw new StateMachineException.NoEventOperatorMatchesEvent(typeof(IEvent<TMessage>));
 
         var predicate = configurator.GetPredicate(context);
         // If the configurator just have the CorrelationBy, then we have the get the correlationId from instance
@@ -73,7 +73,7 @@ public abstract partial class StateMachine<TInstance>
         if (instance is null)
         {
             if (isMessageDelaying) return; // Completed?
-            if (statesWithFlows.All(x => x.State != Initial))
+            if (statesWithOperators.All(x => x.State != Initial))
             {
                 var missingInstanceAction = configurator.MissingInstanceBehavior;
                 if (missingInstanceAction is null)
@@ -92,8 +92,9 @@ public abstract partial class StateMachine<TInstance>
             instance = await machineInstanceRepository.CreateInstanceAsync(newCorrelationId, token);
         }
 
-        var flow = statesWithFlows.FirstOrDefault(x => (State)x.State == new State(instance.State)).FlowOperator;
-        if (flow is null)
+        var eventOperator = statesWithOperators
+            .FirstOrDefault(x => (State)x.State == new State(instance.State)).EventOperator;
+        if (eventOperator is null)
             throw new StateMachineException.EventNotDeclaredForState(typeof(TMessage), instance.State);
 
         if (_innerMessageConfigurators.TryGetValue(@event, out var c) &&
@@ -109,7 +110,7 @@ public abstract partial class StateMachine<TInstance>
 
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
             (instance, context.Message, context.RequesterId, context);
-        await flow.ExecuteFlowAsync(stateMachineContext, token);
+        await eventOperator.ExecuteAsync(stateMachineContext, token);
         if (_removeInstanceWhenCompleted && instance.State == Completed.Name)
             await machineInstanceRepository.RemoveInstanceAsync(instance, token);
         await machineInstanceRepository.SaveInstanceAsync(token);

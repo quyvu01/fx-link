@@ -25,7 +25,7 @@ builder.Services.AddSwaggerGen(c =>
         Title = "FxLink StateMachine Sample",
         Version = "v1",
         Description = "StateMachine service: InventoryReservationStateMachine, the single state " +
-                      "machine in this sample. Covers the full FlowOperator DSL under Pessimistic " +
+                      "machine in this sample. Covers the full EventOperator DSL under Pessimistic " +
                       "concurrency (advisory-lock correlation, every OnMissingInstance variant, " +
                       "requests, schedules, activities, and branching)."
     });

@@ -17,8 +17,8 @@ public delegate Task<bool> AsyncOperatorCondition<in TInstance, in TMessage>(
 public delegate bool OperatorCondition<in TInstance, in TMessage>(
     IStateMachineContext<TInstance, TMessage> context) where TInstance : IStateMachineInstance where TMessage : class;
 
-public delegate IFlowOperator<TInstance, TMessage> ActivityOperatorCallback<TInstance, TMessage>(
-    IFlowOperator<TInstance, TMessage> @operator) where TInstance : IStateMachineInstance where TMessage : class;
+public delegate IEventOperator<TInstance, TMessage> ActivityOperatorCallback<TInstance, TMessage>(
+    IEventOperator<TInstance, TMessage> @operator) where TInstance : IStateMachineInstance where TMessage : class;
 
 public delegate T MessageOperatorFactory<in TInstance, in TMessage, out T>(
     IStateMachineContext<TInstance, TMessage> context)
