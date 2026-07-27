@@ -26,8 +26,17 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
         _poolSizeValue = poolSize;
     }
 
-    public void PrefetchCount(ushort prefetchCount) => _prefetchCount = prefetchCount;
-    public void ConcurrentMessageLimit(ushort limitCount) => _concurrentMessageLimit = limitCount;
+    public void PrefetchCount(ushort prefetchCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(prefetchCount, 0);
+        _prefetchCount = prefetchCount;
+    }
+
+    public void ConcurrentMessageLimit(ushort limitCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(limitCount, 0);
+        _concurrentMessageLimit = limitCount;
+    }
 
     internal IRabbitMqConfiguration ToConfiguration() => new RabbitMqConfiguration(_hostValue, _virtualHostValue,
         _portValue, Credential.UserNameValue, Credential.PasswordValue, Credential.SslOptionValue, _poolSizeValue,
