@@ -40,8 +40,8 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
 
             if (ShouldIgnore(ex, ignoreExceptions))
             {
-                context.Headers[DistributedConfigurators.Headers.MessageTypeKey] =
-                    DistributedConfigurators.MessageTypes.DeadLetter;
+                context.Headers[DistributedConfigurators.Headers.MessageKindKey] =
+                    DistributedConfigurators.MessageKinds.DeadLetter;
                 context.Headers[DistributedConfigurators.Headers.ExceptionTypeKey] =
                     ex.GetType().FullName ?? ex.GetType().Name;
                 context.Headers[DistributedConfigurators.Headers.ExceptionMessageKey] = ex.Message;
@@ -66,16 +66,16 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 var nextRetry = intervals[retryCount];
                 context.Headers[DistributedConfigurators.Headers.RetryCountKey] = retryCount + 1;
                 context.Headers[DistributedConfigurators.Headers.TimeToLiveKey] = nextRetry.TotalMilliseconds;
-                context.Headers[DistributedConfigurators.Headers.MessageTypeKey] =
-                    DistributedConfigurators.MessageTypes.Retry;
+                context.Headers[DistributedConfigurators.Headers.MessageKindKey] =
+                    DistributedConfigurators.MessageKinds.Retry;
                 logger?.LogWarning(
                     "Message: {@Message} processed failed with exception: {@Exception}. Retry will be processed after: {@TimeSpan}",
                     context.Message, new { ex.Message, ex.StackTrace }, nextRetry);
             }
             else
             {
-                context.Headers[DistributedConfigurators.Headers.MessageTypeKey] =
-                    DistributedConfigurators.MessageTypes.DeadLetter;
+                context.Headers[DistributedConfigurators.Headers.MessageKindKey] =
+                    DistributedConfigurators.MessageKinds.DeadLetter;
                 context.Headers[DistributedConfigurators.Headers.ExceptionTypeKey] =
                     ex.GetType().FullName ?? ex.GetType().Name;
                 context.Headers[DistributedConfigurators.Headers.ExceptionMessageKey] = ex.Message;

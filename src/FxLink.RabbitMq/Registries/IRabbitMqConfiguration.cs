@@ -5,7 +5,7 @@ namespace FxLink.RabbitMq.Registries;
 internal interface IRabbitMqConfiguration
 {
     string RabbitMqHost { get; }
-    string RabbitVirtualHost { get; }
+    string RabbitMqVirtualHost { get; }
     int RabbitMqPort { get; }
     string RabbitMqUserName { get; }
     string RabbitMqPassword { get; }

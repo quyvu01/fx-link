@@ -3,33 +3,35 @@ using FxLink.Faults;
 
 namespace FxLink.RabbitMq.Extensions;
 
-internal static class Extensions
+internal static class RabbitMqNamingExtensions
 {
     private static readonly ConcurrentDictionary<Type, string> ConsumerNameCache = new();
     private static readonly ConcurrentDictionary<Type, string> ExchangeNameCache = new();
 
-    extension(Type consumerType)
+    // Applies to both consumer types and message types — RabbitMqClient calls these on the
+    // consumer's Type for queue/consumer names, and on each message's Type for exchange names.
+    extension(Type type)
     {
-        internal string GetRetryExchangeName() => $"{consumerType.GetExchangeName()}.retry";
-        internal string GetDeadLetterExchangeName() => $"{consumerType.GetExchangeName()}.deadletter";
-        internal string GetDelayExchangeName() => $"{consumerType.GetExchangeName()}.delay";
+        internal string GetRetryExchangeName() => $"{type.GetExchangeName()}.retry";
+        internal string GetDeadLetterExchangeName() => $"{type.GetExchangeName()}.deadletter";
+        internal string GetDelayExchangeName() => $"{type.GetExchangeName()}.delay";
 
         internal string GetRetryConsumerName(Type exchangeType) =>
-            $"{consumerType.GetConsumerName()}.retry.{exchangeType.GetExchangeName().Split('.').LastOrDefault()}";
+            $"{type.GetConsumerName()}.retry.{exchangeType.GetExchangeName().Split('.').LastOrDefault()}";
 
-        internal string GetDeadLetterConsumerName() => $"{consumerType.GetConsumerName()}.deadletter";
-        
+        internal string GetDeadLetterConsumerName() => $"{type.GetConsumerName()}.deadletter";
+
         internal string GetConsumerName()
         {
-            ArgumentNullException.ThrowIfNull(consumerType);
-            return ConsumerNameCache.GetOrAdd(consumerType,
+            ArgumentNullException.ThrowIfNull(type);
+            return ConsumerNameCache.GetOrAdd(type,
                 static t => $"{t.Namespace}.{t.Name}".ToLower());
         }
 
         internal string GetExchangeName()
         {
-            ArgumentNullException.ThrowIfNull(consumerType);
-            return ExchangeNameCache.GetOrAdd(consumerType, static t =>
+            ArgumentNullException.ThrowIfNull(type);
+            return ExchangeNameCache.GetOrAdd(type, static t =>
             {
                 if (!typeof(Fault).IsAssignableFrom(t)) return $"{t!.Namespace}.{GetSafeTypeName(t)}".ToLower();
                 if (!t.IsGenericType || t.GetGenericTypeDefinition() != typeof(Fault<>))
