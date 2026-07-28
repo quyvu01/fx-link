@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Threading.Channels;
 using FxLink.Abstractions;
 using FxLink.RabbitMq.Abstractions;
-using FxLink.RabbitMq.Constants;
 using FxLink.RabbitMq.Entities;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RabbitMq.Registries;
@@ -21,7 +20,8 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     private readonly IRabbitMqConfiguration _rabbitMqConfiguration =
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
 
-    private static readonly ConcurrentDictionary<Type, MethodInfo> GetConsumerDispatchInternalMethodCache = [];
+    private static readonly ConcurrentDictionary<(Type ConsumerType, Type ConfiguratorType), MethodInfo>
+        GetConfiguratorInternalMethodCache = [];
 
     private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = [];
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
@@ -81,8 +81,8 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        var userName = _rabbitMqConfiguration.RabbitMqUserName ?? RabbitMqConstants.DefaultUserName;
-        var password = _rabbitMqConfiguration.RabbitMqPassword ?? RabbitMqConstants.DefaultPassword;
+        var userName = _rabbitMqConfiguration.RabbitMqUserName;
+        var password = _rabbitMqConfiguration.RabbitMqPassword;
         var connectionFactory = new ConnectionFactory
         {
             HostName = _rabbitMqConfiguration.RabbitMqHost,
@@ -103,9 +103,8 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         // Task.Delay wait at the bottom of this method).
         _connection.ConnectionShutdownAsync += (_, args) =>
         {
-            _logger.LogWarning(
-                "RabbitMQ connection shut down (ReplyText={ReplyText}); AutomaticRecoveryEnabled will attempt to reconnect.",
-                args.ReplyText);
+            _logger.LogWarning("RabbitMQ connection shut down (ReplyText={ReplyText}); " +
+                               "AutomaticRecoveryEnabled will attempt to reconnect.", args.ReplyText);
             return Task.CompletedTask;
         };
         _connection.RecoverySucceededAsync += (_, _) =>
@@ -198,12 +197,21 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             {
                 var consumerType = c.Key;
                 var messageTypes = c.Select(g => g.MessageType).ToArray();
-                var queueName = consumerType.GetConsumerName();
-                var deadLetterQueue = consumerType.GetDeadLetterConsumerName();
+
+                var receiveEndpointDefinition = GetConfigurator<IReceiveEndpointDefinition>(consumerType);
+
+                var (queueName, autoDelete) = receiveEndpointDefinition switch
+                {
+                    { } val => new QueueConfiguration(val.ReceiveEndpoint, val.AutoDelete),
+                    _ => new QueueConfiguration(consumerType.GetConsumerName(), false)
+                };
+
+                var deadLetterQueue = queueName.DeadLetterQueueName();
 
                 await DeclareTopologyAsync();
 
-                var dispatchDefinition = GetConsumerDispatchDefinition(consumerType);
+                var dispatchDefinition = GetConfigurator<IConsumerDispatchDefinition>(consumerType)
+                                         ?? ConsumerDispatchDefinition.FromConfiguration(_rabbitMqConfiguration);
                 var prefetchCount = dispatchDefinition.PrefetchCount;
                 var concurrentMessageLimit = dispatchDefinition.ConcurrentMessageLimit;
                 var createChannelOptions = new CreateChannelOptions(
@@ -270,11 +278,12 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 {
                     await using var declareChannel = await _connection
                         .CreateChannelAsync(cancellationToken: cancellationToken);
-                    await declareChannel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
-                        autoDelete: false, arguments: null, cancellationToken: cancellationToken);
 
-                    await declareChannel.QueueDeclareAsync(deadLetterQueue, durable: false, exclusive: false,
-                        autoDelete: false, cancellationToken: cancellationToken);
+                    await declareChannel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
+                        autoDelete: autoDelete, cancellationToken: cancellationToken);
+
+                    await declareChannel.QueueDeclareAsync(queue: deadLetterQueue, durable: false, exclusive: false,
+                        autoDelete: autoDelete, cancellationToken: cancellationToken);
 
                     foreach (var messageType in messageTypes)
                     {
@@ -291,9 +300,9 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         await declareChannel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout,
                             durable: false, cancellationToken: cancellationToken);
 
-                        var retryQueue = consumerType.GetRetryConsumerName(messageType);
+                        var retryQueue = queueName.RetryConsumerName(messageType);
                         await declareChannel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
-                            autoDelete: false, arguments: new Dictionary<string, object>
+                            autoDelete: autoDelete, arguments: new Dictionary<string, object>
                             {
                                 ["x-dead-letter-exchange"] = exchangeName,
                                 ["x-dead-letter-routing-key"] = string.Empty
@@ -366,36 +375,30 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         }
     }
 
-    private IConsumerDispatchDefinition GetConsumerDispatchDefinition(Type consumerType)
+    private TMessageConfigurator GetConfigurator<TMessageConfigurator>(Type consumerType)
+        where TMessageConfigurator : IMessageConfigurator
     {
-        var method = GetConsumerDispatchInternalMethodCache.GetOrAdd(consumerType, BuildGetConsumerDispatchInternalMethod);
-        return (IConsumerDispatchDefinition)method.Invoke(this, null);
+        var method = GetConfiguratorInternalMethodCache.GetOrAdd((consumerType, typeof(TMessageConfigurator)),
+            static key => BuildGetConfiguratorInternalMethod(key.ConsumerType, key.ConfiguratorType));
+        return (TMessageConfigurator)method.Invoke(this, null);
     }
 
-    private static MethodInfo BuildGetConsumerDispatchInternalMethod(Type consumerType)
+    private static MethodInfo BuildGetConfiguratorInternalMethod(Type consumerType, Type configuratorType)
     {
-        var openMethod = typeof(RabbitMqClient).GetMethod(
-            nameof(GetConsumerDispatchInternal), BindingFlags.NonPublic | BindingFlags.Instance)!;
-        return openMethod.MakeGenericMethod(consumerType);
+        var openMethod = typeof(RabbitMqClient)
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Single(m => m.Name == nameof(GetConfigurator) && m.GetGenericArguments().Length == 2);
+        return openMethod.MakeGenericMethod(consumerType, configuratorType);
     }
 
-    private IConsumerDispatchDefinition GetConsumerDispatchInternal<TConsumer>() where TConsumer : IConsumer
+    private TMessageConfigurator GetConfigurator<TConsumer, TMessageConfigurator>() where TConsumer : IConsumer
+        where TMessageConfigurator : IMessageConfigurator
     {
-        try
-        {
-            var configurator = serviceProvider.GetService<IConsumerConfigurator<TConsumer>>();
-            if (configurator is null) return ConsumerDispatchDefinition.FromConfiguration(_rabbitMqConfiguration);
-            var consumerConfigurator = (ConsumerConfigurator<TConsumer>)configurator!;
-            var consumerDispatchConfig = consumerConfigurator
-                .GetConfigurator<IConsumerDispatchDefinition>(typeof(TConsumer));
-            if (consumerDispatchConfig is not null) return consumerDispatchConfig;
-            return ConsumerDispatchDefinition.FromConfiguration(_rabbitMqConfiguration);
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning("Failed to load consumer dispatch settings: {@Exception}, return default instead!",
-                new { e.Message, e.StackTrace });
-            return ConsumerDispatchDefinition.FromConfiguration(_rabbitMqConfiguration);
-        }
+        var configurator = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
+        return configurator?.ConsumerConfigurator is not ConsumerConfigurator<TConsumer> consumerConfigurator
+            ? default
+            : consumerConfigurator.GetConfigurator<TMessageConfigurator>(typeof(TConsumer));
     }
+
+    private sealed record QueueConfiguration(string QueueName, bool AutoDelete);
 }

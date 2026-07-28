@@ -39,5 +39,33 @@ public static class ConsumerDispatchExtensions
 
             ((ConsumerDispatchDefinition)currentConfigurator)?.SetConcurrentMessageLimit(limitCount);
         }
+
+        public void ReceivedEndpoint(string endpoint, Action<IReceivedEndpointConfigurator> options = null)
+        {
+            var consumerConfigurator = (ConsumerConfigurator<TConsumer>)configurator;
+            var currentConfigurator = consumerConfigurator
+                .GetConfigurator<IReceiveEndpointDefinition>(typeof(TConsumer));
+            var receivedEndpointConfigurator = new ReceivedEndpointConfigurator();
+            options?.Invoke(receivedEndpointConfigurator);
+            if (currentConfigurator is null)
+            {
+                var newConfig = new ReceiveEndpointDefinition();
+                SetConfig(newConfig);
+                consumerConfigurator.AddConfigurator(typeof(TConsumer), newConfig);
+            }
+
+            SetConfig(currentConfigurator);
+            return;
+
+            void SetConfig(IReceiveEndpointDefinition config)
+            {
+                if (config is not ReceiveEndpointDefinition definition) return;
+                definition.SetReceivedEndpoint(endpoint);
+                if (options is not null)
+                {
+                    definition.SetAutoDelete(receivedEndpointConfigurator.AutoDelete);
+                }
+            }
+        }
     }
 }
