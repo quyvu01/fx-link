@@ -100,4 +100,10 @@ app.MapPost("/orders/{orderId:guid}/refund", async (IPublisher publisher, Guid o
     .WithSummary("Cross-service plain pub/sub (Order -> Payment), fire and forget")
     .WithOpenApi();
 
+app.MapPost("/test-no-consumers", async (IPublisher publisher) =>
+{
+    await publisher.PublishAsync(new MessageWithoutConsumer { OrderId = "123" });
+    return "Publisher unknow consumer";
+});
+
 app.Run();

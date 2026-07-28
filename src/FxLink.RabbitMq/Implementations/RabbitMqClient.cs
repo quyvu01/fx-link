@@ -23,7 +23,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
     private static readonly ConcurrentDictionary<Type, MethodInfo> GetConsumerDispatchInternalMethodCache = [];
 
-    private readonly ConcurrentDictionary<string, Lazy<Task>> _declaredExchanges = [];
     private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = [];
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
     private readonly ILogger<RabbitMqClient> _logger = serviceProvider.GetRequiredService<ILogger<RabbitMqClient>>();
@@ -37,7 +36,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         var channel = await _channelPool.Reader.ReadAsync(token);
         try
         {
-            if (message.ExchangeName is { Length: > 0 } exchangeName) await EnsureExchangeDeclaredAsync(exchangeName);
             await channel.BasicPublishAsync(message.ExchangeName, message.RoutingKey, mandatory: message.Mandatory,
                 basicProperties: message.Props, message.MessageBody, token);
         }
@@ -366,16 +364,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             var channel = await CreatePublishChannelAsync();
             await _channelPool.Writer.WriteAsync(channel);
         }
-    }
-
-    private Task EnsureExchangeDeclaredAsync(string exchangeName)
-    {
-        var lazy = _declaredExchanges.GetOrAdd(exchangeName,
-            name => new Lazy<Task>(() => DeclareExchangeAsync(name)));
-        // Don't let a transient failure permanently poison this exchange for the process
-        // lifetime — drop the cached attempt so the next publish retries the declaration.
-        if (lazy.Value.IsFaulted) _declaredExchanges.TryRemove(exchangeName, out _);
-        return lazy.Value;
     }
 
     private IConsumerDispatchDefinition GetConsumerDispatchDefinition(Type consumerType)
