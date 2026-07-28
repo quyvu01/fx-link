@@ -41,7 +41,8 @@ builder.Services.AddFxLink(opts =>
     opts.AddRabbitMq(config =>
     {
         config.Host("localhost", "fxlink");
-        config.PrefetchCount(2);
+        config.PrefetchCount(1);
+        config.ConcurrentMessageLimit(1);
     });
 });
 

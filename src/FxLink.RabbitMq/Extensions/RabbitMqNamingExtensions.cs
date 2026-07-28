@@ -15,12 +15,6 @@ internal static class RabbitMqNamingExtensions
         internal string GetRetryExchangeName() => $"{type.GetExchangeName()}.retry";
         internal string GetDeadLetterExchangeName() => $"{type.GetExchangeName()}.deadletter";
         internal string GetDelayExchangeName() => $"{type.GetExchangeName()}.delay";
-
-        internal string GetRetryConsumerName(Type exchangeType) =>
-            $"{type.GetConsumerName()}.retry.{exchangeType.GetExchangeName().Split('.').LastOrDefault()}";
-
-        internal string GetDeadLetterConsumerName() => $"{type.GetConsumerName()}.deadletter";
-
         internal string GetConsumerName()
         {
             ArgumentNullException.ThrowIfNull(type);
@@ -40,6 +34,14 @@ internal static class RabbitMqNamingExtensions
                 return $"{t.Namespace}.{nameof(Fault)}.{GetSafeTypeName(innerMessageType)}".ToLower();
             });
         }
+    }
+
+    extension(string consumerName)
+    {
+        internal string DeadLetterQueueName() => $"{consumerName}.deadletter";
+
+        internal string RetryConsumerName(Type exchangeType) =>
+            $"{consumerName}.retry.{exchangeType.GetExchangeName().Split('.').LastOrDefault()}";
     }
 
     // Builds a name that stays unique across closed generic types (e.g. Fault<OrderCreated> vs

@@ -1,10 +1,12 @@
+using FxLink.RabbitMq.Constants;
+
 namespace FxLink.RabbitMq.Registries;
 
 internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
 {
     private string _hostValue;
     private string _virtualHostValue;
-    private int _portValue = 5672;
+    private int _portValue = RabbitMqConstants.DefaultPort;
     private RabbitMqCredential Credential { get; } = new();
     private int _poolSizeValue = Math.Min(Environment.ProcessorCount, 8);
     private ushort _prefetchCountValue = (ushort)Math.Min(Environment.ProcessorCount * 2, 16);
