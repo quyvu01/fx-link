@@ -16,7 +16,7 @@ public static class DependencyExtensions
         var configurator = new Configurator(serviceCollection);
         options?.Invoke(configurator);
         serviceCollection.AddSingleton(configurator.MessageKeys);
-        serviceCollection.AddTransient<IPublisher, PublisherImpl>();
+        serviceCollection.AddTransient<IPublisher, Publisher>();
         serviceCollection.AddScoped(typeof(IConsumerConnector<>), typeof(ConsumerConnector<>));
         serviceCollection.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
         serviceCollection.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));
@@ -28,7 +28,7 @@ public static class DependencyExtensions
         serviceCollection.AddSingleton<IInMemoryResponseGetter>(sp =>
             sp.GetRequiredService<InMemoryResponseProcessor>());
 
-        serviceCollection.AddSingleton(typeof(IRequester<>), typeof(RequesterImpl<>));
+        serviceCollection.AddSingleton(typeof(IRequester<>), typeof(Requester<>));
 
         configurator.AddConsumerPipelineBehaviors(c => c
             .Of(typeof(RetryPipelineBehavior<>))

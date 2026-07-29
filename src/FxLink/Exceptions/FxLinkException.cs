@@ -23,4 +23,18 @@ public static class FxLinkException
     /// <summary>UseMessageRetry was called on a non-generic IConsumerConfigurator.</summary>
     public sealed class ConsumerConfiguratorMustBeGeneric(Type configuratorType) :
         DistributedException($"{configuratorType.Name} must be a generic type implementing {typeof(IConsumerConfigurator<>).FullName}!");
+
+    /// <summary>A dynamic message contract type passed to the proxy builder was not an interface.</summary>
+    public sealed class MessageContractMustBeInterface(Type type) :
+        DistributedException($"{type.Name} must be an interface to be used as a dynamic message contract!");
+
+    /// <summary>A dynamic message contract interface declares a member other than a property.</summary>
+    public sealed class MessageContractMustOnlyDeclareProperties(Type type) :
+        DistributedException(
+            $"{type.Name} must only declare properties (get/set) — methods are not supported on dynamic message contracts!");
+
+    /// <summary>A concrete message type passed to PublishAsync&lt;TMessage&gt;(object values) has no public parameterless constructor.</summary>
+    public sealed class MessageContractRequiresParameterlessConstructor(Type type) :
+        DistributedException(
+            $"{type.Name} must have a public parameterless constructor to be hydrated from PublishAsync<{type.Name}>(object values)!");
 }

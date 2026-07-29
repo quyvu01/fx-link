@@ -3,11 +3,12 @@ using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
 using FxLink.Exceptions;
+using FxLink.Serialization;
 using FxLink.Wrappers;
 
 namespace FxLink.Implementations;
 
-internal class RequesterImpl<TMessage>(
+internal class Requester<TMessage>(
     IClientConnector<TMessage> connector,
     IInMemoryResponseGetter inMemoryResponseGetter)
     : IRequester<TMessage>
@@ -33,4 +34,12 @@ internal class RequesterImpl<TMessage>(
         CancellationToken token = default)
         where TResponse : class
         => RequestAsync<TResponse>(message, RequestContext.New(), token);
+
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(object values, IRequestContext context,
+        CancellationToken token = default) where TResponse : class
+        => RequestAsync<TResponse>(MessageContractActivator.CreateFrom<TMessage>(values), context, token);
+
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(object values, CancellationToken token = default)
+        where TResponse : class
+        => RequestAsync<TResponse>(values, RequestContext.New(), token);
 }

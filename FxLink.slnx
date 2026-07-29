@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/FxLink.Tests/">
     <Project Path="tests/Contracts/Contracts.csproj" />
+    <Project Path="tests/FxLink.Tests/FxLink.Tests.csproj" />
     <Project Path="tests/Order/Order.csproj" />
     <Project Path="tests/Payment/Payment.csproj" />
     <Project Path="tests/StateMachine/StateMachine.csproj" />

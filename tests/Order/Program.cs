@@ -67,6 +67,22 @@ app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logge
     .WithSummary("Publish OrderPlaced (no state machine, IPublisher -> IConsumer)")
     .WithOpenApi();
 
+// app.MapPost("/orders/created", async (IPublisher publisher, ILogger<Program> logger) =>
+//     {
+//         await publisher.PublishAsync<IOrderCreated>(new { OrderId = "1123", Price = 123 });
+//         logger.LogInformation("[API/Publisher] Order order created");
+//         return "Order created";
+//     })
+//     .WithOpenApi();
+
+app.MapPost("/orders/get-test", async (IRequester<IOrderCreated> requester, ILogger<Program> logger) =>
+    {
+        var result = await requester
+            .RequestAsync<IOrderResponse>(new { OrderId = "1123", Price = 123 });
+        return result;
+    })
+    .WithOpenApi();
+
 app.MapGet("/orders/result", async (IRequester<OrderResult> requester, Guid orderId, CancellationToken token) =>
     {
         var result = await requester.RequestAsync<OrderResultResponse>(new OrderResult { OrderId = orderId },
