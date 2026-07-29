@@ -23,6 +23,7 @@
     <ItemGroup>
         <InternalsVisibleTo Include="FxLink.RabbitMq"/>
         <InternalsVisibleTo Include="FxLink.StateMachine"/>
+        <InternalsVisibleTo Include="FxLink.Tests"/>
     </ItemGroup>
 
     <ItemGroup>

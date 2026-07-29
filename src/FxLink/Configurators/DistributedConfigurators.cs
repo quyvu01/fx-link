@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FxLink.Serialization;
 
 namespace FxLink.Configurators;
 
@@ -7,7 +8,8 @@ public static class DistributedConfigurators
     public static readonly JsonSerializerOptions JsonSerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
+        WriteIndented = true,
+        Converters = { new InterfaceMessageJsonConverterFactory() }
     };
 
     internal static readonly TimeSpan[] DefaultRetryPolicy =

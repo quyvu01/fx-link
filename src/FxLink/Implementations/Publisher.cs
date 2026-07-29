@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Implementations;
 
-internal sealed class PublisherImpl(IServiceProvider serviceProvider) : IPublisher
+internal sealed class Publisher(IServiceProvider serviceProvider) : IPublisher
 {
     public async Task PublishAsync<TMessage>(TMessage message, IPublisherContext context,
         CancellationToken token = default)

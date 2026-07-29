@@ -9,4 +9,10 @@ public interface IRequester<in TMessage> where TMessage : class
 
     Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message, CancellationToken token = default)
         where TResponse : class;
+    
+    Task<IResponseContext<TResponse>> RequestAsync<TResponse>(object values, IRequestContext context,
+        CancellationToken token = default) where TResponse : class;
+
+    Task<IResponseContext<TResponse>> RequestAsync<TResponse>(object values, CancellationToken token = default)
+        where TResponse : class;
 }
