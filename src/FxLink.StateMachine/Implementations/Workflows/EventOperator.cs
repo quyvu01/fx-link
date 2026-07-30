@@ -4,6 +4,7 @@ using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
 using FxLink.Extensions;
 using FxLink.Faults;
+using FxLink.Serialization;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
 using FxLink.StateMachine.Configurators;
@@ -121,6 +122,10 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         }
     }
 
+    public IEventOperator<TInstance, TMessage> Publish<T>(
+        MessageOperatorFactory<TInstance, TMessage, object> messageFactory) where T : class =>
+        Publish(ConvertMessageFactory<T>(messageFactory));
+
     public IEventOperator<TInstance, TMessage> PublishAsync<T>(
         [NotNull] MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
     {
@@ -136,6 +141,10 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         }
     }
 
+    public IEventOperator<TInstance, TMessage> PublishAsync<T>(
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync) where T : class =>
+        PublishAsync(ConvertMessageAsyncFactory<T>(messageFactoryAsync));
+
     public IEventOperator<TInstance, TMessage> Response<T>(
         [NotNull] MessageOperatorFactory<TInstance, TMessage, T> messageFactory)
         where T : class
@@ -149,6 +158,10 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             return Task.FromResult(message);
         }
     }
+
+    public IEventOperator<TInstance, TMessage> Response<T>(
+        MessageOperatorFactory<TInstance, TMessage, object> messageFactory) where T : class =>
+        Response(ConvertMessageFactory<T>(messageFactory));
 
     public IEventOperator<TInstance, TMessage> ResponseAsync<T>(
         [NotNull] MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
@@ -165,6 +178,10 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         }
     }
 
+    public IEventOperator<TInstance, TMessage> ResponseAsync<T>(
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync) where T : class =>
+        ResponseAsync(ConvertMessageAsyncFactory<T>(messageFactoryAsync));
+
     public IEventOperator<TInstance, TMessage> Schedule<T>([NotNull] ISchedule<T> schedule,
         [NotNull] MessageOperatorFactory<TInstance, TMessage, T> messageFactory) where T : class
     {
@@ -178,6 +195,10 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             return Task.FromResult(message);
         }
     }
+
+    public IEventOperator<TInstance, TMessage> Schedule<T>(ISchedule<T> schedule,
+        MessageOperatorFactory<TInstance, TMessage, object> messageFactory) where T : class =>
+        Schedule(schedule, ConvertMessageFactory<T>(messageFactory));
 
     public IEventOperator<TInstance, TMessage> ScheduleAsync<T>([NotNull] ISchedule<T> schedule,
         [NotNull] MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class
@@ -209,6 +230,10 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         }
     }
 
+    public IEventOperator<TInstance, TMessage> ScheduleAsync<T>(ISchedule<T> schedule,
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync) where T : class =>
+        ScheduleAsync(schedule, ConvertMessageAsyncFactory<T>(messageFactoryAsync));
+
     public IEventOperator<TInstance, TMessage> Unschedule<T>([NotNull] ISchedule<T> schedule) where T : class
     {
         ArgumentNullException.ThrowIfNull(schedule);
@@ -238,6 +263,11 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             return Task.FromResult(message);
         }
     }
+
+    public IEventOperator<TInstance, TMessage> Request<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+        MessageOperatorFactory<TInstance, TMessage, object> messageFactory)
+        where TRequest : class where TResponse : class =>
+        Request(request, ConvertMessageFactory<TRequest>(messageFactory));
 
     public IEventOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
         MessageOperatorFactoryAsync<TInstance, TMessage, TRequest> messageFactoryAsync)
@@ -308,6 +338,11 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         }
     }
 
+    public IEventOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync)
+        where TRequest : class where TResponse : class =>
+        RequestAsync(request, ConvertMessageAsyncFactory<TRequest>(messageFactoryAsync));
+
     public IEventOperator<TInstance, TMessage> Activity(StateMchineOperatorActivity<TInstance, TMessage> activity)
     {
         ArgumentNullException.ThrowIfNull(activity);
@@ -367,5 +402,29 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         var newOperator = new EventOperator<TInstance, TMessage>(Event, stateMachine);
         newOperator.TransitionTo(new State(transitionAction.Invoke()));
         await newOperator.ExecuteAsync(context, ct);
+    }
+
+    private static MessageOperatorFactory<TInstance, TMessage, T> ConvertMessageFactory<T>(
+        MessageOperatorFactory<TInstance, TMessage, object> messageFactory) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(messageFactory);
+        return context =>
+        {
+            var values = messageFactory.Invoke(context);
+            var message = MessageContractActivator.CreateFrom<T>(values);
+            return message;
+        };
+    }
+
+    private static MessageOperatorFactoryAsync<TInstance, TMessage, T> ConvertMessageAsyncFactory<T>(
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(messageFactoryAsync);
+        return async (context, ct) =>
+        {
+            var values = await messageFactoryAsync.Invoke(context, ct);
+            var message = MessageContractActivator.CreateFrom<T>(values);
+            return message;
+        };
     }
 }
