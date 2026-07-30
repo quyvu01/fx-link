@@ -174,7 +174,7 @@ internal static class MessageContractActivator
     // Price` property, or `Count = "5"` (string) into an `int Count` property. Deliberately not a
     // general-purpose converter: types that don't implement IConvertible (Guid, Uri, TimeSpan,
     // Version, ...) are out of scope for now and fall through unconverted.
-    private static bool TryConvertPrimitive(Type targetType, object value, out object converted)
+    internal static bool TryConvertPrimitive(Type targetType, object value, out object converted)
     {
         var effectiveTargetType = Nullable.GetUnderlyingType(targetType) ?? targetType;
 

@@ -8,13 +8,13 @@ internal record StateMachineContext<TInstance, TMessage>(
     TMessage Message,
     Guid? RequesterId,
     Guid CorrelationId,
-    Dictionary<string, object> Headers)
+    IHeaders Headers)
     : IStateMachineContext<TInstance, TMessage>
     where TInstance : IStateMachineInstance
     where TMessage : class
 {
     public StateMachineContext(TInstance Instance, TMessage Message, Guid? RequesterId, IContext context) :
-        this(Instance, Message, RequesterId, context.CorrelationId, new Dictionary<string, object>(context.Headers))
+        this(Instance, Message, RequesterId, context.CorrelationId, new HeaderBag(context.Headers))
     {
     }
 
@@ -27,12 +27,12 @@ internal record StateMachineContext<TInstance>(
     TInstance Instance,
     Guid? RequesterId,
     Guid CorrelationId,
-    Dictionary<string, object> Headers)
+    IHeaders Headers)
     : IStateMachineContext<TInstance>
     where TInstance : IStateMachineInstance
 {
     internal StateMachineContext(TInstance Instance, Guid? RequesterId, IContext context) :
-        this(Instance, RequesterId, context.CorrelationId, new Dictionary<string, object>(context.Headers))
+        this(Instance, RequesterId, context.CorrelationId, new HeaderBag(context.Headers))
     {
     }
 

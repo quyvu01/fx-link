@@ -34,17 +34,18 @@ internal sealed class RabbitMqScheduleExchangeProvider(IRabbitMqClient client) :
     public Task PublishDelayedAsync<TMessage>(TMessage message, IContext context, long delayInMs,
         CancellationToken cancellationToken = default) where TMessage : class
     {
+        var nativeHeaders = context.Headers.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+        nativeHeaders["x-delay"] = delayInMs;
         var props = new BasicProperties
         {
             CorrelationId = context.CorrelationId.ToString(),
-            Headers = new Dictionary<string, object>(context.Headers) { ["x-delay"] = delayInMs },
+            Headers = nativeHeaders,
             Type = typeof(TMessage).AssemblyQualifiedName
         };
 
         var routingKey = string.Empty;
-        if (context is IResponseContext responseContext && responseContext.Headers
-                .TryGetValue(DistributedConfigurators.Headers.ReplyToKey, out var replyToAsObject))
-            routingKey = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(replyToAsObject));
+        if (context is IResponseContext responseContext)
+            routingKey = responseContext.Headers.Get<string>(DistributedConfigurators.Headers.ReplyToKey);
 
         var envelope = new Envelope<TMessage>(message, context);
         var serializedMessage = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);

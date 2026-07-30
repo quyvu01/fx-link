@@ -20,9 +20,9 @@ internal class InMemoryInMemoryMessage<TMessage>
     {
         var token = CancellationToken.None;
         if (item.Context is IPublisherContext &&
-            item.Context.Headers.TryGetValue(DistributedConfigurators.Headers.ScheduleMessageKey, out var messageId))
+            item.Context.Headers.Get<string>(DistributedConfigurators.Headers.ScheduleMessageKey) is { } messageId)
         {
-            token = _dispatcher.AcquiredToken(Guid.Parse(messageId.ToString()!), delay);
+            token = _dispatcher.AcquiredToken(Guid.Parse(messageId), delay);
         }
 
         await Task.Delay(delay, token);
@@ -41,16 +41,13 @@ internal class InMemoryInMemoryMessage<TMessage>
                 if (messageData.Context is IPublisherContext publisherContext)
                 {
                     var headers = publisherContext.Headers;
-                    if (headers.TryGetValue(DistributedConfigurators.Headers.MessageKindKey,
-                            out var messageKeyTypeObj) &&
-                        messageKeyTypeObj.Equals(DistributedConfigurators.MessageKinds.Delay))
+                    if (headers.Get<string>(DistributedConfigurators.Headers.MessageKindKey) ==
+                            DistributedConfigurators.MessageKinds.Delay &&
+                        headers.TryGetHeader(DistributedConfigurators.Headers.DelayInMsKey, out _))
                     {
-                        if (headers.TryGetValue(DistributedConfigurators.Headers.DelayInMsKey, out var delayObject) &&
-                            double.TryParse(delayObject.ToString(), out var delay))
-                        {
-                            PushToDelayChannel(messageData, TimeSpan.FromMilliseconds(delay));
-                            continue;
-                        }
+                        var delay = headers.Get<double>(DistributedConfigurators.Headers.DelayInMsKey);
+                        PushToDelayChannel(messageData, TimeSpan.FromMilliseconds(delay));
+                        continue;
                     }
                 }
 

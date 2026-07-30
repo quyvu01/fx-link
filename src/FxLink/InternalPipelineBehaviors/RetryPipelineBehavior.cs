@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text.Json;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
@@ -40,13 +39,13 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
 
             if (ShouldIgnore(ex, ignoreExceptions))
             {
-                context.Headers[DistributedConfigurators.Headers.MessageKindKey] =
-                    DistributedConfigurators.MessageKinds.DeadLetter;
-                context.Headers[DistributedConfigurators.Headers.ExceptionTypeKey] =
-                    ex.GetType().FullName ?? ex.GetType().Name;
-                context.Headers[DistributedConfigurators.Headers.ExceptionMessageKey] = ex.Message;
-                context.Headers[DistributedConfigurators.Headers.ExceptionStackTraceKey] =
-                    ex.StackTrace ?? string.Empty;
+                context.Headers.Set(DistributedConfigurators.Headers.MessageKindKey,
+                    DistributedConfigurators.MessageKinds.DeadLetter);
+                context.Headers.Set(DistributedConfigurators.Headers.ExceptionTypeKey,
+                    ex.GetType().FullName ?? ex.GetType().Name);
+                context.Headers.Set(DistributedConfigurators.Headers.ExceptionMessageKey, ex.Message);
+                context.Headers.Set(DistributedConfigurators.Headers.ExceptionStackTraceKey,
+                    ex.StackTrace ?? string.Empty);
                 logger?.LogError(
                     "Message has been moved to dead letter queue due the exception ignore: {@Message} with exception: {@Exception}",
                     context.Message, new { ex.Message, ex.StackTrace });
@@ -54,7 +53,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 return;
             }
 
-            var retryCount = GetRetryCountFromHeader(context.Headers);
+            var retryCount = context.Headers.Get<int>(DistributedConfigurators.Headers.RetryCountKey);
 
             if (retryCount < intervals.Length)
             {
@@ -64,23 +63,23 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 // immediately instead of blocking it for the whole backoff duration — see
                 // RabbitMqClient's retry exchange/queue (TTL + x-dead-letter-exchange) topology.
                 var nextRetry = intervals[retryCount];
-                context.Headers[DistributedConfigurators.Headers.RetryCountKey] = retryCount + 1;
-                context.Headers[DistributedConfigurators.Headers.TimeToLiveKey] = nextRetry.TotalMilliseconds;
-                context.Headers[DistributedConfigurators.Headers.MessageKindKey] =
-                    DistributedConfigurators.MessageKinds.Retry;
+                context.Headers.Set(DistributedConfigurators.Headers.RetryCountKey, retryCount + 1);
+                context.Headers.Set(DistributedConfigurators.Headers.TimeToLiveKey, nextRetry.TotalMilliseconds);
+                context.Headers.Set(DistributedConfigurators.Headers.MessageKindKey,
+                    DistributedConfigurators.MessageKinds.Retry);
                 logger?.LogWarning(
                     "Message: {@Message} processed failed with exception: {@Exception}. Retry will be processed after: {@TimeSpan}",
                     context.Message, new { ex.Message, ex.StackTrace }, nextRetry);
             }
             else
             {
-                context.Headers[DistributedConfigurators.Headers.MessageKindKey] =
-                    DistributedConfigurators.MessageKinds.DeadLetter;
-                context.Headers[DistributedConfigurators.Headers.ExceptionTypeKey] =
-                    ex.GetType().FullName ?? ex.GetType().Name;
-                context.Headers[DistributedConfigurators.Headers.ExceptionMessageKey] = ex.Message;
-                context.Headers[DistributedConfigurators.Headers.ExceptionStackTraceKey] =
-                    ex.StackTrace ?? string.Empty;
+                context.Headers.Set(DistributedConfigurators.Headers.MessageKindKey,
+                    DistributedConfigurators.MessageKinds.DeadLetter);
+                context.Headers.Set(DistributedConfigurators.Headers.ExceptionTypeKey,
+                    ex.GetType().FullName ?? ex.GetType().Name);
+                context.Headers.Set(DistributedConfigurators.Headers.ExceptionMessageKey, ex.Message);
+                context.Headers.Set(DistributedConfigurators.Headers.ExceptionStackTraceKey,
+                    ex.StackTrace ?? string.Empty);
                 logger?.LogError(
                     "Message: {@Message} processed failed with exception: {@Exception} after {@Times} times. Message has been moved to dead letter queue!",
                     context.Message, new { ex.Message, ex.StackTrace }, intervals.Length);
@@ -141,11 +140,5 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
         }
 
         return MessageRetryPolicy.DefaultMessageRetryPolicy;
-    }
-
-    private static int GetRetryCountFromHeader(Dictionary<string, object> headers)
-    {
-        if (!headers.TryGetValue(DistributedConfigurators.Headers.RetryCountKey, out var retryCountAsObject)) return 0;
-        return int.TryParse(JsonSerializer.Serialize(retryCountAsObject), out var retryCount) ? retryCount : 0;
     }
 }
