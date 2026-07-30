@@ -32,33 +32,76 @@ public interface IEventOperator<TInstance, TMessage> : IEventOperator
         ActivityOperatorCallback<TInstance, TMessage> succeedCallback,
         ActivityOperatorCallback<TInstance, TMessage> otherwiseCallback);
 
+    #region Publishing
+
     IEventOperator<TInstance, TMessage> Publish<T>(MessageOperatorFactory<TInstance, TMessage, T> messageFactory)
+        where T : class;
+
+    IEventOperator<TInstance, TMessage> Publish<T>(MessageOperatorFactory<TInstance, TMessage, object> messageFactory)
         where T : class;
 
     IEventOperator<TInstance, TMessage> PublishAsync<T>(
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
 
+    IEventOperator<TInstance, TMessage> PublishAsync<T>(
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync) where T : class;
+
+    #endregion
+
+    #region Response
+
     IEventOperator<TInstance, TMessage> Response<T>(MessageOperatorFactory<TInstance, TMessage, T> messageFactory)
+        where T : class;
+
+    IEventOperator<TInstance, TMessage> Response<T>(MessageOperatorFactory<TInstance, TMessage, object> messageFactory)
         where T : class;
 
     IEventOperator<TInstance, TMessage> ResponseAsync<T>(
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
 
+    IEventOperator<TInstance, TMessage> ResponseAsync<T>(
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync) where T : class;
+
+    #endregion
+
+    #region Scheduling
+
     IEventOperator<TInstance, TMessage> Schedule<T>(ISchedule<T> schedule,
         MessageOperatorFactory<TInstance, TMessage, T> messageFactory) where T : class;
+
+    IEventOperator<TInstance, TMessage> Schedule<T>(ISchedule<T> schedule,
+        MessageOperatorFactory<TInstance, TMessage, object> messageFactory) where T : class;
 
     IEventOperator<TInstance, TMessage> ScheduleAsync<T>(ISchedule<T> schedule,
         MessageOperatorFactoryAsync<TInstance, TMessage, T> messageFactoryAsync) where T : class;
 
+    IEventOperator<TInstance, TMessage> ScheduleAsync<T>(ISchedule<T> schedule,
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync) where T : class;
+
     IEventOperator<TInstance, TMessage> Unschedule<T>(ISchedule<T> schedule) where T : class;
+
+    #endregion
+
+    #region Request
 
     IEventOperator<TInstance, TMessage> Request<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
         MessageOperatorFactory<TInstance, TMessage, TRequest> messageFactory)
+        where TRequest : class where TResponse : class;
+    
+    IEventOperator<TInstance, TMessage> Request<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+        MessageOperatorFactory<TInstance, TMessage, object> messageFactory)
         where TRequest : class where TResponse : class;
 
     IEventOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
         MessageOperatorFactoryAsync<TInstance, TMessage, TRequest> messageFactoryAsync)
         where TRequest : class where TResponse : class;
+    
+    IEventOperator<TInstance, TMessage> RequestAsync<TRequest, TResponse>(IRequest<TRequest, TResponse> request,
+        MessageOperatorFactoryAsync<TInstance, TMessage, object> messageFactoryAsync)
+        where TRequest : class where TResponse : class;
+
+    #endregion
+
 
     IEventOperator<TInstance, TMessage> Activity(StateMchineOperatorActivity<TInstance, TMessage> activity);
 }
