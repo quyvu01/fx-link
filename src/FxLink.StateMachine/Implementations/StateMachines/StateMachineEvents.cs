@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
 using FxLink.Extensions;
@@ -22,18 +21,10 @@ public abstract partial class StateMachine<TInstance>
     {
         var @event = new Event<TMessage>();
         // Here, we will resolve the activity
-        if (context.Headers.TryGetValue(StateMachineConfigurators.MessageRoutingKey, out var messageRoutingKey))
-        {
-            var messageKey = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(messageRoutingKey));
+        if (context.Headers.Get<string>(StateMachineConfigurators.MessageRoutingKey) is { } messageKey)
             @event.SetName(messageKey);
-        }
 
-        var messageType = context.Headers
-                .TryGetValue(DistributedConfigurators.Headers.MessageKindKey, out var messageTypeAsObj) switch
-            {
-                true => JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(messageTypeAsObj)),
-                _ => null
-            };
+        var messageType = context.Headers.Get<string>(DistributedConfigurators.Headers.MessageKindKey);
 
         var isMessageDelaying = messageType == DistributedConfigurators.MessageKinds.Delay;
 

@@ -2,11 +2,11 @@ namespace FxLink.Abstractions.Contexts;
 
 public class ResponseContext : AbstractContext, IResponseContext
 {
-    internal ResponseContext(Guid requesterId, Guid correlationId, Dictionary<string, object> headers)
+    internal ResponseContext(Guid requesterId, Guid correlationId, IHeaders headers)
         : base(correlationId, headers) => RequesterId = requesterId;
 
     public ResponseContext(Guid requesterId, IContext context)
-        : this(requesterId, context.CorrelationId, new Dictionary<string, object>(context.Headers))
+        : this(requesterId, context.CorrelationId, new HeaderBag(context.Headers))
     {
     }
 
@@ -17,11 +17,11 @@ internal sealed class ResponseContext<TResponse> : ResponseContext, IResponseCon
     where TResponse : class
 {
     internal ResponseContext(TResponse message, Guid requesterId, Guid correlationId,
-        Dictionary<string, object> headers)
+        IHeaders headers)
         : base(requesterId, correlationId, headers) => Message = message;
 
     public ResponseContext(TResponse message, Guid requesterId, IContext context)
-        : this(message, requesterId, context.CorrelationId, new Dictionary<string, object>(context.Headers))
+        : this(message, requesterId, context.CorrelationId, new HeaderBag(context.Headers))
     {
     }
 

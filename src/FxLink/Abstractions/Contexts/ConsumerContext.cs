@@ -7,14 +7,14 @@ namespace FxLink.Abstractions.Contexts;
 public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMessage> where TMessage : class
 {
     internal ConsumerContext(TMessage message, Guid? requesterId, Guid correlationId,
-        Dictionary<string, object> headers) : base(correlationId, headers)
+        IHeaders headers) : base(correlationId, headers)
     {
         RequesterId = requesterId;
         Message = message;
     }
 
     public ConsumerContext(TMessage message, Guid? requesterId, IContext context)
-        : this(message, requesterId, context.CorrelationId, new Dictionary<string, object>(context.Headers))
+        : this(message, requesterId, context.CorrelationId, new HeaderBag(context.Headers))
     {
     }
 

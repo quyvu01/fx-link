@@ -30,7 +30,7 @@ internal class RabbitMqClientConnector<TMessage>(
 
     public async Task SendAsync(TMessage message, IContext context, CancellationToken token = default)
     {
-        var messageKind = GetMessageKind(context);
+        var messageKind = context.Headers.Get<string>(DistributedConfigurators.Headers.MessageKindKey);
 
         if (messageKind == DistributedConfigurators.MessageKinds.Delay)
         {
@@ -39,7 +39,7 @@ internal class RabbitMqClientConnector<TMessage>(
                     $"Cannot send a delayed {typeof(TMessage).Name}: no IDelayMessageProvider is registered. " +
                     "Call IConfigurator.UseRabbitMqDelayScheduler() (or register a custom IDelayMessageProvider) " +
                     "before publishing delayed messages.");
-            var delayInMs = GetDelayTimeFromHeader(context.Headers);
+            var delayInMs = (long)context.Headers.Get<double>(DistributedConfigurators.Headers.DelayInMsKey);
             await _delayMessageProvider.PublishDelayedAsync(message, context, delayInMs, token);
             return;
         }
@@ -48,26 +48,18 @@ internal class RabbitMqClientConnector<TMessage>(
             { CorrelationId = context.CorrelationId.ToString(), Type = typeof(TMessage).AssemblyQualifiedName };
         if (context is IRequestContext) props.ReplyTo = client.ReplyQueueName;
         if (messageKind == DistributedConfigurators.MessageKinds.Retry)
-            props.Expiration = GetTimeToLiveFromHeader(context.Headers).ToString();
+            props.Expiration = ((long)context.Headers.Get<double>(DistributedConfigurators.Headers.TimeToLiveKey))
+                .ToString();
 
         var envelope = new Envelope<TMessage>(message, context);
         var serializedMessage = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
         var messageBytes = Encoding.UTF8.GetBytes(serializedMessage);
         var routingKey = string.Empty;
-        if (context is IResponseContext responseContext && responseContext.Headers
-                .TryGetValue(DistributedConfigurators.Headers.ReplyToKey, out var replyToAsObject))
-            routingKey = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(replyToAsObject));
+        if (context is IResponseContext responseContext)
+            routingKey = responseContext.Headers.Get<string>(DistributedConfigurators.Headers.ReplyToKey);
 
         var exchangeName = GetExchangeName(context, messageKind);
         await client.PublishMessageAsync(new MessagePublisher(exchangeName, routingKey, props, messageBytes), token);
-    }
-
-    private static string GetMessageKind(IContext context)
-    {
-        if (!context.Headers.TryGetValue(DistributedConfigurators.Headers.MessageKindKey, out var messageKindObject))
-            return null;
-        var messageKindJson = JsonSerializer.Serialize(messageKindObject);
-        return JsonSerializer.Deserialize<string>(messageKindJson);
     }
 
     private static string GetExchangeName(IContext context, string messageKind)
@@ -79,18 +71,6 @@ internal class RabbitMqClientConnector<TMessage>(
             DistributedConfigurators.MessageKinds.DeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
             _ => typeof(TMessage).GetExchangeName()
         };
-    }
-
-    private static long GetTimeToLiveFromHeader(Dictionary<string, object> headers)
-    {
-        if (!headers.TryGetValue(DistributedConfigurators.Headers.TimeToLiveKey, out var timeToLiveObject)) return 0;
-        return double.TryParse(JsonSerializer.Serialize(timeToLiveObject), out var timeToLive) ? (long)timeToLive : 0;
-    }
-
-    private static long GetDelayTimeFromHeader(Dictionary<string, object> headers)
-    {
-        if (!headers.TryGetValue(DistributedConfigurators.Headers.DelayInMsKey, out var delayInMs)) return 0;
-        return double.TryParse(JsonSerializer.Serialize(delayInMs), out var delay) ? (long)delay : 0;
     }
 
     public override async Task ProcessMessageReceivedAsync(BasicDeliverEventArgs args, Type consumerType)
@@ -107,7 +87,7 @@ internal class RabbitMqClientConnector<TMessage>(
         var serverConnector = scope.ServiceProvider.GetRequiredService<IConsumerConnector<TMessage>>();
         var headers = envelope.Context.Headers;
         if (args.BasicProperties.ReplyTo is { Length: > 0 } replyTo)
-            headers[DistributedConfigurators.Headers.ReplyToKey] = replyTo;
+            headers.Set(DistributedConfigurators.Headers.ReplyToKey, replyTo);
         var consumerContext = new ConsumerContext<TMessage>(envelope.Message, envelope.Context.RequesterId,
             envelope.Context.CorrelationId, headers);
         await serverConnector.ConsumeAsync(consumerContext, consumerType, args.CancellationToken);

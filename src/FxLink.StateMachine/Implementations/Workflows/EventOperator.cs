@@ -219,13 +219,11 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             var tokenId = Id.New();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             setter.Invoke(context.Instance, tokenId);
-            var headers = new Dictionary<string, object>(context.Headers)
-            {
-                [DistributedConfigurators.Headers.MessageKindKey] = DistributedConfigurators.MessageKinds.Delay,
-                [DistributedConfigurators.Headers.DelayInMsKey] = delay.TotalMilliseconds,
-                [DistributedConfigurators.Headers.ScheduleMessageKey] = tokenId.ToString(),
-                [StateMachineConfigurators.MessageRoutingKey] = schedule.Received.Name,
-            };
+            var headers = new HeaderBag(context.Headers)
+                .With(DistributedConfigurators.Headers.MessageKindKey, DistributedConfigurators.MessageKinds.Delay)
+                .With(DistributedConfigurators.Headers.DelayInMsKey, delay.TotalMilliseconds)
+                .With(DistributedConfigurators.Headers.ScheduleMessageKey, tokenId.ToString())
+                .With(StateMachineConfigurators.MessageRoutingKey, schedule.Received.Name);
             await publisher.PublishAsync(message, new PublisherContext(context.CorrelationId, headers), ct);
         }
     }
@@ -303,10 +301,8 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
                 {
                     var responseContext = await requester.RequestAsync<TResponse>(message, requestContext, ct);
                     var server = services.GetRequiredService<IConsumerConnector<TResponse>>();
-                    var headers = new Dictionary<string, object>(context.Headers)
-                    {
-                        [StateMachineConfigurators.MessageRoutingKey] = request.Completed.Name
-                    };
+                    var headers = new HeaderBag(context.Headers)
+                        .With(StateMachineConfigurators.MessageRoutingKey, request.Completed.Name);
                     var ctx = new ConsumerContext<TResponse>(responseContext.Message,
                         responseContext.RequesterId, responseContext.CorrelationId, headers);
                     await server.ConsumeAsync(ctx, consumerType, ct);

@@ -4,13 +4,13 @@ namespace FxLink.Abstractions.Contexts;
 
 public sealed class RequestContext : AbstractContext, IRequestContext
 {
-    internal RequestContext(Guid correlationId, Dictionary<string, object> headers)
+    internal RequestContext(Guid correlationId, IHeaders headers)
         : base(correlationId, headers)
     {
     }
 
     public RequestContext(IContext context)
-        : this(context.CorrelationId, new Dictionary<string, object>(context.Headers))
+        : this(context.CorrelationId, new HeaderBag(context.Headers))
     {
     }
 
@@ -21,7 +21,7 @@ public sealed class RequestContext : AbstractContext, IRequestContext
     public static RequestContext New(TimeSpan? timeout = null, TimeSpan? timeToLive = null,
         IDictionary<string, object> headers = null)
     {
-        var headerCloned = new Dictionary<string, object>(headers ?? new Dictionary<string, object>());
+        var headerCloned = new HeaderBag(headers ?? new Dictionary<string, object>());
         var context = new RequestContext(Id.New(), headerCloned);
         if (timeout is { } t) context.Timeout = t;
         if (timeToLive is { } ttl) context.TimeToLive = ttl;
