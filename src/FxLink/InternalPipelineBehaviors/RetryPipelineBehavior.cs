@@ -5,6 +5,7 @@ using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
 using FxLink.Delegates;
+using FxLink.Extensions;
 using FxLink.Registries;
 using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,8 +35,8 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             var intervals = retryPolicy.RetryIntervals;
             var ignoreExceptions = retryPolicy.IgnoreExceptions;
 
-            var publisher = services.GetService<IPublisher>();
-            if (publisher is null) throw;
+            var publisher = services.GetRequiredService<IPublisher>();
+            publisher.SetContext(context);
 
             if (ShouldIgnore(ex, ignoreExceptions))
             {
@@ -49,7 +50,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 logger?.LogError(
                     "Message has been moved to dead letter queue due the exception ignore: {@Message} with exception: {@Exception}",
                     context.Message, new { ex.Message, ex.StackTrace });
-                await publisher.PublishAsync(context.Message, new PublisherContext(context), token);
+                await publisher.PublishAsync(context.Message, token);
                 return;
             }
 
@@ -85,7 +86,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                     context.Message, new { ex.Message, ex.StackTrace }, intervals.Length);
             }
 
-            await publisher.PublishAsync(context.Message, new PublisherContext(context), token);
+            await publisher.PublishAsync(context.Message, token);
         }
     }
 

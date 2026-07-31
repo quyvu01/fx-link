@@ -1,6 +1,5 @@
 using Contracts.Messages;
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
 using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
 using Microsoft.OpenApi.Models;
@@ -85,8 +84,8 @@ app.MapPost("/orders/get-test", async (IRequester<IOrderCreated> requester, ILog
 
 app.MapGet("/orders/result", async (IRequester<OrderResult> requester, Guid orderId, CancellationToken token) =>
     {
-        var result = await requester.RequestAsync<OrderResultResponse>(new OrderResult { OrderId = orderId },
-            RequestContext.New(timeout: TimeSpan.FromSeconds(5)), token);
+        var result = await requester
+            .RequestAsync<OrderResultResponse>(new OrderResult { OrderId = orderId }, token);
         return result;
     })
     .WithTags("Plain pub/sub")
@@ -99,8 +98,7 @@ app.MapPost("/orders/{orderId:guid}/charge", async (IRequester<ChargePayment> re
         decimal amount, CancellationToken token) =>
     {
         var result = await requester.RequestAsync<PaymentResult>(
-            new ChargePayment { OrderId = orderId, Amount = amount },
-            RequestContext.New(timeout: TimeSpan.FromSeconds(5)), token);
+            new ChargePayment { OrderId = orderId, Amount = amount }, token);
         return result;
     })
     .WithTags("Payment")

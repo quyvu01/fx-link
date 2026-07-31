@@ -11,10 +11,34 @@ namespace FxLink.Implementations;
 internal class Requester<TMessage>(
     IClientConnector<TMessage> connector,
     IInMemoryResponseGetter inMemoryResponseGetter)
-    : IRequester<TMessage>
+    : IInternalContext, IRequester<TMessage>
     where TMessage : class
 {
-    public async Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message, IRequestContext context,
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message,
+        Action<IRequestContext> contextOptions, CancellationToken token = default) where TResponse : class
+    {
+        var context = Context is null ? RequestContext.New() : new RequestContext(Context);
+        contextOptions?.Invoke(context);
+        return RequestAsync<TResponse>(message, context, token);
+    }
+
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message,
+        CancellationToken token = default)
+        where TResponse : class
+        => RequestAsync<TResponse>(message, (Action<IRequestContext>)null, token);
+
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(object values,
+        Action<IRequestContext> contextOptions, CancellationToken token = default) where TResponse : class =>
+        RequestAsync<TResponse>(MessageContractActivator.CreateFrom<TMessage>(values), contextOptions, token);
+
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(object values, CancellationToken token = default)
+        where TResponse : class
+        => RequestAsync<TResponse>(values, null, token);
+
+    public IContext Context { get; private set; }
+    public void SetContext(IContext context) => Context = context;
+
+    private async Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message, IRequestContext context,
         CancellationToken token = default) where TResponse : class
     {
         if (context.Timeout < TimeSpan.Zero)
@@ -29,17 +53,4 @@ internal class Requester<TMessage>(
             DistributedConfigurators.JsonSerializerOptions);
         return new ResponseContext<TResponse>(response, context.RequesterId, ctx);
     }
-
-    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message,
-        CancellationToken token = default)
-        where TResponse : class
-        => RequestAsync<TResponse>(message, RequestContext.New(), token);
-
-    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(object values, IRequestContext context,
-        CancellationToken token = default) where TResponse : class
-        => RequestAsync<TResponse>(MessageContractActivator.CreateFrom<TMessage>(values), context, token);
-
-    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(object values, CancellationToken token = default)
-        where TResponse : class
-        => RequestAsync<TResponse>(values, RequestContext.New(), token);
 }

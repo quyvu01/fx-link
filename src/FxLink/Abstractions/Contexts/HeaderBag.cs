@@ -28,27 +28,28 @@ internal sealed class HeaderBag : IHeaders
 
     public T Get<T>(string key, T defaultValue = default)
     {
-        if (!_headers.TryGetValue(key, out var value) || value is null
-            || value is JsonElement { ValueKind: JsonValueKind.Null })
-            return defaultValue;
+        if (!_headers.TryGetValue(key, out var value) || value is null ||
+            value is JsonElement { ValueKind: JsonValueKind.Null }) return defaultValue;
 
-        if (value is T typed) return typed;
-
-        if (value is JsonElement element)
+        switch (value)
         {
-            try
-            {
-                return element.Deserialize<T>(DistributedConfigurators.JsonSerializerOptions);
-            }
-            catch
-            {
-                return defaultValue;
-            }
-        }
+            case T typed:
+                return typed;
+            case JsonElement element:
+                try
+                {
+                    return element.Deserialize<T>(DistributedConfigurators.JsonSerializerOptions);
+                }
+                catch
+                {
+                    return defaultValue;
+                }
 
-        return MessageContractActivator.TryConvertPrimitive(typeof(T), value, out var converted)
-            ? (T)converted
-            : defaultValue;
+            default:
+                return MessageContractActivator.TryConvertPrimitive(typeof(T), value, out var converted)
+                    ? (T)converted
+                    : defaultValue;
+        }
     }
 
     public IEnumerator<KeyValuePair<string, object>> GetEnumerator() => _headers.GetEnumerator();

@@ -10,8 +10,7 @@ internal class InMemoryResponseProcessor : IInMemoryResponseSetter, IInMemoryRes
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<object>> _lookup = new();
 
     public async Task<MessageData<Result>> GetResponse<TResponse>(Guid requestId,
-        CancellationToken token = default)
-        where TResponse : class
+        CancellationToken token = default) where TResponse : class
     {
         var tcs = new TaskCompletionSource<object>();
         token.Register(() => tcs.SetException(new TimeoutException()));

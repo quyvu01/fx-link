@@ -14,9 +14,9 @@ public static class MessageContractExtensions
 {
     extension(IPublisher publisher)
     {
-        public Task PublishAsync<TMessage>(object values, IPublisherContext context,
+        public Task PublishAsync<TMessage>(object values, Action<IPublisherContext> contextOptions,
             CancellationToken token = default) where TMessage : class =>
-            publisher.PublishAsync(MessageContractActivator.CreateFrom<TMessage>(values), context, token);
+            publisher.PublishAsync(MessageContractActivator.CreateFrom<TMessage>(values), contextOptions, token);
 
         public Task PublishAsync<TMessage>(object values,
             CancellationToken token = default) where TMessage : class =>

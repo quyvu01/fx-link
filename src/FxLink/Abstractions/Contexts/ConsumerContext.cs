@@ -1,3 +1,5 @@
+using FxLink.Extensions;
+using FxLink.Serialization;
 using FxLink.Statics;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,14 +32,23 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
         await client.SendAsync(Result.Success(message), new ResponseContext(requesterId, this), token);
     }
 
-    public async Task PublishAsync<T>(T message, IPublisherContext context, CancellationToken token = default)
-        where T : class
+    public Task ResponseAsync<TResponse>(object message, CancellationToken token = default) where TResponse : class =>
+        ResponseAsync(MessageContractActivator.CreateFrom<TResponse>(message), token);
+
+    public async Task PublishAsync<T>(T message, Action<IPublisherContext> contextOptions,
+        CancellationToken token = default) where T : class
     {
         var services = ConsumerAmbient.Services;
         var publisher = services.GetRequiredService<IPublisher>();
-        await publisher.PublishAsync(message, context, token);
+        publisher.SetContext(this);
+        await publisher.PublishAsync(message, contextOptions, token);
     }
 
-    public async Task PublishAsync<T>(T message, CancellationToken token = default) where T : class =>
-        await PublishAsync(message, new PublisherContext(this), token);
+    public async Task PublishAsync<T>(T message, CancellationToken token = default) where T : class
+    {
+        var services = ConsumerAmbient.Services;
+        var publisher = services.GetRequiredService<IPublisher>();
+        publisher.SetContext(this);
+        await publisher.PublishAsync(message, null, token);
+    }
 }

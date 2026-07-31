@@ -14,6 +14,6 @@ public sealed class PublisherContext : AbstractContext, IPublisherContext
     {
     }
 
-    public static PublisherContext New(IDictionary<string, object> headers = null) =>
+    internal static PublisherContext New(IDictionary<string, object> headers = null) =>
         new(Id.New(), new HeaderBag(headers ?? new Dictionary<string, object>()));
 }
