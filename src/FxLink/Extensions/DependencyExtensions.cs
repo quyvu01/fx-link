@@ -1,4 +1,5 @@
 using FxLink.Abstractions;
+using FxLink.Abstractions.Contexts;
 using FxLink.Implementations;
 using FxLink.InternalPipelineBehaviors;
 using FxLink.PipelineBehaviors;
@@ -16,7 +17,7 @@ public static class DependencyExtensions
         var configurator = new Configurator(serviceCollection);
         options?.Invoke(configurator);
         serviceCollection.AddSingleton(configurator.MessageKeys);
-        serviceCollection.AddTransient<IPublisher, Publisher>();
+        serviceCollection.AddScoped<IPublisher, Publisher>();
         serviceCollection.AddScoped(typeof(IConsumerConnector<>), typeof(ConsumerConnector<>));
         serviceCollection.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
         serviceCollection.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));
@@ -33,7 +34,7 @@ public static class DependencyExtensions
         configurator.AddConsumerPipelineBehaviors(c => c
             .Of(typeof(RetryPipelineBehavior<>))
         );
-        
+
         configurator.AddPublisherPipelineBehaviors(c => c
             .Of(typeof(PublisherErrorPipelineBehavior<>)));
 
