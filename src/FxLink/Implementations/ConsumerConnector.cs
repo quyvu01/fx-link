@@ -15,9 +15,8 @@ internal class ConsumerConnector<TMessage>(
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(consumerType);
-        using var scope = serviceProvider.CreateScope();
-        ConsumerAmbient.SetConsumerAmbientData(scope.ServiceProvider, consumerType);
-        var pipelineBehavior = scope.ServiceProvider
+        ConsumerAmbient.SetConsumerAmbientData(serviceProvider, consumerType);
+        var pipelineBehavior = serviceProvider
             .GetRequiredService<ConsumerPipelineBehaviorOrchestrator<TMessage>>();
         await pipelineBehavior.ExecuteAsync(context, token);
     }
