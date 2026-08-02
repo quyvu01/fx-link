@@ -1,3 +1,3 @@
 namespace FxLink.Abstractions;
 
-public interface IAction;
+public interface IMessageAction;
