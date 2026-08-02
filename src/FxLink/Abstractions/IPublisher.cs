@@ -2,7 +2,7 @@ using FxLink.Abstractions.Contexts;
 
 namespace FxLink.Abstractions;
 
-public interface IPublisher : IAction
+public interface IPublisher : IMessageAction
 {
     Task PublishAsync<TMessage>(TMessage message, Action<IPublisherContext> contextOptions,
         CancellationToken token = default) where TMessage : class;

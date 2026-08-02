@@ -1,8 +1,8 @@
 namespace FxLink.Extensions;
 
-public static class Extensions
+internal static class Extensions
 {
-    public static void ForEach<T>(this IEnumerable<T> src, Action<T> action)
+    internal static void ForEach<T>(this IEnumerable<T> src, Action<T> action)
     {
         foreach (var item in src ?? []) action?.Invoke(item);
     }

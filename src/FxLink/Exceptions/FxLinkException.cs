@@ -37,4 +37,8 @@ public static class FxLinkException
     public sealed class MessageContractRequiresParameterlessConstructor(Type type) :
         DistributedException(
             $"{type.Name} must have a public parameterless constructor to be hydrated from PublishAsync<{type.Name}>(object values)!");
+
+    /// <summary>RequestAsync(object values) was called on an IRequester whose concrete type isn't generic over TMessage, so TMessage can't be resolved via reflection.</summary>
+    public sealed class RequesterMustBeGeneric(Type requesterType) :
+        DistributedException($"{requesterType.Name} must be a generic type implementing {typeof(IRequester<>).FullName}!");
 }
