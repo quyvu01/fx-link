@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using FxLink.Abstractions.Contexts;
+using FxLink.Exceptions;
 
 namespace FxLink.StateMachine.Contexts;
 
@@ -9,10 +10,9 @@ internal abstract class StateMachineContextPayload : IContextPayload
 
     public T GetPayload<T>()
     {
-        var payload = _contextPayloads
-            .GetValueOrDefault(typeof(T));
-        if (!payload.IsValueCreated) throw new Exception();
-        return (T)payload.Value ?? throw new Exception();
+        if (!_contextPayloads.TryGetValue(typeof(T), out var payload))
+            throw new FxLinkException.ContextPayloadNotFound(typeof(T));
+        return (T)payload.Value ?? throw new FxLinkException.ContextPayloadNotFound(typeof(T));
     }
 
     public void SetPayload<T>(T payload) => _contextPayloads[typeof(T)] = new Lazy<object>(() => payload);

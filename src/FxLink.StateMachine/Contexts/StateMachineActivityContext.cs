@@ -26,20 +26,10 @@ internal class StateMachineActivityContext<TInstance, TMessage>(
 
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
-    public TInstance Instance { get; init; } = instance;
-    public TMessage Message { get; init; } = message;
-    public Guid CorrelationId { get; init; } = correlationId;
-    public IHeaders Headers { get; init; } = headers;
-
-    public void Deconstruct(out TInstance instance, out TMessage message, out Guid? requesterId, out Guid correlationId,
-        out IHeaders headers)
-    {
-        instance = this.Instance;
-        message = this.Message;
-        requesterId = this.RequesterId;
-        correlationId = this.CorrelationId;
-        headers = this.Headers;
-    }
+    public TInstance Instance { get; } = instance;
+    public TMessage Message { get; } = message;
+    public Guid CorrelationId { get; } = correlationId;
+    public IHeaders Headers { get; } = headers;
 }
 
 internal class StateMachineActivityContext<TInstance>(
@@ -63,15 +53,7 @@ internal class StateMachineActivityContext<TInstance>(
 
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
-    public TInstance Instance { get; init; } = instance;
-    public Guid CorrelationId { get; init; } = correlationId;
-    public IHeaders Headers { get; init; } = headers;
-
-    public void Deconstruct(out TInstance instance, out Guid? requesterId, out Guid correlationId, out IHeaders headers)
-    {
-        instance = this.Instance;
-        requesterId = this.RequesterId;
-        correlationId = this.CorrelationId;
-        headers = this.Headers;
-    }
+    public TInstance Instance { get; } = instance;
+    public Guid CorrelationId { get; } = correlationId;
+    public IHeaders Headers { get; } = headers;
 }
