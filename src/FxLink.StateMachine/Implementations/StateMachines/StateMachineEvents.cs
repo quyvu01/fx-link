@@ -8,7 +8,7 @@ using FxLink.StateMachine.Contexts;
 using FxLink.StateMachine.Exceptions;
 using FxLink.StateMachine.Extensions;
 using FxLink.StateMachine.Registries;
-using FxLink.Statics;
+using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Implementations.StateMachines;
@@ -33,7 +33,7 @@ public abstract partial class StateMachine<TInstance>
 
         if (activityConfigurator.Value is not EventConfigurator<TInstance, TMessage> configurator) return;
 
-        var services = ConsumerAmbient.Services;
+        var services = context.GetPayload<IServiceProvider>();
         var machineInstanceRepository = services.GetRequiredService<IStateMachineInstanceRepository<TInstance>>();
 
 
@@ -57,7 +57,7 @@ public abstract partial class StateMachine<TInstance>
         // If the configurator just have the CorrelationBy, then we have the get the correlationId from instance
         var correlationId = configurator.GetCorrelationId(context) ??
                             await machineInstanceRepository.GetCorrelationIdAsync(predicate, token);
-        
+
         await using var scope = await machineInstanceRepository.BeginScopeAsync(correlationId, token: token);
 
         var instance = await machineInstanceRepository.GetInstanceAsync(predicate, token);
@@ -101,6 +101,8 @@ public abstract partial class StateMachine<TInstance>
 
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
             (instance, context.Message, context.RequesterId, context);
+        stateMachineContext.SetPayload(services);
+        stateMachineContext.SetPayload(context.GetPayload<ConsumerContextWrapped>());
         await eventOperator.ExecuteAsync(stateMachineContext, token);
         if (_removeInstanceWhenCompleted && instance.State == Completed.Name)
             await machineInstanceRepository.RemoveInstanceAsync(instance, token);

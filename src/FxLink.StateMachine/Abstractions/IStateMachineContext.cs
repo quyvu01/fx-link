@@ -2,7 +2,7 @@ using FxLink.Abstractions.Contexts;
 
 namespace FxLink.StateMachine.Abstractions;
 
-public interface IStateMachineContext<out TInstance> : IContext where TInstance : IStateMachineInstance
+public interface IStateMachineContext<out TInstance> : IContextPayload, IContext where TInstance : IStateMachineInstance
 {
     TInstance Instance { get; }
     Guid? RequesterId { get; }

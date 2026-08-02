@@ -1,13 +1,16 @@
+using System.Collections.Concurrent;
 using FxLink.Extensions;
 using FxLink.Serialization;
-using FxLink.Statics;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Abstractions.Contexts;
 
-public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMessage> where TMessage : class
+public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMessage>
+    where TMessage : class
 {
+    private readonly ConcurrentDictionary<Type, Lazy<object>> _contextPayloads = [];
+
     internal ConsumerContext(TMessage message, Guid? requesterId, Guid correlationId,
         IHeaders headers) : base(correlationId, headers)
     {
@@ -26,7 +29,7 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
     public async Task ResponseAsync<TResponse>(TResponse message, CancellationToken token = default)
         where TResponse : class
     {
-        var services = ConsumerAmbient.Services;
+        var services = GetPayload<IServiceProvider>();
         var client = services.GetService<IClientConnector<Result>>();
         if (client is null || RequesterId is not { } requesterId) return;
         await client.SendAsync(Result.Success(message), new ResponseContext(requesterId, this), token);
@@ -38,17 +41,22 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
     public async Task PublishAsync<T>(T message, Action<IPublisherContext> contextOptions,
         CancellationToken token = default) where T : class
     {
-        var services = ConsumerAmbient.Services;
+        var services = GetPayload<IServiceProvider>();
         var publisher = services.GetRequiredService<IPublisher>();
         publisher.SetContext(this);
         await publisher.PublishAsync(message, contextOptions, token);
     }
 
     public async Task PublishAsync<T>(T message, CancellationToken token = default) where T : class
+        => await PublishAsync(message, null, token);
+
+    public T GetPayload<T>()
     {
-        var services = ConsumerAmbient.Services;
-        var publisher = services.GetRequiredService<IPublisher>();
-        publisher.SetContext(this);
-        await publisher.PublishAsync(message, null, token);
+        var payload = _contextPayloads
+            .GetValueOrDefault(typeof(T));
+        if (!payload.IsValueCreated) throw new Exception();
+        return (T)payload.Value ?? throw new Exception();
     }
+
+    public void SetPayload<T>(T payload) => _contextPayloads[typeof(T)] = new Lazy<object>(() => payload);
 }

@@ -1,7 +1,6 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Serialization;
-using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Extensions;
@@ -14,7 +13,7 @@ public static class ConsumerContextExtensions
             Action<IRequestContext> contextOptions, CancellationToken token = default)
             where TMessage : class where TResponse : class
         {
-            var services = ConsumerAmbient.Services;
+            var services = consumerContext.GetPayload<IServiceProvider>();
             var requester = services.GetRequiredService<IRequester<TMessage>>();
             return await requester.RequestAsync<TResponse>(message, contextOptions, token);
         }

@@ -135,7 +135,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var message = await messageFactoryAsync.Invoke(context, ct);
-            var services = ConsumerAmbient.Services;
+            var services = context.GetPayload<IServiceProvider>();
             var publisher = services.GetRequiredService<IPublisher>();
             await publisher.PublishAsync(message, ct);
         }
@@ -215,7 +215,8 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
                 throw new StateMachineException.ScheduleDelayConfiguredTwice(schedule.Name);
             var message = await messageFactoryAsync.Invoke(context, ct);
             var delay = scheduleConfigurator.Delay ?? scheduleConfigurator.DelayProvider.Invoke(context);
-            var publisher = ConsumerAmbient.Services.GetRequiredService<IPublisher>();
+            var services = context.GetPayload<IServiceProvider>();
+            var publisher = services.GetRequiredService<IPublisher>();
             var tokenId = Id.New();
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             setter.Invoke(context.Instance, tokenId);
@@ -285,7 +286,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             // in-memory process message based on request/reply pattern
             // run in background without current process
             // need to create a new service scope before it is disposed!
-            var newScope = ConsumerAmbient.Services.CreateScope();
+            var newScope = context.GetPayload<IServiceProvider>().CreateScope();
             _ = Task.Run(async () =>
             {
                 var services = newScope.ServiceProvider;
@@ -352,7 +353,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             activity.Invoke(stateMachineActivityConfigurator);
             stateMachineActivityConfigurator.ValidateItSelf();
 
-            var services = ConsumerAmbient.Services;
+            var services = context.GetPayload<IServiceProvider>();
 
             if (stateMachineActivityConfigurator.ActivityOfType is { } activityOfType)
             {

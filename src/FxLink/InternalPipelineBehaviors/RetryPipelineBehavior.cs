@@ -5,9 +5,8 @@ using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
 using FxLink.Delegates;
-using FxLink.Extensions;
 using FxLink.Registries;
-using FxLink.Statics;
+using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -22,7 +21,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
-        var services = ConsumerAmbient.Services;
+        var services = context.GetPayload<IServiceProvider>();
         var logger = services.GetService<ILogger<RetryPipelineBehavior<TMessage>>>();
         try
         {
@@ -30,13 +29,12 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
         }
         catch (Exception ex)
         {
-            var consumerType = ConsumerAmbient.ConsumerType;
+            var consumerType = context.GetPayload<ConsumerContextWrapped>().ConsumerType;
             var retryPolicy = (GetRetryPolicy(consumerType) as MessageRetryPolicy)!;
             var intervals = retryPolicy.RetryIntervals;
             var ignoreExceptions = retryPolicy.IgnoreExceptions;
 
             var publisher = services.GetRequiredService<IPublisher>();
-            publisher.SetContext(context);
 
             if (ShouldIgnore(ex, ignoreExceptions))
             {
