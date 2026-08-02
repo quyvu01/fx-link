@@ -1,7 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.Delegates;
-using FxLink.Statics;
+using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.PipelineBehaviors;
@@ -10,12 +10,12 @@ internal class ConsumerPipelineBehaviorOrchestrator<TMessage>(IServiceProvider s
 {
     internal async Task ExecuteAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
     {
-        var consumerType = ConsumerAmbient.ConsumerType;
+        var consumerType = context.GetPayload<ConsumerContextWrapped>().ConsumerType;
         if (consumerType is null)
         {
             var messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
             consumerType = messageKeys.GetKeysByMessageType(typeof(TMessage))
-                .OfType<Type>().FirstOrDefault();
+                .FirstOrDefault();
         }
 
         var consumer = serviceProvider.GetKeyedService<IConsumer<TMessage>>(consumerType);

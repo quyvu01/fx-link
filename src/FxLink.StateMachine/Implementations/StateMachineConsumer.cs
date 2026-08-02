@@ -1,7 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.StateMachine.Abstractions;
-using FxLink.Statics;
+using FxLink.Wrappers;
 
 namespace FxLink.StateMachine.Implementations;
 
@@ -10,7 +10,7 @@ public sealed class StateMachineConsumer<TMessage>(IServiceProvider serviceProvi
 {
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
     {
-        var consumerType = ConsumerAmbient.ConsumerType;
+        var consumerType = context.GetPayload<ConsumerContextWrapped>().ConsumerType;
         if (serviceProvider.GetService(consumerType) is IStateMachine stateMachine)
             await stateMachine.RaiseEventAsync(context, token);
     }

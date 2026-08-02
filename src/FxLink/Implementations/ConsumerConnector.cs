@@ -1,7 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
 using FxLink.PipelineBehaviors;
-using FxLink.Statics;
+using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Implementations;
@@ -15,7 +15,8 @@ internal class ConsumerConnector<TMessage>(
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(consumerType);
-        ConsumerAmbient.SetConsumerAmbientData(serviceProvider, consumerType);
+        context.SetPayload(serviceProvider);
+        context.SetPayload(new ConsumerContextWrapped(consumerType));
         var pipelineBehavior = serviceProvider
             .GetRequiredService<ConsumerPipelineBehaviorOrchestrator<TMessage>>();
         await pipelineBehavior.ExecuteAsync(context, token);
