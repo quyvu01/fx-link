@@ -41,4 +41,8 @@ public static class FxLinkException
     /// <summary>RequestAsync(object values) was called on an IRequester whose concrete type isn't generic over TMessage, so TMessage can't be resolved via reflection.</summary>
     public sealed class RequesterMustBeGeneric(Type requesterType) :
         DistributedException($"{requesterType.Name} must be a generic type implementing {typeof(IRequester<>).FullName}!");
+
+    /// <summary>GetPayload&lt;T&gt; was called on a context but no payload of that type was ever set via SetPayload&lt;T&gt;.</summary>
+    public sealed class ContextPayloadNotFound(Type payloadType) :
+        DistributedException($"No payload of type {payloadType.Name} has been set on this context. Call SetPayload<{payloadType.Name}>() before GetPayload<{payloadType.Name}>().");
 }
