@@ -8,9 +8,9 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
     private string _virtualHostValue;
     private int _portValue = RabbitMqConstants.DefaultPort;
     private RabbitMqCredential Credential { get; } = new();
-    private int _poolSizeValue = Math.Min(Environment.ProcessorCount, 8);
-    private ushort _prefetchCountValue = (ushort)Math.Min(Environment.ProcessorCount * 2, 16);
-    private ushort _concurrentMessageLimitValue = (ushort)Math.Min(Environment.ProcessorCount * 2, 16);
+    private int _poolSizeValue = RabbitMqConstants.DefaultPoolSize;
+    private ushort _prefetchCountValue = RabbitMqConstants.DefaultPrefetchCount;
+    private ushort _concurrentMessageLimitValue = RabbitMqConstants.DefaultConcurrentMessageLimit;
 
     public void Host(string host, string virtualHost, int port = 5672, Action<RabbitMqCredential> configure = null)
     {
