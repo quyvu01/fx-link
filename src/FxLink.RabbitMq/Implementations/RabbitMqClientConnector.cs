@@ -30,26 +30,35 @@ internal class RabbitMqClientConnector<TMessage>(
 
     public async Task SendAsync(TMessage message, IContext context, CancellationToken token = default)
     {
-        var messageKind = context.Headers.Get<string>(DistributedConfigurators.Headers.MessageKindKey);
+        var deliveryKind = context.Headers.Get<string>(DistributedConfigurators.Headers.DeliveryKindKey);
+        var delay = (context as IPublisherContext)?.DelayTime;
 
-        if (messageKind == DistributedConfigurators.MessageKinds.Delay)
+        if (deliveryKind == DistributedConfigurators.DeliveryKinds.Delay)
         {
             if (_delayMessageProvider is null)
                 throw new InvalidOperationException(
                     $"Cannot send a delayed {typeof(TMessage).Name}: no IDelayMessageProvider is registered. " +
                     "Call IConfigurator.UseRabbitMqDelayScheduler() (or register a custom IDelayMessageProvider) " +
                     "before publishing delayed messages.");
-            var delayInMs = (long)context.Headers.Get<double>(DistributedConfigurators.Headers.DelayInMsKey);
-            await _delayMessageProvider.PublishDelayedAsync(message, context, delayInMs, token);
+            await _delayMessageProvider.PublishDelayedAsync(message, context,
+                (long)(delay ?? TimeSpan.Zero).TotalMilliseconds, token);
             return;
         }
 
         var props = new BasicProperties
             { CorrelationId = context.CorrelationId.ToString(), Type = typeof(TMessage).AssemblyQualifiedName };
-        if (context is IRequestContext) props.ReplyTo = client.ReplyQueueName;
-        if (messageKind == DistributedConfigurators.MessageKinds.Retry)
-            props.Expiration = ((long)context.Headers.Get<double>(DistributedConfigurators.Headers.TimeToLiveKey))
-                .ToString();
+        if (context is IRequestContext requestContext)
+        {
+            props.ReplyTo = client.ReplyQueueName;
+            if (requestContext.TimeToLive is { } ttl) props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
+        }
+        else if (context is IPublisherContext publisherContext)
+        {
+            if (deliveryKind == DistributedConfigurators.DeliveryKinds.Retry && delay is { } retryDelay)
+                props.Expiration = ((long)retryDelay.TotalMilliseconds).ToString();
+            else if (publisherContext.TimeToLive is { } pttl)
+                props.Expiration = ((long)pttl.TotalMilliseconds).ToString();
+        }
 
         var envelope = new Envelope<TMessage>(message, context);
         var serializedMessage = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
@@ -58,17 +67,17 @@ internal class RabbitMqClientConnector<TMessage>(
         if (context is IResponseContext responseContext)
             routingKey = responseContext.Headers.Get<string>(DistributedConfigurators.Headers.ReplyToKey);
 
-        var exchangeName = GetExchangeName(context, messageKind);
+        var exchangeName = GetExchangeName(context, deliveryKind);
         await client.PublishMessageAsync(new MessagePublisher(exchangeName, routingKey, props, messageBytes), token);
     }
 
-    private static string GetExchangeName(IContext context, string messageKind)
+    private static string GetExchangeName(IContext context, string deliveryKind)
     {
         if (context is IResponseContext) return string.Empty;
-        return messageKind switch
+        return deliveryKind switch
         {
-            DistributedConfigurators.MessageKinds.Retry => typeof(TMessage).GetRetryExchangeName(),
-            DistributedConfigurators.MessageKinds.DeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
+            DistributedConfigurators.DeliveryKinds.Retry => typeof(TMessage).GetRetryExchangeName(),
+            DistributedConfigurators.DeliveryKinds.DeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
             _ => typeof(TMessage).GetExchangeName()
         };
     }

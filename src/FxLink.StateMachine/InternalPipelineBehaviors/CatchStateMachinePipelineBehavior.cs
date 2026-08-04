@@ -27,19 +27,15 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
                 case StateMachineException.InstanceMustBeInitializedFirst:
                     logger.LogError("State machine instance must be initialized fist for context: {@Message}", context);
                     // Do nothing here. We don't need to handle this exception!
-                    break;
+                    return;
                 case StateMachineException.EventNotDeclaredForState ex:
                     logger.LogError(ex.Message);
                     // We have to response Fault to requester. Seems we have to implement result pattern here
-                    if (context.RequesterId is { } requesterId)
-                    {
-                        var client = serviceProvider.GetRequiredService<IClientConnector<Result>>();
-                        await client.SendAsync(Result.Failed(ex), new ResponseContext(requesterId, context), token);
-                    }
-
-                    break;
+                    if (context.RequesterId is not { } requesterId) return;
+                    var client = serviceProvider.GetRequiredService<IClientConnector<Result>>();
+                    await client.SendAsync(Result.Failed(ex), new ResponseContext(requesterId, context), token);
+                    return;
             }
-            logger.LogError(e.Message);
             throw;
         }
     }

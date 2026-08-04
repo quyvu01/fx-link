@@ -22,10 +22,8 @@ public static class DistributedConfigurators
     public static class Headers
     {
         public const string RetryCountKey = "x-retry-count";
-        public const string TimeToLiveKey = "x-retry-ttl";
-        public const string DelayInMsKey = "x-delay-ms";
-        public const string ScheduleMessageKey = "x-schedule-message";
-        public const string MessageKindKey = "x-message-type";
+        public const string DeliveryKindKey = "x-delivery-kind";
+        public const string RequestSemanticsKey = "x-request-kind";
         public const string ReplyToKey = "x-reply-to";
 
         public const string ExceptionTypeKey = "x-exception-type";
@@ -33,10 +31,15 @@ public static class DistributedConfigurators
         public const string ExceptionStackTraceKey = "x-exception-stacktrace";
     }
 
-    public static class MessageKinds
+    public static class DeliveryKinds
     {
-        public const string Retry = "message-retry";
-        public const string DeadLetter = "message-dead-letter";
-        public const string Delay = "message-delay";
+        public const string Retry = "delivery-retry";
+        public const string DeadLetter = "delivery-dead-letter";
+        public const string Delay = "delivery-delay";
+    }
+
+    public static class RequestSemantics
+    {
+        public const string RequestAsPublisher = "request-as-publisher";
     }
 }

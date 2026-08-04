@@ -4,7 +4,7 @@ namespace FxLink.Abstractions.Contexts;
 
 public sealed class RequestContext : AbstractContext, IRequestContext
 {
-    internal RequestContext(Guid correlationId, IHeaders headers)
+    private RequestContext(Guid correlationId, IHeaders headers)
         : base(correlationId, headers)
     {
     }
@@ -14,7 +14,7 @@ public sealed class RequestContext : AbstractContext, IRequestContext
     {
     }
 
-    public Guid RequesterId { get; internal set; } = Id.New();
+    public Guid RequesterId { get; } = Id.New();
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan? TimeToLive { get; set; } = TimeSpan.FromSeconds(30);
 

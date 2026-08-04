@@ -4,5 +4,8 @@ namespace FxLink.StateMachine.Extensions;
 
 internal static class ActivityExtensions
 {
-    public static void SetName(this IActivity activity, string name) => activity.Name = name;
+    extension(IActivity activity)
+    {
+        public void SetName(string name) => activity.Name = name;
+    }
 }

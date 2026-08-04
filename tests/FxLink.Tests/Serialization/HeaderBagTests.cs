@@ -75,14 +75,14 @@ public class HeaderBagTests
         var correlationId = Guid.NewGuid();
         var headers = new HeaderBag();
         headers.Set(DistributedConfigurators.Headers.RetryCountKey, 3);
-        headers.Set(DistributedConfigurators.Headers.DelayInMsKey, 1500.0);
+        headers.Set("x-delay-ms", 1500.0);
         headers.Set("x-correlation", correlationId);
 
         var json = JsonSerializer.Serialize<IHeaders>(headers, DistributedConfigurators.JsonSerializerOptions);
         var roundTripped = JsonSerializer.Deserialize<IHeaders>(json, DistributedConfigurators.JsonSerializerOptions);
 
         roundTripped.Get<int>(DistributedConfigurators.Headers.RetryCountKey).ShouldBe(3);
-        roundTripped.Get<double>(DistributedConfigurators.Headers.DelayInMsKey).ShouldBe(1500.0);
+        roundTripped.Get<double>("x-delay-ms").ShouldBe(1500.0);
         // Guid isn't IConvertible — this only succeeds via the JsonElement.Deserialize<T> branch,
         // pinning down that the fallback order actually matters.
         roundTripped.Get<Guid>("x-correlation").ShouldBe(correlationId);

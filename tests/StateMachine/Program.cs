@@ -12,6 +12,8 @@ using Serilog;
 using StateMachine.Databases;
 using StateMachine.Dtos.Inventory;
 using StateMachine.StateMachines.Inventory;
+using StateMachine.Tests;
+using StateMachine.Tests.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,12 +57,9 @@ builder.Services.AddFxLink(opts =>
 
     opts.AddConsumerDefinitionsFromAssemblies(typeof(Program).Assembly);
 
-    opts.AddRabbitMq(config =>
-    {
-        config.Host("localhost", "fxlink");
-    });
+    opts.AddRabbitMq(config => { config.Host("localhost", "fxlink"); });
     opts.UseRabbitMqDelayScheduler();
-    
+
     opts.AddStateMachines(c =>
     {
         c.AddActivitiesFromAssemblies(typeof(Program).Assembly);
@@ -74,6 +73,7 @@ builder.Services.AddFxLink(opts =>
                 config.DbContextFactory(sp => sp.GetRequiredService<StateMachineDbContext>());
             });
         });
+        c.Of<SagaStateMachine>(cfg => { cfg.InMemoryRepository(); });
     });
 });
 
@@ -156,6 +156,15 @@ app.MapGet("/inventory/{orderId:guid}/summary", async (IRequester<GetReservation
             new GetReservationSummary { OrderId = orderId },
             token);
         return result;
+    })
+    .WithTags("Inventory")
+    .WithSummary("Query reservation summary from any state (DuringAny)")
+    .WithOpenApi();
+
+app.MapPost("/test-request-reply", async (IPublisher publisher, CancellationToken token) =>
+    {
+        await publisher.PublishAsync<IInitTest>(new { Name = "SomeName" }, token);
+        return "Publisher Request Reply";
     })
     .WithTags("Inventory")
     .WithSummary("Query reservation summary from any state (DuringAny)")

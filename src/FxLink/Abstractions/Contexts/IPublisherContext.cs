@@ -1,3 +1,9 @@
 namespace FxLink.Abstractions.Contexts;
 
-public interface IPublisherContext : IContext;
+public interface IPublisherContext : IContext
+{
+    TimeSpan? DelayTime { get; set; }
+    TimeSpan? TimeToLive { get; set; }
+    Guid? ScheduleToken { get; set; }
+    Guid? RequesterId { get; set; }
+}

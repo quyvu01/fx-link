@@ -24,9 +24,9 @@ public abstract partial class StateMachine<TInstance>
         if (context.Headers.Get<string>(StateMachineConfigurators.MessageRoutingKey) is { } messageKey)
             @event.SetName(messageKey);
 
-        var messageType = context.Headers.Get<string>(DistributedConfigurators.Headers.MessageKindKey);
+        var deliveryKind = context.Headers.Get<string>(DistributedConfigurators.Headers.DeliveryKindKey);
 
-        var isMessageDelaying = messageType == DistributedConfigurators.MessageKinds.Delay;
+        var isMessageDelaying = deliveryKind == DistributedConfigurators.DeliveryKinds.Delay;
 
         var activityConfigurator = _messageConfigurators
             .FirstOrDefault(a => a.Key.Equals(@event));
