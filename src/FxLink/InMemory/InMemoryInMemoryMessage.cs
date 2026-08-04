@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using FxLink.Abstractions.Contexts;
-using FxLink.Configurators;
 using FxLink.Entities;
 
 namespace FxLink.InMemory;
@@ -19,11 +18,8 @@ internal class InMemoryInMemoryMessage<TMessage>
     private void PushToDelayChannel(MessageData<TMessage> item, TimeSpan delay) => _ = Task.Run(async () =>
     {
         var token = CancellationToken.None;
-        if (item.Context is IPublisherContext &&
-            item.Context.Headers.Get<string>(DistributedConfigurators.Headers.ScheduleMessageKey) is { } messageId)
-        {
-            token = _dispatcher.AcquiredToken(Guid.Parse(messageId), delay);
-        }
+        if (item.Context is IPublisherContext { ScheduleToken: { } scheduleToken })
+            token = _dispatcher.AcquiredToken(scheduleToken, delay);
 
         await Task.Delay(delay, token);
         await _channel.Writer.WriteAsync(item, CancellationToken.None);
@@ -38,17 +34,10 @@ internal class InMemoryInMemoryMessage<TMessage>
             {
                 await _inboundRing.WaitAsync();
                 if (!_inboundMessages.TryDequeue(out var messageData)) continue;
-                if (messageData.Context is IPublisherContext publisherContext)
+                if (messageData.Context is IPublisherContext { DelayTime: { } delay })
                 {
-                    var headers = publisherContext.Headers;
-                    if (headers.Get<string>(DistributedConfigurators.Headers.MessageKindKey) ==
-                            DistributedConfigurators.MessageKinds.Delay &&
-                        headers.TryGetHeader(DistributedConfigurators.Headers.DelayInMsKey, out _))
-                    {
-                        var delay = headers.Get<double>(DistributedConfigurators.Headers.DelayInMsKey);
-                        PushToDelayChannel(messageData, TimeSpan.FromMilliseconds(delay));
-                        continue;
-                    }
+                    PushToDelayChannel(messageData, delay);
+                    continue;
                 }
 
                 _processingMessages.Enqueue(messageData);

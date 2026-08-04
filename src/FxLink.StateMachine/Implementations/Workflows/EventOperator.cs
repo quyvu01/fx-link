@@ -221,11 +221,13 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             var setter = scheduleConfigurator.TokenIdProvider.GetSetter();
             setter.Invoke(context.Instance, tokenId);
             var headers = new HeaderBag(context.Headers)
-                .With(DistributedConfigurators.Headers.MessageKindKey, DistributedConfigurators.MessageKinds.Delay)
-                .With(DistributedConfigurators.Headers.DelayInMsKey, delay.TotalMilliseconds)
-                .With(DistributedConfigurators.Headers.ScheduleMessageKey, tokenId.ToString())
+                .With(DistributedConfigurators.Headers.DeliveryKindKey, DistributedConfigurators.DeliveryKinds.Delay)
                 .With(StateMachineConfigurators.MessageRoutingKey, schedule.Received.Name);
-            var publisherContext = new PublisherContext(context.CorrelationId, headers);
+            var publisherContext = new PublisherContext(context.CorrelationId, headers)
+            {
+                DelayTime = delay,
+                ScheduleToken = tokenId
+            };
             publisher.SetContext(publisherContext);
             await publisher.PublishAsync(message, ct);
         }
@@ -281,59 +283,37 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             if (!stateMachine.InternalActivityConfigurators.TryGetValue(request, out var configurator) ||
-                configurator is not IRequestConfigurator<TInstance, TRequest, TResponse> scheduleConfigurator) return;
+                configurator is not IRequestConfigurator<TInstance, TRequest, TResponse> requestConfigurator) return;
             var message = await messageFactoryAsync.Invoke(context, ct);
-            // in-memory process message based on request/reply pattern
-            // run in background without current process
-            // need to create a new service scope before it is disposed!
-            var newScope = context.GetPayload<IServiceProvider>().CreateScope();
-            _ = Task.Run(async () =>
-            {
-                var services = newScope.ServiceProvider;
-                var requester = services.GetRequiredService<IRequester<TRequest>>();
-                var timeout = scheduleConfigurator.Timeout;
-                var ttl = scheduleConfigurator.TimeToLive;
+            var serviceProvider = context.GetPayload<IServiceProvider>();
+            // This architecture is different from request/reply patter
+            // I will publish message instead of request message then wait it....
+            var timeout = requestConfigurator.Timeout;
+            var ttl = requestConfigurator.TimeToLive ?? timeout;
+            var requestPublisher = serviceProvider.GetRequiredService<IPublisher>();
 
-                var requestContext = new RequestContext(context.CorrelationId, context.Headers)
-                {
-                    Timeout = timeout, TimeToLive = ttl
-                };
-                var consumerType = stateMachine.GetType();
-                requester.SetContext(requestContext);
-                // Re-check this one, if we resolve IServer or the stateMachine directly? Or we have some other specification ways
-                try
-                {
-                    var responseContext = await requester.RequestAsync<TResponse>(message, null, ct);
-                    var server = services.GetRequiredService<IConsumerConnector<TResponse>>();
-                    var headers = new HeaderBag(context.Headers)
-                        .With(StateMachineConfigurators.MessageRoutingKey, request.Completed.Name);
-                    var ctx = new ConsumerContext<TResponse>(responseContext.Message,
-                        responseContext.RequesterId, responseContext.CorrelationId, headers);
-                    await server.ConsumeAsync(ctx, consumerType, ct);
-                }
-                catch (TimeoutException)
-                {
-                    // Need to invoke timeout event
-                    var server = services.GetRequiredService<IConsumerConnector<RequestTimeoutExpired<TRequest>>>();
-                    var timeoutResponse = new RequestTimeoutExpired<TRequest>(message, context.CorrelationId,
-                        DateTime.UtcNow.Add(timeout), requestContext.RequesterId);
-                    var ctx = new ConsumerContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
-                        requestContext.RequesterId, context);
-                    await server.ConsumeAsync(ctx, consumerType, ct);
-                }
-                catch (Exception e)
-                {
-                    // Need to invoke fault event
-                    var server = services.GetRequiredService<IConsumerConnector<Fault<TRequest>>>();
-                    var faultResponse = new Fault<TRequest>(message).FromException(e);
-                    var ctx = new ConsumerContext<Fault<TRequest>>(faultResponse, requestContext.RequesterId, context);
-                    await server.ConsumeAsync(ctx, consumerType, ct);
-                }
-                finally
-                {
-                    newScope.Dispose();
-                }
-            }, ct);
+            var requestHeaders = new HeaderBag(context.Headers)
+                .With(DistributedConfigurators.Headers.RequestSemanticsKey,
+                    DistributedConfigurators.RequestSemantics.RequestAsPublisher)
+                .With(StateMachineConfigurators.MessageRoutingKey, request.Completed.Name);
+            var requestContext = new PublisherContext(context.CorrelationId, requestHeaders) { TimeToLive = ttl };
+            requestPublisher.SetContext(requestContext);
+            await requestPublisher.PublishAsync(message, ct);
+
+            // Durable timeout watchdog: a delayed message that raises TimeoutExpired if it's still
+            // relevant by the time it's delivered. Completed/Failed/TimeoutExpired are all bound only
+            // During(request.Pending, ...), so whichever of the three arrives first transitions the
+            // instance out of Pending; the other(s) then find no EventOperator for the new state and
+            // are swallowed as StateMachineException.EventNotDeclaredForState — no extra token needed.
+            var timeoutPublisher = serviceProvider.GetRequiredService<IPublisher>();
+            var timeoutMessage = new RequestTimeoutExpired<TRequest>(message, context.CorrelationId,
+                DateTime.UtcNow.Add(timeout), Id.New());
+            var timeoutHeaders = new HeaderBag(context.Headers)
+                .With(DistributedConfigurators.Headers.DeliveryKindKey, DistributedConfigurators.DeliveryKinds.Delay)
+                .With(StateMachineConfigurators.MessageRoutingKey, request.TimeoutExpired.Name);
+            var timeoutContext = new PublisherContext(context.CorrelationId, timeoutHeaders) { DelayTime = timeout };
+            timeoutPublisher.SetContext(timeoutContext);
+            await timeoutPublisher.PublishAsync(timeoutMessage, ct);
         }
     }
 
