@@ -1,9 +1,9 @@
 using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
 using FxLink.Extensions;
+using FxLink.Faults;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
-using FxLink.StateMachine.Configurators;
 using FxLink.StateMachine.Contexts;
 using FxLink.StateMachine.Exceptions;
 using FxLink.StateMachine.Extensions;
@@ -15,14 +15,59 @@ namespace FxLink.StateMachine.Implementations.StateMachines;
 
 public abstract partial class StateMachine<TInstance>
 {
+    private const string CompletedSuffix = nameof(IRequest<,>.Completed);
+    private const string FailedSuffix = nameof(IRequest<,>.Failed);
+    private const string TimeoutExpiredSuffix = nameof(IRequest<,>.TimeoutExpired);
+    private const string ReceivedSuffix = nameof(ISchedule<>.Received);
+
+    private Dictionary<Type, string> _eventSuffixCache;
+
+    // Requests publish/watchdog messages carry only the activity's root name (e.g. "PaymentRequest"),
+    // never a pre-baked "PaymentRequest.Completed" — that would leak unchanged through retry/dead-letter
+    // republishing onto Fault<TRequest>/RequestTimeoutExpired<TRequest> messages, which need a different
+    // suffix. The consumer resolves the full name here, from the concrete TMessage of *this* delivery.
+    private string ResolveEventName<TMessage>(string rootName) where TMessage : class
+    {
+        var messageType = typeof(TMessage);
+        if (messageType.IsGenericType)
+        {
+            var genericDefinition = messageType.GetGenericTypeDefinition();
+            if (genericDefinition == typeof(Fault<>)) return $"{rootName}.{FailedSuffix}";
+            if (genericDefinition == typeof(RequestTimeoutExpired<>)) return $"{rootName}.{TimeoutExpiredSuffix}";
+        }
+
+        _eventSuffixCache ??= BuildEventSuffixCache();
+        return _eventSuffixCache.TryGetValue(messageType, out var suffix) ? $"{rootName}.{suffix}" : rootName;
+    }
+
+    // Maps a bare message type to the suffix of whichever registered activity produces it: a Request's
+    // TResponse resolves to "Completed", a Schedule's TMessage resolves to "Received". Built once from
+    // InternalActivityConfigurators, which is fully populated by the time any event is first raised.
+    private Dictionary<Type, string> BuildEventSuffixCache()
+    {
+        var map = new Dictionary<Type, string>();
+        foreach (var activity in InternalActivityConfigurators.Keys)
+        foreach (var iface in activity.GetType().GetInterfaces())
+        {
+            if (!iface.IsGenericType) continue;
+            var genericDefinition = iface.GetGenericTypeDefinition();
+            if (genericDefinition == typeof(IRequest<,>))
+                map[iface.GetGenericArguments()[1]] = CompletedSuffix;
+            else if (genericDefinition == typeof(ISchedule<>))
+                map[iface.GetGenericArguments()[0]] = ReceivedSuffix;
+        }
+
+        return map;
+    }
+
     // Note this raise event may have a lot of edge cases like race condition, state fall -> outbox and inbox
     public async Task RaiseEventAsync<TMessage>(IConsumerContext<TMessage> context, CancellationToken token = default)
         where TMessage : class
     {
         var @event = new Event<TMessage>();
         // Here, we will resolve the activity
-        if (context.Headers.Get<string>(StateMachineConfigurators.MessageRoutingKey) is { } messageKey)
-            @event.SetName(messageKey);
+        if (context.Headers.Get<string>(DistributedConfigurators.Headers.MessageRoutingKey) is { } rootName)
+            @event.SetName(ResolveEventName<TMessage>(rootName));
 
         var deliveryKind = context.Headers.Get<string>(DistributedConfigurators.Headers.DeliveryKindKey);
 

@@ -47,17 +47,23 @@ internal class RabbitMqClientConnector<TMessage>(
 
         var props = new BasicProperties
             { CorrelationId = context.CorrelationId.ToString(), Type = typeof(TMessage).AssemblyQualifiedName };
-        if (context is IRequestContext requestContext)
+        switch (context)
         {
-            props.ReplyTo = client.ReplyQueueName;
-            if (requestContext.TimeToLive is { } ttl) props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
-        }
-        else if (context is IPublisherContext publisherContext)
-        {
-            if (deliveryKind == DistributedConfigurators.DeliveryKinds.Retry && delay is { } retryDelay)
+            case IRequestContext requestContext:
+            {
+                props.ReplyTo = client.ReplyQueueName;
+                if (requestContext.TimeToLive is { } ttl) props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
+                break;
+            }
+            case IPublisherContext when deliveryKind == DistributedConfigurators.DeliveryKinds.Retry && delay is { } retryDelay:
                 props.Expiration = ((long)retryDelay.TotalMilliseconds).ToString();
-            else if (publisherContext.TimeToLive is { } pttl)
-                props.Expiration = ((long)pttl.TotalMilliseconds).ToString();
+                break;
+            case IPublisherContext publisherContext:
+            {
+                if (publisherContext.TimeToLive is { } ttl)
+                    props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
+                break;
+            }
         }
 
         var envelope = new Envelope<TMessage>(message, context);

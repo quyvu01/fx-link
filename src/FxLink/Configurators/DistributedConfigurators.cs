@@ -24,6 +24,7 @@ public static class DistributedConfigurators
         public const string RetryCountKey = "x-retry-count";
         public const string DeliveryKindKey = "x-delivery-kind";
         public const string RequestSemanticsKey = "x-request-kind";
+        public const string MessageRoutingKey = "x-message-routing-key";
         public const string ReplyToKey = "x-reply-to";
 
         public const string ExceptionTypeKey = "x-exception-type";

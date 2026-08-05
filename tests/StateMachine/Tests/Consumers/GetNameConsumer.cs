@@ -9,7 +9,8 @@ public sealed class GetNameConsumer(ILogger<GetNameConsumer> logger) : IConsumer
     public async Task ConsumeAsync(IConsumerContext<IGetName> context, CancellationToken token = default)
     {
         logger.LogInformation("Received: {@Context}", context);
-        await Task.Delay(TimeSpan.FromSeconds(2), token); 
+        await Task.Delay(TimeSpan.FromSeconds(1), token);
+        throw new Exception("Test throw exception!!!");
         // await context.ResponseAsync<INameResponse>(context.Message, token);
     }
 }

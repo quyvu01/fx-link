@@ -7,7 +7,6 @@ using FxLink.Faults;
 using FxLink.Serialization;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Abstractions.Workflows;
-using FxLink.StateMachine.Configurators;
 using FxLink.StateMachine.Contexts;
 using FxLink.StateMachine.Delegates;
 using FxLink.StateMachine.Exceptions;
@@ -222,7 +221,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             setter.Invoke(context.Instance, tokenId);
             var headers = new HeaderBag(context.Headers)
                 .With(DistributedConfigurators.Headers.DeliveryKindKey, DistributedConfigurators.DeliveryKinds.Delay)
-                .With(StateMachineConfigurators.MessageRoutingKey, schedule.Received.Name);
+                .With(DistributedConfigurators.Headers.MessageRoutingKey, schedule.Name);
             var publisherContext = new PublisherContext(context.CorrelationId, headers)
             {
                 DelayTime = delay,
@@ -295,7 +294,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             var requestHeaders = new HeaderBag(context.Headers)
                 .With(DistributedConfigurators.Headers.RequestSemanticsKey,
                     DistributedConfigurators.RequestSemantics.RequestAsPublisher)
-                .With(StateMachineConfigurators.MessageRoutingKey, request.Completed.Name);
+                .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
             var requestContext = new PublisherContext(context.CorrelationId, requestHeaders) { TimeToLive = ttl };
             requestPublisher.SetContext(requestContext);
             await requestPublisher.PublishAsync(message, ct);
@@ -310,7 +309,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
                 DateTime.UtcNow.Add(timeout), Id.New());
             var timeoutHeaders = new HeaderBag(context.Headers)
                 .With(DistributedConfigurators.Headers.DeliveryKindKey, DistributedConfigurators.DeliveryKinds.Delay)
-                .With(StateMachineConfigurators.MessageRoutingKey, request.TimeoutExpired.Name);
+                .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
             var timeoutContext = new PublisherContext(context.CorrelationId, timeoutHeaders) { DelayTime = timeout };
             timeoutPublisher.SetContext(timeoutContext);
             await timeoutPublisher.PublishAsync(timeoutMessage, ct);
