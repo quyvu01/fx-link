@@ -6,6 +6,7 @@ using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
 using FxLink.Delegates;
 using FxLink.Extensions;
+using FxLink.Faults;
 using FxLink.Registries;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,11 +48,11 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                     context.Message, new { ex.Message, ex.StackTrace });
                 publisher.SetContext(context);
                 await publisher.PublishAsync(context.Message, ctx => ctx.RequesterId = context.RequesterId, token);
+                await PublishFaultAsync(publisher, context, ex, token);
                 return;
             }
 
             var retryCount = context.Headers.Get<int>(DistributedConfigurators.Headers.RetryCountKey);
-            TimeSpan? delayTime = null;
 
             if (retryCount < intervals.Length)
             {
@@ -60,30 +61,33 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 // main exchange once the TTL expires. This frees the consumer/prefetch slot
                 // immediately instead of blocking it for the whole backoff duration — see
                 // RabbitMqClient's retry exchange/queue (TTL + x-dead-letter-exchange) topology.
-                delayTime = intervals[retryCount];
+                var nextRetry = intervals[retryCount];
                 context.Headers.Set(DistributedConfigurators.Headers.RetryCountKey, retryCount + 1);
                 context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
                     DistributedConfigurators.DeliveryKinds.Retry);
                 logger?.LogWarning(
                     "Message: {@Message} processed failed with exception: {@Exception}. Retry will be processed after: {@TimeSpan}",
-                    context.Message, new { ex.Message, ex.StackTrace }, delayTime);
-            }
-            else
-            {
-                context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
-                    DistributedConfigurators.DeliveryKinds.DeadLetter);
-                SetExceptionHeaders(context, ex);
-                logger?.LogError(
-                    "Message: {@Message} processed failed with exception: {@Exception} after {@Times} times. Message has been moved to dead letter queue!",
-                    context.Message, new { ex.Message, ex.StackTrace }, intervals.Length);
+                    context.Message, new { ex.Message, ex.StackTrace }, nextRetry);
+
+                publisher.SetContext(context);
+                await publisher.PublishAsync(context.Message, ctx =>
+                {
+                    ctx.DelayTime = nextRetry;
+                    ctx.RequesterId = context.RequesterId;
+                }, token);
+                return;
             }
 
+            context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
+                DistributedConfigurators.DeliveryKinds.DeadLetter);
+            SetExceptionHeaders(context, ex);
+            logger?.LogError(
+                "Message: {@Message} processed failed with exception: {@Exception} after {@Times} times. Message has been moved to dead letter queue!",
+                context.Message, new { ex.Message, ex.StackTrace }, intervals.Length);
+
             publisher.SetContext(context);
-            await publisher.PublishAsync(context.Message, ctx =>
-            {
-                ctx.DelayTime = delayTime;
-                ctx.RequesterId = context.RequesterId;
-            }, token);
+            await publisher.PublishAsync(context.Message, ctx => ctx.RequesterId = context.RequesterId, token);
+            await PublishFaultAsync(publisher, context, ex, token);
         }
     }
 
@@ -93,6 +97,28 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             ex.GetType().FullName ?? ex.GetType().Name);
         context.Headers.Set(DistributedConfigurators.Headers.ExceptionMessageKey, ex.Message);
         context.Headers.Set(DistributedConfigurators.Headers.ExceptionStackTraceKey, ex.StackTrace ?? string.Empty);
+    }
+
+    // Generic fault broadcast: any consumer that cares (e.g. a saga's Request.Failed event, typed
+    // as IEvent<Fault<TMessage>>) can subscribe independently — this behavior doesn't need to know
+    // who's listening. Fault<T>.FromException walks the full InnerException chain, unlike the flat
+    // Type/Message/StackTrace headers above which only capture the outermost exception.
+    private static async Task PublishFaultAsync(IPublisher publisher, IConsumerContext<TMessage> context,
+        Exception ex, CancellationToken token)
+    {
+        var fault = new Fault<TMessage>(context.Message).FromException(ex, context.CorrelationId.ToString());
+        publisher.SetContext(context);
+        await publisher.PublishAsync(fault, ctx =>
+        {
+            ctx.RequesterId = context.RequesterId;
+            // context.Headers still carries this delivery attempt's DeliveryKind/RetryCount — Fault<TMessage>
+            // is a fresh, normal publish, not itself a dead-letter/retry, so it must not inherit routing
+            // meant for the original message's delivery attempt. MessageRoutingKey is left untouched: it
+            // only ever carries the activity's root name (never a pre-baked outcome-specific suffix), so
+            // it's still correct/needed for the Fault<TMessage> consumer to resolve its own event name.
+            ctx.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey, null);
+            ctx.Headers.Set(DistributedConfigurators.Headers.RetryCountKey, null);
+        }, token);
     }
 
     private static bool ShouldIgnore(Exception ex, Type[] ignoreExceptions)
