@@ -7,13 +7,13 @@ using FxLink.Wrappers;
 
 namespace FxLink.Implementations;
 
-internal class Requester<TMessage>(
-    IClientConnector<TMessage> connector,
+internal class Requester<TRequest>(
+    IClientConnector<TRequest> connector,
     IInMemoryResponseGetter inMemoryResponseGetter)
-    : IInternalContext, IRequester<TMessage>
-    where TMessage : class
+    : IInternalContext, IRequester<TRequest>
+    where TRequest : class
 {
-    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message,
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TRequest message,
         Action<IRequestContext> contextOptions, CancellationToken token = default) where TResponse : class
     {
         var context = Context is null ? RequestContext.New() : new RequestContext(Context);
@@ -21,7 +21,7 @@ internal class Requester<TMessage>(
         return RequestAsync<TResponse>(message, context, token);
     }
 
-    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message,
+    public Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TRequest message,
         CancellationToken token = default)
         where TResponse : class
         => RequestAsync<TResponse>(message, (Action<IRequestContext>)null, token);
@@ -29,7 +29,7 @@ internal class Requester<TMessage>(
     public IContext Context { get; private set; }
     public void SetContext(IContext context) => Context = context;
 
-    private async Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message, IRequestContext context,
+    private async Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TRequest message, IRequestContext context,
         CancellationToken token = default) where TResponse : class
     {
         if (context.Timeout < TimeSpan.Zero)

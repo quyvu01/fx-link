@@ -42,8 +42,7 @@ public class Fault
 
     public Exception ToException()
     {
-        if (Exceptions is not { Length: > 0 })
-            return null;
+        if (Exceptions is not { Length: > 0 }) return null;
 
         // Build exception chain from innermost to outermost
         Exception innerException = null;
@@ -85,7 +84,7 @@ public sealed class Fault<T>(T message) : Fault
             FaultId = Guid.NewGuid().ToString(),
             FaultedMessageId = faultedMessageId,
             Timestamp = DateTime.UtcNow,
-            Exceptions = exceptions.ToArray(),
+            Exceptions = [.. exceptions],
             Host = HostInfo.Current
         };
     }

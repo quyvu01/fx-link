@@ -1,5 +1,6 @@
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
+using FxLink.Configurators;
 using FxLink.Delegates;
 using FxLink.StateMachine.Exceptions;
 using FxLink.Wrappers;
@@ -22,6 +23,15 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
         }
         catch (Exception e)
         {
+            var requestSemantics = context.Headers.Get<string>(DistributedConfigurators.Headers.RequestSemanticsKey);
+            if (requestSemantics is DistributedConfigurators.RequestSemantics.RequestAsPublisher)
+            {
+                if (context.RequesterId is not { } requesterId) return;
+                var client = serviceProvider.GetRequiredService<IClientConnector<Result>>();
+                await client.SendAsync(Result.Failed(e), new ResponseContext(requesterId, context), token);
+                return;
+            }
+
             switch (e)
             {
                 case StateMachineException.InstanceMustBeInitializedFirst:
@@ -36,6 +46,7 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
                     await client.SendAsync(Result.Failed(ex), new ResponseContext(requesterId, context), token);
                     return;
             }
+
             throw;
         }
     }

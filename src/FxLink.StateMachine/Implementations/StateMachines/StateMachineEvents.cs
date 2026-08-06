@@ -66,7 +66,7 @@ public abstract partial class StateMachine<TInstance>
     {
         var @event = new Event<TMessage>();
         // Here, we will resolve the activity
-        if (context.Headers.Get<string>(DistributedConfigurators.Headers.MessageRoutingKey) is { } rootName)
+        if (context.Headers.Get<string>(DistributedConfigurators.Headers.MessageRoutingKey) is { Length: > 0 } rootName)
             @event.SetName(ResolveEventName<TMessage>(rootName));
 
         var deliveryKind = context.Headers.Get<string>(DistributedConfigurators.Headers.DeliveryKindKey);
