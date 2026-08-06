@@ -6,7 +6,6 @@ using FxLink.StateMachine.Extensions;
 
 namespace FxLink.StateMachine.Implementations.StateMachines;
 
-// Todo: validate this one later, may we need to check more edge cases...
 public abstract partial class StateMachine<TInstance>
 {
     private void SetMachineStates()

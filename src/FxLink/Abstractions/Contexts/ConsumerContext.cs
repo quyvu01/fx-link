@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using FxLink.Configurators;
 using FxLink.Exceptions;
 using FxLink.Extensions;
 using FxLink.Serialization;
@@ -33,13 +32,6 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
     {
         var services = GetPayload<IServiceProvider>();
         var client = services.GetService<IClientConnector<Result>>();
-        var requestSemantics = Headers.Get<string>(DistributedConfigurators.Headers.RequestSemanticsKey);
-        if (requestSemantics is DistributedConfigurators.RequestSemantics.RequestAsPublisher)
-        {
-            await PublishAsync(message, token);
-            return;
-        }
-
         if (client is null || RequesterId is not { } requesterId) return;
         await client.SendAsync(Result.Success(message), new ResponseContext(requesterId, this), token);
     }

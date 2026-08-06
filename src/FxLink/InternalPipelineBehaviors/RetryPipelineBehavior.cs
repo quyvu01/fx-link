@@ -6,7 +6,6 @@ using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
 using FxLink.Delegates;
 using FxLink.Extensions;
-using FxLink.Faults;
 using FxLink.Registries;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,18 +36,20 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             var ignoreExceptions = retryPolicy.IgnoreExceptions;
 
             var publisher = services.GetRequiredService<IPublisher>();
+            var requestSemantics = context.Headers.Get<string>(DistributedConfigurators.Headers.RequestSemanticsKey);
+            var requestAsPublisher = requestSemantics is DistributedConfigurators.RequestSemantics.RequestAsPublisher;
 
             if (ShouldIgnore(ex, ignoreExceptions))
             {
+                if (requestAsPublisher) throw;
                 context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
                     DistributedConfigurators.DeliveryKinds.DeadLetter);
                 SetExceptionHeaders(context, ex);
+                publisher.SetContext(context);
                 logger?.LogError(
                     "Message has been moved to dead letter queue due the exception ignore: {@Message} with exception: {@Exception}",
                     context.Message, new { ex.Message, ex.StackTrace });
-                publisher.SetContext(context);
                 await publisher.PublishAsync(context.Message, ctx => ctx.RequesterId = context.RequesterId, token);
-                await PublishFaultAsync(publisher, context, ex, token);
                 return;
             }
 
@@ -78,16 +79,15 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 return;
             }
 
+            if (requestAsPublisher) throw;
             context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
                 DistributedConfigurators.DeliveryKinds.DeadLetter);
             SetExceptionHeaders(context, ex);
+            publisher.SetContext(context);
             logger?.LogError(
                 "Message: {@Message} processed failed with exception: {@Exception} after {@Times} times. Message has been moved to dead letter queue!",
                 context.Message, new { ex.Message, ex.StackTrace }, intervals.Length);
-
-            publisher.SetContext(context);
             await publisher.PublishAsync(context.Message, ctx => ctx.RequesterId = context.RequesterId, token);
-            await PublishFaultAsync(publisher, context, ex, token);
         }
     }
 
@@ -97,28 +97,6 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             ex.GetType().FullName ?? ex.GetType().Name);
         context.Headers.Set(DistributedConfigurators.Headers.ExceptionMessageKey, ex.Message);
         context.Headers.Set(DistributedConfigurators.Headers.ExceptionStackTraceKey, ex.StackTrace ?? string.Empty);
-    }
-
-    // Generic fault broadcast: any consumer that cares (e.g. a saga's Request.Failed event, typed
-    // as IEvent<Fault<TMessage>>) can subscribe independently — this behavior doesn't need to know
-    // who's listening. Fault<T>.FromException walks the full InnerException chain, unlike the flat
-    // Type/Message/StackTrace headers above which only capture the outermost exception.
-    private static async Task PublishFaultAsync(IPublisher publisher, IConsumerContext<TMessage> context,
-        Exception ex, CancellationToken token)
-    {
-        var fault = new Fault<TMessage>(context.Message).FromException(ex, context.CorrelationId.ToString());
-        publisher.SetContext(context);
-        await publisher.PublishAsync(fault, ctx =>
-        {
-            ctx.RequesterId = context.RequesterId;
-            // context.Headers still carries this delivery attempt's DeliveryKind/RetryCount — Fault<TMessage>
-            // is a fresh, normal publish, not itself a dead-letter/retry, so it must not inherit routing
-            // meant for the original message's delivery attempt. MessageRoutingKey is left untouched: it
-            // only ever carries the activity's root name (never a pre-baked outcome-specific suffix), so
-            // it's still correct/needed for the Fault<TMessage> consumer to resolve its own event name.
-            ctx.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey, null);
-            ctx.Headers.Set(DistributedConfigurators.Headers.RetryCountKey, null);
-        }, token);
     }
 
     private static bool ShouldIgnore(Exception ex, Type[] ignoreExceptions)

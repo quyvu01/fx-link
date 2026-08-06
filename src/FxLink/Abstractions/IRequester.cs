@@ -4,11 +4,11 @@ namespace FxLink.Abstractions;
 
 public interface IRequester;
 
-public interface IRequester<in TMessage> : IRequester, IMessageAction where TMessage : class
+public interface IRequester<in TRequest> : IRequester, IMessageAction where TRequest : class
 {
-    Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message, Action<IRequestContext> contextOptions,
+    Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TRequest message, Action<IRequestContext> contextOptions,
         CancellationToken token = default) where TResponse : class;
 
-    Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TMessage message, CancellationToken token = default)
+    Task<IResponseContext<TResponse>> RequestAsync<TResponse>(TRequest message, CancellationToken token = default)
         where TResponse : class;
 }

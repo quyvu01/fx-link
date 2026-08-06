@@ -4,7 +4,7 @@ namespace FxLink.Abstractions.Contexts;
 
 public sealed class RequestContext : AbstractContext, IRequestContext
 {
-    private RequestContext(Guid correlationId, IHeaders headers)
+    internal RequestContext(Guid correlationId, IHeaders headers)
         : base(correlationId, headers)
     {
     }

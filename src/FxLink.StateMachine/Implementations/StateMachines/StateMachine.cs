@@ -10,13 +10,11 @@ using FxLink.StateMachine.Registries;
 namespace FxLink.StateMachine.Implementations.StateMachines;
 
 public abstract partial class StateMachine<TInstance> :
-    IEventDefinition<TInstance>,
-    IStateMachine
-    where TInstance : IStateMachineInstance
+    IStateMachine where TInstance : IStateMachineInstance
 {
     public IState Initial { get; } = new State(nameof(Initial));
     public IState Completed { get; } = new State(nameof(Completed));
-    public IState[] States => _states.ToArray();
+    public IState[] States => [.. _states];
     private readonly HashSet<IState> _states = [];
 
     public IReadOnlyDictionary<IActivity, IActivityConfigurator> InternalActivityConfigurators
@@ -101,7 +99,7 @@ public abstract partial class StateMachine<TInstance> :
 
     protected void RemoveInstanceWhenCompleted() => _removeInstanceWhenCompleted = true;
 
-    public IEventOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class =>
+    protected IEventOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class =>
         new EventOperator<TInstance, TMessage>(@event, this);
 
     private void BindEventOperatorsToState(IState state, IEventOperator[] operators) =>

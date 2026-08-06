@@ -1,7 +1,10 @@
 using FxLink.Extensions;
 using FxLink.Registries;
+using FxLink.StateMachine.Abstractions;
+using FxLink.StateMachine.Implementations;
 using FxLink.StateMachine.InternalPipelineBehaviors;
 using FxLink.StateMachine.Registries;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Extensions;
 
@@ -19,5 +22,6 @@ public static class DependencyExtensions
         configurator.AddConsumerPipelineBehaviors(c => c
             .Of(typeof(CatchStateMachinePipelineBehavior<>))
         );
+        configurator.Services.AddSingleton(typeof(IStateMachineRequester<>), typeof(StateMachineRequester<>));
     }
 }

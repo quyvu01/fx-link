@@ -34,9 +34,9 @@ public sealed class SagaStateMachine : StateMachine<SagaStateMachineInstance>
         During(GetName.Pending, When(GetName.Completed)
                 .Then(ctx => logger.LogInformation("[GetName.Completed] message: {@Message}", ctx.Message)),
             When(GetName.TimeoutExpired)
-                .Then(ctx => logger.LogInformation("[GetName.TimeoutExpired] message: {@Message}", ctx.Message)),
+                .Then(ctx => logger.LogInformation("[GetName.TimeoutExpired] message: {@Message}", ctx.Message.Message)),
             When(GetName.Failed)
-                .Then(ctx => logger.LogInformation("[GetName.Failed] message: {@Message}", ctx.Message))
+                .Then(ctx => logger.LogInformation("[GetName.Failed] message: {@Message}", ctx.Message.ToException()))
         );
     }
 }

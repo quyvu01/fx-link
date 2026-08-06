@@ -12,6 +12,7 @@ using FxLink.StateMachine.Delegates;
 using FxLink.StateMachine.Exceptions;
 using FxLink.StateMachine.Registries;
 using FxLink.Statics;
+using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Implementations.Workflows;
@@ -285,34 +286,46 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
                 configurator is not IRequestConfigurator<TInstance, TRequest, TResponse> requestConfigurator) return;
             var message = await messageFactoryAsync.Invoke(context, ct);
             var serviceProvider = context.GetPayload<IServiceProvider>();
-            // This architecture is different from request/reply patter
-            // I will publish message instead of request message then wait it....
+            var consumerType = context.GetPayload<ConsumerContextWrapped>().ConsumerType;
+
             var timeout = requestConfigurator.Timeout;
             var ttl = requestConfigurator.TimeToLive ?? timeout;
-            var requestPublisher = serviceProvider.GetRequiredService<IPublisher>();
+            var stateMachineRequester = serviceProvider.GetRequiredService<IStateMachineRequester<TRequest>>();
 
             var requestHeaders = new HeaderBag(context.Headers)
                 .With(DistributedConfigurators.Headers.RequestSemanticsKey,
                     DistributedConfigurators.RequestSemantics.RequestAsPublisher)
                 .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
-            var requestContext = new PublisherContext(context.CorrelationId, requestHeaders) { TimeToLive = ttl };
-            requestPublisher.SetContext(requestContext);
-            await requestPublisher.PublishAsync(message, ct);
-
-            // Durable timeout watchdog: a delayed message that raises TimeoutExpired if it's still
-            // relevant by the time it's delivered. Completed/Failed/TimeoutExpired are all bound only
-            // During(request.Pending, ...), so whichever of the three arrives first transitions the
-            // instance out of Pending; the other(s) then find no EventOperator for the new state and
-            // are swallowed as StateMachineException.EventNotDeclaredForState — no extra token needed.
-            var timeoutPublisher = serviceProvider.GetRequiredService<IPublisher>();
-            var timeoutMessage = new RequestTimeoutExpired<TRequest>(message, context.CorrelationId,
-                DateTime.UtcNow.Add(timeout), Id.New());
-            var timeoutHeaders = new HeaderBag(context.Headers)
-                .With(DistributedConfigurators.Headers.DeliveryKindKey, DistributedConfigurators.DeliveryKinds.Delay)
-                .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
-            var timeoutContext = new PublisherContext(context.CorrelationId, timeoutHeaders) { DelayTime = timeout };
-            timeoutPublisher.SetContext(timeoutContext);
-            await timeoutPublisher.PublishAsync(timeoutMessage, ct);
+            var requestContext = new RequestContext(context.CorrelationId, requestHeaders)
+                { TimeToLive = ttl, Timeout = timeout };
+            await stateMachineRequester.RequestAsync<TResponse>(message, requestContext, async (sp, response) =>
+            {
+                var server = sp.GetRequiredService<IConsumerConnector<TResponse>>();
+                var headers = new HeaderBag(context.Headers)
+                    .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
+                var consumerContext = new ConsumerContext<TResponse>(response,
+                    requestContext.RequesterId, context.CorrelationId, headers);
+                await server.ConsumeAsync(consumerContext, consumerType, ct);
+            }, async (sp, rq, ex) =>
+            {
+                var server = sp.GetRequiredService<IConsumerConnector<Fault<TRequest>>>();
+                var faultResponse = new Fault<TRequest>(rq).FromException(ex);
+                var headers = new HeaderBag(context.Headers)
+                    .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
+                var ctx = new ConsumerContext<Fault<TRequest>>(faultResponse, requestContext.RequesterId,
+                    context.CorrelationId, headers);
+                await server.ConsumeAsync(ctx, consumerType, ct);
+            }, async (sp, rq) =>
+            {
+                var server = sp.GetRequiredService<IConsumerConnector<RequestTimeoutExpired<TRequest>>>();
+                var timeoutResponse = new RequestTimeoutExpired<TRequest>(rq, context.CorrelationId,
+                    DateTime.UtcNow.Add(timeout), context.RequesterId);
+                var headers = new HeaderBag(context.Headers)
+                    .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
+                var ctx = new ConsumerContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
+                    requestContext.RequesterId, context.CorrelationId, headers);
+                await server.ConsumeAsync(ctx, consumerType, ct);
+            }, ct);
         }
     }
 
