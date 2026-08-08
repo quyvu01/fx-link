@@ -27,8 +27,8 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
             if (requestSemantics is DistributedConfigurators.RequestSemantics.RequestAsPublisher)
             {
                 if (context.RequesterId is not { } requesterId) return;
-                var client = serviceProvider.GetRequiredService<IClientConnector<Result>>();
-                await client.SendAsync(Result.Failed(e), new ResponseContext(requesterId, context), token);
+                var client = serviceProvider.GetRequiredService<IClientConnector<Result<TMessage>>>();
+                await client.SendAsync(Result<TMessage>.Failed(e), new ResponseContext(requesterId, context), token);
                 return;
             }
 
@@ -42,8 +42,8 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
                     logger.LogError(ex.Message);
                     // We have to response Fault to requester. Seems we have to implement result pattern here
                     if (context.RequesterId is not { } requesterId) return;
-                    var client = serviceProvider.GetRequiredService<IClientConnector<Result>>();
-                    await client.SendAsync(Result.Failed(ex), new ResponseContext(requesterId, context), token);
+                    var client = serviceProvider.GetRequiredService<IClientConnector<Result<TMessage>>>();
+                    await client.SendAsync(Result<TMessage>.Failed(ex), new ResponseContext(requesterId, context), token);
                     return;
             }
 

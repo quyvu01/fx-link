@@ -10,7 +10,7 @@ public sealed class GetNameConsumer(ILogger<GetNameConsumer> logger) : IConsumer
     {
         logger.LogInformation("Received: {@Context}", context.Message);
         await Task.Delay(TimeSpan.FromSeconds(1), token);
-        throw new Exception("Test throw exception!!!");
-        // await context.ResponseAsync<INameResponse>(context.Message, token);
+        // throw new Exception("Test throw exception!!!");
+        await context.ResponseAsync<INameResponse>(context.Message, token);
     }
 }

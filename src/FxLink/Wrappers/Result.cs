@@ -1,5 +1,3 @@
-using System.Text.Json;
-using FxLink.Configurators;
 using FxLink.Faults;
 
 namespace FxLink.Wrappers;
@@ -8,19 +6,14 @@ namespace FxLink.Wrappers;
 /// Represents a unified response wrapper for FxMap request/reply operations.
 /// way to handle both successful responses and error scenarios.
 /// </summary>
-public class Result
+public class Result<T>
 {
     /// <summary>
     /// Gets whether the request was processed successfully.
     /// </summary>
     public bool IsSuccess { get; init; }
 
-    /// <summary>
-    /// Gets the response data when the request is successful.
-    /// Will be null when <see cref="IsSuccess"/> is false.
-    /// </summary>
-
-    public string DataAsJson { get; set; }
+    public T Data { get; set; }
 
     /// <summary>
     /// Gets the fault information when the request failed.
@@ -33,11 +26,11 @@ public class Result
     /// </summary>
     /// <param name="data">The response data.</param>
     /// <returns>A successful FxMapResponse containing the data.</returns>
-    public static Result Success(object data) => new()
+    public static Result<T> Success(T data) => new()
     {
         IsSuccess = true,
         Fault = null,
-        DataAsJson = JsonSerializer.Serialize(data, DistributedConfigurators.JsonSerializerOptions)
+        Data = data
     };
 
     /// <summary>
@@ -45,10 +38,9 @@ public class Result
     /// </summary>
     /// <param name="fault">The fault information.</param>
     /// <returns>A failed FxMapResponse containing the fault.</returns>
-    public static Result Failed(Fault fault) => new()
+    public static Result<T> Failed(Fault fault) => new()
     {
         IsSuccess = false,
-        DataAsJson = null,
         Fault = fault
     };
 
@@ -58,10 +50,9 @@ public class Result
     /// <param name="exception">The exception that caused the failure.</param>
     /// <param name="faultedMessageId">Optional identifier for the faulted message.</param>
     /// <returns>A failed FxMapResponse containing the fault information.</returns>
-    public static Result Failed(Exception exception, string faultedMessageId = null) => new()
+    public static Result<T> Failed(Exception exception, string faultedMessageId = null) => new()
     {
         IsSuccess = false,
-        DataAsJson = null,
         Fault = Fault.FromException(exception, faultedMessageId)
     };
 }

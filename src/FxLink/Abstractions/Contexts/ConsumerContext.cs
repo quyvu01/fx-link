@@ -31,9 +31,9 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
         where TResponse : class
     {
         var services = GetPayload<IServiceProvider>();
-        var client = services.GetService<IClientConnector<Result>>();
+        var client = services.GetService<IClientConnector<Result<TResponse>>>();
         if (client is null || RequesterId is not { } requesterId) return;
-        await client.SendAsync(Result.Success(message), new ResponseContext(requesterId, this), token);
+        await client.SendAsync(Result<TResponse>.Success(message), new ResponseContext(requesterId, this), token);
     }
 
     public Task ResponseAsync<TResponse>(object message, CancellationToken token = default) where TResponse : class =>

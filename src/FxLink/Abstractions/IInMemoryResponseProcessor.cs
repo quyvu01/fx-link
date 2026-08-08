@@ -10,6 +10,6 @@ internal interface IInMemoryResponseSetter
 
 internal interface IInMemoryResponseGetter
 {
-    Task<MessageData<Result>> GetResponse<TResponse>(Guid requestId, CancellationToken token = default)
+    Task<MessageData<Result<TResponse>>> GetResponse<TResponse>(Guid requestId, CancellationToken token = default)
         where TResponse : class;
 }

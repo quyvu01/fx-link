@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using FxLink.Abstractions;
@@ -55,7 +58,8 @@ internal class RabbitMqClientConnector<TMessage>(
                 if (requestContext.TimeToLive is { } ttl) props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
                 break;
             }
-            case IPublisherContext when deliveryKind == DistributedConfigurators.DeliveryKinds.Retry && delay is { } retryDelay:
+            case IPublisherContext
+                when deliveryKind == DistributedConfigurators.DeliveryKinds.Retry && delay is { } retryDelay:
                 props.Expiration = ((long)retryDelay.TotalMilliseconds).ToString();
                 break;
             case IPublisherContext publisherContext:
@@ -108,17 +112,50 @@ internal class RabbitMqClientConnector<TMessage>(
         await serverConnector.ConsumeAsync(consumerContext, consumerType, args.CancellationToken);
     }
 
-    public override async Task ProcessResponseMessageAsync(BasicDeliverEventArgs args)
+    private static readonly
+        ConcurrentDictionary<Type, Action<RabbitMqClientConnector<TMessage>, string, CancellationToken>>
+        ProcessResponseDelegateCache = new();
+
+    public override Task ProcessResponseMessageAsync(BasicDeliverEventArgs args)
     {
-        await Task.Yield();
-        var messageType = args.BasicProperties.Type;
-        if (typeof(Result).AssemblyQualifiedName != messageType) return;
-        var bodyAsJson = Encoding.UTF8.GetString(args.Body.Span);
-        var envelope = JsonSerializer.Deserialize<ConsumerContextEnvelope<Result>>(bodyAsJson,
+        var messageTypeAsString = args.BasicProperties.Type;
+        if (string.IsNullOrEmpty(messageTypeAsString)) return Task.CompletedTask;
+        var messageType = Type.GetType(messageTypeAsString);
+        if (messageType is null || !messageType.IsGenericType ||
+            messageType.GetGenericTypeDefinition() != typeof(Result<>)) return Task.CompletedTask;
+        var responseType = messageType.GetGenericArguments()[0];
+        var jsonBody = Encoding.UTF8.GetString(args.Body.Span);
+
+        var processDelegate = ProcessResponseDelegateCache
+            .GetOrAdd(responseType, BuildProcessResponseDelegate);
+        processDelegate.Invoke(this, jsonBody, args.CancellationToken);
+        return Task.CompletedTask;
+    }
+
+    private static Action<RabbitMqClientConnector<TMessage>, string, CancellationToken> BuildProcessResponseDelegate(
+        Type responseType)
+    {
+        var openMethod = typeof(RabbitMqClientConnector<TMessage>).GetMethod(
+            nameof(ProcessResponseMessageInternalAsync),
+            BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var closedMethod = openMethod.MakeGenericMethod(responseType);
+
+        var instanceParam = Expression.Parameter(typeof(RabbitMqClientConnector<TMessage>), "instance");
+        var jsonParam = Expression.Parameter(typeof(string), "json");
+        var tokenParam = Expression.Parameter(typeof(CancellationToken), "token");
+        var call = Expression.Call(instanceParam, closedMethod, jsonParam, tokenParam);
+
+        return Expression.Lambda<Action<RabbitMqClientConnector<TMessage>, string, CancellationToken>>(
+            call, instanceParam, jsonParam, tokenParam).Compile();
+    }
+
+    private void ProcessResponseMessageInternalAsync<TResponse>(string json, CancellationToken token = default)
+        where TResponse : class
+    {
+        var envelope = JsonSerializer.Deserialize<ConsumerContextEnvelope<Result<TResponse>>>(json,
             DistributedConfigurators.JsonSerializerOptions);
         if (envelope?.Context.RequesterId is not { } requesterId) return;
-        inMemoryResponseSetter.TrySetResult(requesterId, new MessageData<Result>(envelope.Message,
-            new ResponseContext(requesterId, envelope.Context.CorrelationId, envelope.Context.Headers),
-            args.CancellationToken));
+        inMemoryResponseSetter.TrySetResult(requesterId, new MessageData<Result<TResponse>>(envelope.Message,
+            new ResponseContext(requesterId, envelope.Context.CorrelationId, envelope.Context.Headers), token));
     }
 }

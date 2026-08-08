@@ -161,10 +161,10 @@ app.MapGet("/inventory/{orderId:guid}/summary", async (IRequester<GetReservation
     .WithSummary("Query reservation summary from any state (DuringAny)")
     .WithOpenApi();
 
-app.MapPost("/test-request-reply", async (IPublisher publisher, CancellationToken token) =>
+app.MapPost("/test-request-reply", async (IRequester<IGetName> requester, CancellationToken token) =>
     {
-        await publisher.PublishAsync<IInitTest>(new { Name = "SomeName" }, token);
-        return "Publisher Request Reply";
+        var result = await requester.RequestAsync<INameResponse>(new { Name = "SomeName" }, token);
+        return result.Message;
     })
     .WithTags("Inventory")
     .WithSummary("Query reservation summary from any state (DuringAny)")
