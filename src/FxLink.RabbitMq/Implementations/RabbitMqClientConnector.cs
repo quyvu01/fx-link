@@ -108,7 +108,7 @@ internal class RabbitMqClientConnector<TMessage>(
         if (args.BasicProperties.ReplyTo is { Length: > 0 } replyTo)
             headers.Set(DistributedConfigurators.Headers.ReplyToKey, replyTo);
         var consumerContext = new ConsumerContext<TMessage>(envelope.Message, envelope.Context.RequesterId,
-            envelope.Context.CorrelationId, headers);
+            envelope.Context.CorrelationId, headers, envelope.Context.SentTime, envelope.Context.HostInfo);
         await serverConnector.ConsumeAsync(consumerContext, consumerType, args.CancellationToken);
     }
 
