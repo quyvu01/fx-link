@@ -1,9 +1,6 @@
-using System.Text.Json;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
-using FxLink.Configurators;
 using FxLink.Exceptions;
-using FxLink.Wrappers;
 
 namespace FxLink.Implementations;
 
@@ -40,8 +37,6 @@ internal class Requester<TRequest>(
         var (result, ctx, _) = await inMemoryResponseGetter
             .GetResponse<TResponse>(context.RequesterId, tcs.Token);
         if (!result.IsSuccess) throw result.Fault.ToException();
-        // var response = JsonSerializer.Deserialize<TResponse>(result.DataAsJson,
-        //     DistributedConfigurators.JsonSerializerOptions);
         var response = result.Data;
         return new ResponseContext<TResponse>(response, context.RequesterId, ctx);
     }

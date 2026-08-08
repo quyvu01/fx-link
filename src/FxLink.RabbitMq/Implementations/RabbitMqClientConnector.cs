@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using System.Linq.Expressions;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using FxLink.Abstractions;
@@ -25,8 +23,7 @@ internal abstract class AbstractRabbitMqConnector
 
 internal class RabbitMqClientConnector<TMessage>(
     IRabbitMqClient client,
-    IServiceProvider services,
-    IInMemoryResponseSetter inMemoryResponseSetter) :
+    IServiceProvider services) :
     AbstractRabbitMqConnector, IClientConnector<TMessage> where TMessage : class
 {
     private readonly IDelayMessageProvider _delayMessageProvider = services.GetService<IDelayMessageProvider>();
@@ -120,50 +117,26 @@ internal class RabbitMqClientConnector<TMessage>(
         await serverConnector.ConsumeAsync(consumerContext, consumerType, args.CancellationToken);
     }
 
-    private static readonly
-        ConcurrentDictionary<Type, Action<RabbitMqClientConnector<TMessage>, string, CancellationToken>>
-        ProcessResponseDelegateCache = new();
+    private static readonly ConcurrentDictionary<string, Type> MessageResponseProcessors = new();
 
     public override Task ProcessResponseMessageAsync(BasicDeliverEventArgs args)
     {
         var messageTypeAsString = args.BasicProperties.Type;
+
         if (string.IsNullOrEmpty(messageTypeAsString)) return Task.CompletedTask;
-        var messageType = Type.GetType(messageTypeAsString);
-        if (messageType is null || !messageType.IsGenericType ||
-            messageType.GetGenericTypeDefinition() != typeof(Result<>)) return Task.CompletedTask;
-        var responseType = messageType.GetGenericArguments()[0];
+        var serviceType = MessageResponseProcessors
+            .GetOrAdd(messageTypeAsString, static msg =>
+            {
+                var messageType = Type.GetType(msg);
+                if (messageType is null || !messageType.IsGenericType ||
+                    messageType.GetGenericTypeDefinition() != typeof(Result<>)) return null;
+                var responseType = messageType.GetGenericArguments()[0];
+                return typeof(IWireResultDispatcher<>).MakeGenericType(responseType);
+            });
+        if (serviceType is null) return Task.CompletedTask;
         var jsonBody = Encoding.UTF8.GetString(args.Body.Span);
-
-        var processDelegate = ProcessResponseDelegateCache
-            .GetOrAdd(responseType, BuildProcessResponseDelegate);
-        processDelegate.Invoke(this, jsonBody, args.CancellationToken);
+        var wireResultDispatcher = services.GetRequiredService(serviceType) as WireResultDispatcher;
+        wireResultDispatcher?.SetResult(jsonBody, args.CancellationToken);
         return Task.CompletedTask;
-    }
-
-    private static Action<RabbitMqClientConnector<TMessage>, string, CancellationToken> BuildProcessResponseDelegate(
-        Type responseType)
-    {
-        var openMethod = typeof(RabbitMqClientConnector<TMessage>).GetMethod(
-            nameof(ProcessResponseMessageInternalAsync),
-            BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var closedMethod = openMethod.MakeGenericMethod(responseType);
-
-        var instanceParam = Expression.Parameter(typeof(RabbitMqClientConnector<TMessage>), "instance");
-        var jsonParam = Expression.Parameter(typeof(string), "json");
-        var tokenParam = Expression.Parameter(typeof(CancellationToken), "token");
-        var call = Expression.Call(instanceParam, closedMethod, jsonParam, tokenParam);
-
-        return Expression.Lambda<Action<RabbitMqClientConnector<TMessage>, string, CancellationToken>>(
-            call, instanceParam, jsonParam, tokenParam).Compile();
-    }
-
-    private void ProcessResponseMessageInternalAsync<TResponse>(string json, CancellationToken token = default)
-        where TResponse : class
-    {
-        var envelope = JsonSerializer.Deserialize<ConsumerContextEnvelope<Result<TResponse>>>(json,
-            DistributedConfigurators.JsonSerializerOptions);
-        if (envelope?.Context.RequesterId is not { } requesterId) return;
-        inMemoryResponseSetter.TrySetResult(requesterId, new MessageData<Result<TResponse>>(envelope.Message,
-            new ResponseContext(requesterId, envelope.Context.CorrelationId, envelope.Context.Headers), token));
     }
 }
