@@ -13,20 +13,23 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
     private readonly ConcurrentDictionary<Type, Lazy<object>> _contextPayloads = [];
 
     internal ConsumerContext(TMessage message, Guid? requesterId, Guid correlationId, IHeaders headers,
-        DateTime? sentTime = null, IHostInfo hostInfo = null) : base(correlationId, headers, sentTime, hostInfo)
+        DateTime? sentTime = null, IHostInfo hostInfo = null, TimeSpan? timeToLive = null)
+        : base(correlationId, headers, sentTime, hostInfo)
     {
         RequesterId = requesterId;
         Message = message;
+        TimeToLive = timeToLive;
     }
 
     public ConsumerContext(TMessage message, Guid? requesterId, IContext context)
         : this(message, requesterId, context.CorrelationId, new HeaderBag(context.Headers),
-            context.SentTime, context.HostInfo)
+            context.SentTime, context.HostInfo, (context as IConsumerContext)?.TimeToLive)
     {
     }
 
     public Guid? RequesterId { get; }
     public TMessage Message { get; }
+    public TimeSpan? TimeToLive { get; }
 
     public async Task ResponseAsync<TResponse>(TResponse message, CancellationToken token = default)
         where TResponse : class
