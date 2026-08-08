@@ -38,10 +38,11 @@ internal class Requester<TRequest>(
         tcs.CancelAfter(context.Timeout);
         await connector.SendAsync(message, context, tcs.Token);
         var (result, ctx, _) = await inMemoryResponseGetter
-            .GetResponse<Result>(context.RequesterId, tcs.Token);
+            .GetResponse<TResponse>(context.RequesterId, tcs.Token);
         if (!result.IsSuccess) throw result.Fault.ToException();
-        var response = JsonSerializer.Deserialize<TResponse>(result.DataAsJson,
-            DistributedConfigurators.JsonSerializerOptions);
+        // var response = JsonSerializer.Deserialize<TResponse>(result.DataAsJson,
+        //     DistributedConfigurators.JsonSerializerOptions);
+        var response = result.Data;
         return new ResponseContext<TResponse>(response, context.RequesterId, ctx);
     }
 }

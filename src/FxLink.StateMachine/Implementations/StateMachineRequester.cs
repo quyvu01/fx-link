@@ -1,12 +1,9 @@
-using System.Text.Json;
 using System.Threading.Channels;
 using FxLink.Abstractions;
 using FxLink.Abstractions.Contexts;
-using FxLink.Configurators;
 using FxLink.Exceptions;
 using FxLink.Extensions;
 using FxLink.StateMachine.Abstractions;
-using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.StateMachine.Implementations;
@@ -36,7 +33,7 @@ internal class StateMachineRequester<TRequest> : IStateMachineRequester<TRequest
         Func<IServiceProvider, TResponse, Task> succeedCallback,
         Func<IServiceProvider, TRequest, Exception, Task> faultCallback,
         Func<IServiceProvider, TRequest, Task> timeoutCallback,
-        CancellationToken token = default)
+        CancellationToken token = default) where TResponse : class
     {
         if (context.Timeout < TimeSpan.Zero)
             throw new FxLinkException.RequestTimeoutMustNotBeNegative(context.Timeout);
@@ -52,7 +49,7 @@ internal class StateMachineRequester<TRequest> : IStateMachineRequester<TRequest
             try
             {
                 var (result, _, _) = await _inMemoryResponseGetter
-                    .GetResponse<Result>(context.RequesterId, tcs.Token);
+                    .GetResponse<TResponse>(context.RequesterId, tcs.Token);
                 if (!result.IsSuccess)
                 {
                     var exception = result.Fault.ToException();
@@ -60,8 +57,7 @@ internal class StateMachineRequester<TRequest> : IStateMachineRequester<TRequest
                     return;
                 }
 
-                var response = JsonSerializer
-                    .Deserialize<TResponse>(result.DataAsJson, DistributedConfigurators.JsonSerializerOptions);
+                var response = result.Data;
                 await succeedCallback.Invoke(scoped.ServiceProvider, response);
             }
             catch (TimeoutException)

@@ -9,14 +9,14 @@ internal class InMemoryResponseProcessor : IInMemoryResponseSetter, IInMemoryRes
 {
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<object>> _lookup = new();
 
-    public async Task<MessageData<Result>> GetResponse<TResponse>(Guid requestId,
+    public async Task<MessageData<Result<TResponse>>> GetResponse<TResponse>(Guid requestId,
         CancellationToken token = default) where TResponse : class
     {
         var tcs = new TaskCompletionSource<object>();
         token.Register(() => tcs.SetException(new TimeoutException()));
         _lookup.TryAdd(requestId, tcs);
         var resultAsObject = await tcs.Task;
-        return resultAsObject as MessageData<Result>;
+        return resultAsObject as MessageData<Result<TResponse>>;
     }
 
     public bool TrySetResult(Guid requestId, object result) =>

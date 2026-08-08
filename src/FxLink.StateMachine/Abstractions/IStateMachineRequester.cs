@@ -8,5 +8,5 @@ internal interface IStateMachineRequester<TRequest> where TRequest : class
         Func<IServiceProvider, TResponse, Task> succeedCallback,
         Func<IServiceProvider, TRequest, Exception, Task> faultCallback,
         Func<IServiceProvider, TRequest, Task> timeoutCallback,
-        CancellationToken token = default);
+        CancellationToken token = default) where TResponse : class;
 }
