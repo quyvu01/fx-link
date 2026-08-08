@@ -58,6 +58,13 @@ internal class RabbitMqClientConnector<TMessage>(
                 if (requestContext.TimeToLive is { } ttl) props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
                 break;
             }
+            // The response leg previously got no Expiration at all — a response could sit in the
+            // reply queue indefinitely even after the requester already timed out. TimeToLive here
+            // is carried forward from the originating request (see ResponseContext), so the reply
+            // expires under the same wire-level budget the request itself was published with.
+            case IResponseContext { TimeToLive: { } ttl }:
+                props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
+                break;
             case IPublisherContext
                 when deliveryKind == DistributedConfigurators.DeliveryKinds.Retry && delay is { } retryDelay:
                 props.Expiration = ((long)retryDelay.TotalMilliseconds).ToString();
@@ -108,7 +115,8 @@ internal class RabbitMqClientConnector<TMessage>(
         if (args.BasicProperties.ReplyTo is { Length: > 0 } replyTo)
             headers.Set(DistributedConfigurators.Headers.ReplyToKey, replyTo);
         var consumerContext = new ConsumerContext<TMessage>(envelope.Message, envelope.Context.RequesterId,
-            envelope.Context.CorrelationId, headers, envelope.Context.SentTime, envelope.Context.HostInfo);
+            envelope.Context.CorrelationId, headers, envelope.Context.SentTime, envelope.Context.HostInfo,
+            envelope.Context.TimeToLive);
         await serverConnector.ConsumeAsync(consumerContext, consumerType, args.CancellationToken);
     }
 
