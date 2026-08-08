@@ -9,11 +9,12 @@ public static class DistributedConfigurators
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
-        // HeadersJsonConverter must come first: it's an exact match for IHeaders, whereas
-        // InterfaceMessageJsonConverterFactory.CanConvert accepts ANY non-corlib interface type
-        // (including IHeaders) and would otherwise claim it first and fail — IHeaders declares
-        // methods (Get/Set/TryGetHeader), which the message-contract proxy builder rejects.
-        Converters = { new HeadersJsonConverter(), new InterfaceMessageJsonConverterFactory() }
+        // HeadersJsonConverter and ContextJsonConverter must come first: they're exact matches for
+        // IHeaders/IContext, whereas InterfaceMessageJsonConverterFactory.CanConvert accepts ANY
+        // non-corlib interface type (including these two) and would otherwise claim them first —
+        // IHeaders declares methods (Get/Set/TryGetHeader), which the message-contract proxy builder
+        // rejects, and IContext would serialize by its 4-member contract instead of the runtime type.
+        Converters = { new HeadersJsonConverter(), new ContextJsonConverter(), new InterfaceMessageJsonConverterFactory() }
     };
 
     internal static readonly TimeSpan[] DefaultRetryPolicy =

@@ -2,7 +2,7 @@ using FxLink.Abstractions.Contexts;
 
 namespace FxLink.Entities;
 
-public record Envelope<TMessage>(TMessage Message, object Context) where TMessage : class;
+public record Envelope<TMessage>(TMessage Message, IContext Context) where TMessage : class;
 
 public sealed record ConsumerContextEnvelope<TMessage> where TMessage : class
 {
@@ -17,4 +17,5 @@ public sealed record ConsumerContextSerializable
     public IHeaders Headers { get; set; }
     public DateTime? SentTime { get; set; }
     public HostInfo HostInfo { get; set; }
+    public TimeSpan? TimeToLive { get; set; }
 }

@@ -16,22 +16,22 @@ public sealed class HostInfo : IHostInfo
     /// <summary>
     /// Gets or sets the machine name.
     /// </summary>
-    public string MachineName { get; private init; }
+    public string MachineName { get; init; }
 
     /// <summary>
     /// Gets or sets the process name.
     /// </summary>
-    public string ProcessName { get; private init; }
+    public string ProcessName { get; init; }
 
     /// <summary>
     /// Gets or sets the process ID.
     /// </summary>
-    public int ProcessId { get; private init; }
+    public int ProcessId { get; init; }
 
     /// <summary>
     /// Gets or sets the assembly name.
     /// </summary>
-    public string Assembly { get; private init; }
+    public string Assembly { get; init; }
 
     /// <summary>
     /// Gets the current host information.
