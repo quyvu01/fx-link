@@ -99,8 +99,11 @@ public abstract partial class StateMachine<TInstance> :
 
     protected void RemoveInstanceWhenCompleted() => _removeInstanceWhenCompleted = true;
 
-    protected IEventOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class =>
-        new EventOperator<TInstance, TMessage>(@event, this);
+    protected IEventOperator<TInstance, TMessage> When<TMessage>(IEvent<TMessage> @event) where TMessage : class
+        => new EventOperator<TInstance, TMessage>(@event, this);
+
+    protected IEventOperator Ignore<TMessage>(IEvent<TMessage> @event) where TMessage : class
+        => new EventOperator<TInstance, TMessage>(@event, this);
 
     private void BindEventOperatorsToState(IState state, IEventOperator[] operators) =>
         _stateMapEventOperators.GetOrAdd(state, _ => []).AddRange(operators);

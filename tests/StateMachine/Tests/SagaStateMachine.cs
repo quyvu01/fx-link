@@ -8,11 +8,14 @@ namespace StateMachine.Tests;
 public sealed class SagaStateMachine : StateMachine<SagaStateMachineInstance>
 {
     public IEvent<IInitTest> TestInitialized { get; private set; }
+    public IEvent<IIgnoreTest> IgnoreTest { get; private set; }
     public IRequest<IGetName, INameResponse> GetName { get; private set; }
 
     public SagaStateMachine(ILogger<SagaStateMachine> logger)
     {
         Event(TestInitialized, x => x.CorrelationBy((_, _) => false).SelectId(_ => Id.New()));
+        Event(IgnoreTest, x => x
+            .CorrelationBy((ins, ctx) => ins.Name == ctx.Message.Name));
         Request(GetName, x =>
         {
             x.Timeout = TimeSpan.FromSeconds(5);
@@ -34,9 +37,11 @@ public sealed class SagaStateMachine : StateMachine<SagaStateMachineInstance>
         During(GetName.Pending, When(GetName.Completed)
                 .Then(ctx => logger.LogInformation("[GetName.Completed] message: {@Message}", ctx.Message)),
             When(GetName.TimeoutExpired)
-                .Then(ctx => logger.LogInformation("[GetName.TimeoutExpired] message: {@Message}", ctx.Message.Message)),
+                .Then(ctx =>
+                    logger.LogInformation("[GetName.TimeoutExpired] message: {@Message}", ctx.Message.Message)),
             When(GetName.Failed)
                 .Then(ctx => logger.LogInformation("[GetName.Failed] message: {@Message}", ctx.Message.ToException()))
         );
+        During(GetName.Pending, Ignore(IgnoreTest));
     }
 }
