@@ -170,4 +170,13 @@ app.MapPost("/test-request-reply", async (IRequester<IGetName> requester, Cancel
     .WithSummary("Query reservation summary from any state (DuringAny)")
     .WithOpenApi();
 
+app.MapPost("/test-saga-request-reply", async (IPublisher publisher, CancellationToken token) =>
+    {
+        await publisher.PublishAsync<IInitTest>(new { Name = "SomeName" }, token);
+        return "Test saga published";
+    })
+    .WithTags("Inventory")
+    .WithSummary("Query reservation summary from any state (DuringAny)")
+    .WithOpenApi();
+
 app.Run();

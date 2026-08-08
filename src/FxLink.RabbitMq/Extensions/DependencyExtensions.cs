@@ -23,6 +23,7 @@ public static class DependencyExtensions
             services.AddSingleton<IRabbitMqClient>(sp => sp.GetRequiredService<RabbitMqClient>());
             services.AddSingleton(typeof(IClientConnector<>), typeof(RabbitMqClientConnector<>));
             services.AddSingleton(typeof(IRequester<>), typeof(RabbitMqClientConnector<>));
+            services.AddSingleton(typeof(IWireResultDispatcher<>), typeof(WireResultDispatcher<>));
             services.AddHostedService<RabbitMqSupervisorWorker>();
         }
 
