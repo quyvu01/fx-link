@@ -16,6 +16,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\FxLink.RabbitMq\FxLink.RabbitMq.csproj" />
+        <ProjectReference Include="..\..\src\FxLink.RoutingSlip\FxLink.RoutingSlip.csproj" />
         <ProjectReference Include="..\..\src\FxLink\FxLink.csproj"/>
         <ProjectReference Include="..\Contracts\Contracts.csproj"/>
     </ItemGroup>
