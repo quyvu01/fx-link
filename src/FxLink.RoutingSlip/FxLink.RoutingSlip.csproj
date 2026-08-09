@@ -5,7 +5,7 @@
         <LangVersion>default</LangVersion>
         <Version>2.3.0</Version>
         <Authors>Quy Vu</Authors>
-        <PackageId>FxLink.StateMachine</PackageId>
+        <PackageId>FxLink.RoutingSlip</PackageId>
         <Description>A distributed messaging framework for .NET</Description>
         <PackageTags>FxLink;distributed;open-source</PackageTags>
         <RepositoryUrl>https://github.com/quyvu01/fx-link</RepositoryUrl>
@@ -23,7 +23,9 @@
         <None Include="..\..\LICENSE" Pack="true" PackagePath="\"/>
         <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
+
     <ItemGroup>
-      <ProjectReference Include="..\FxLink\FxLink.csproj" />
+        <ProjectReference Include="..\FxLink\FxLink.csproj"/>
     </ItemGroup>
+
 </Project>
