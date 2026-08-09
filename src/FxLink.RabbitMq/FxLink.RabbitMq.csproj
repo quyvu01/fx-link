@@ -7,7 +7,7 @@
         <Version>2.3.0</Version>
         <Authors>Quy Vu</Authors>
         <PackageId>FxLink.RabbitMq</PackageId>
-        <Description>The distributed messaging .NET</Description>
+        <Description>A distributed messaging framework for .NET</Description>
         <PackageTags>FxLink;distributed;open-source</PackageTags>
         <RepositoryUrl>https://github.com/quyvu01/fx-link</RepositoryUrl>
         <PackageIcon>FxLink.png</PackageIcon>

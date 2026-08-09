@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/FxLink.RoutingSlip/">
+    <Project Path="src/FxLink.RoutingSlip/FxLink.RoutingSlip.csproj" />
+  </Folder>
   <Folder Name="/FxLink.StateMachine/">
     <Project Path="src/FxLink.StateMachine.EntityFrameworkCore/FxLink.StateMachine.EntityFrameworkCore.csproj" />
     <Project Path="src/FxLink.StateMachine/FxLink.StateMachine.csproj" />
