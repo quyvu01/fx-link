@@ -1,5 +1,5 @@
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using Order.Dtos.Orders;
 
 namespace Order.Consumers;

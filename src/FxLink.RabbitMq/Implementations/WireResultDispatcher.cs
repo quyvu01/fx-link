@@ -1,7 +1,7 @@
 using System.Text.Json;
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
+using FxLink.Contexts;
 using FxLink.Entities;
 using FxLink.RabbitMq.Abstractions;
 using FxLink.Wrappers;

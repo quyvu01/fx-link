@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using FxLink.Exceptions;
 using FxLink.Serialization;
 

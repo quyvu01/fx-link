@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using FxLink.Entities;
 
 namespace FxLink.InMemory;

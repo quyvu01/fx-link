@@ -1,4 +1,4 @@
-namespace FxLink.Abstractions.Contexts;
+namespace FxLink.Contexts;
 
 public abstract class AbstractContext(Guid correlationId, IHeaders headers, DateTime? sentTime = null,
     IHostInfo hostInfo = null) : IContext

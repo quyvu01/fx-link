@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
+using FxLink.Contexts;
 using FxLink.Extensions;
 using FxLink.Faults;
 using FxLink.Serialization;

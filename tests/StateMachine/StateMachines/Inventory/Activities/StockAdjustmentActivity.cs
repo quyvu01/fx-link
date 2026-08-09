@@ -1,4 +1,5 @@
 using FxLink.StateMachine.Abstractions;
+using FxLink.StateMachine.Contexts;
 using StateMachine.Dtos.Inventory;
 
 namespace StateMachine.StateMachines.Inventory.Activities;

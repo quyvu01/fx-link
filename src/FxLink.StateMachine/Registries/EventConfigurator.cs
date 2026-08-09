@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using FxLink.Extensions;
 using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.Exceptions;

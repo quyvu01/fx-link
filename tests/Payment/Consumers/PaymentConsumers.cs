@@ -1,6 +1,6 @@
 using Contracts.Messages;
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 
 namespace Payment.Consumers;
 

@@ -1,11 +1,12 @@
 using System.Collections.Concurrent;
+using FxLink.Abstractions;
 using FxLink.Exceptions;
 using FxLink.Extensions;
 using FxLink.Serialization;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Abstractions.Contexts;
+namespace FxLink.Contexts;
 
 public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMessage>
     where TMessage : class

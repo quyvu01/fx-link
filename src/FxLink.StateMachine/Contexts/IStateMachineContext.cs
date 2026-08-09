@@ -1,6 +1,7 @@
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
+using FxLink.StateMachine.Abstractions;
 
-namespace FxLink.StateMachine.Abstractions;
+namespace FxLink.StateMachine.Contexts;
 
 public interface IStateMachineContext<out TInstance> : IContextPayload, IContext where TInstance : IStateMachineInstance
 {

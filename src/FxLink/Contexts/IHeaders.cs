@@ -1,4 +1,4 @@
-namespace FxLink.Abstractions.Contexts;
+namespace FxLink.Contexts;
 
 /// <summary>
 /// Message headers carried alongside the body. Values set locally are real CLR types; values read

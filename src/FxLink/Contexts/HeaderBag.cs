@@ -3,7 +3,7 @@ using System.Text.Json;
 using FxLink.Configurators;
 using FxLink.Serialization;
 
-namespace FxLink.Abstractions.Contexts;
+namespace FxLink.Contexts;
 
 internal sealed class HeaderBag : IHeaders
 {

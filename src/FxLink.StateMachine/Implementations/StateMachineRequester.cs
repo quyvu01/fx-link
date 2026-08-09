@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using FxLink.Exceptions;
 using FxLink.Extensions;
 using FxLink.StateMachine.Abstractions;

@@ -1,4 +1,6 @@
-namespace FxLink.Abstractions.Contexts;
+using FxLink.Abstractions;
+
+namespace FxLink.Contexts;
 
 public interface IConsumerContext : IContext, IResponse, IPublisher, IContextPayload
 {

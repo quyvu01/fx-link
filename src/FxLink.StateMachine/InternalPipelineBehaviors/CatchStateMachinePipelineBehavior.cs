@@ -1,6 +1,6 @@
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
+using FxLink.Contexts;
 using FxLink.Delegates;
 using FxLink.StateMachine.Exceptions;
 using FxLink.Wrappers;
