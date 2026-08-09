@@ -1,5 +1,5 @@
 using FxLink.Abstractions;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using FxLink.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 

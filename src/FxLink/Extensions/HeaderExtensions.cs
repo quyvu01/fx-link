@@ -1,4 +1,4 @@
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 
 namespace FxLink.Extensions;
 

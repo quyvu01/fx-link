@@ -1,4 +1,6 @@
-namespace FxLink.StateMachine.Abstractions;
+using FxLink.StateMachine.Abstractions;
+
+namespace FxLink.StateMachine.Contexts;
 
 public interface IStateMachineActivityContext<out TInstance> : IStateMachineContext<TInstance>
     where TInstance : IStateMachineInstance

@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using FxLink.Exceptions;
 
 namespace FxLink.StateMachine.Contexts;

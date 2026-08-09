@@ -1,4 +1,4 @@
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using FxLink.StateMachine.Abstractions;
 
 namespace FxLink.StateMachine.Contexts;
@@ -20,7 +20,7 @@ internal class StateMachineContext<TInstance, TMessage>(
 
     public Guid? RequesterId { get; } = requesterId;
     public DateTime? SentTime { get; } = DateTime.UtcNow;
-    public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
+    public IHostInfo HostInfo => FxLink.Contexts.HostInfo.Current;
     public TInstance Instance { get; } = instance;
     public TMessage Message { get; } = message;
     public Guid CorrelationId { get; } = correlationId;
@@ -42,7 +42,7 @@ internal class StateMachineContext<TInstance>(
 
     public Guid? RequesterId { get; } = requesterId;
     public DateTime? SentTime { get; } = DateTime.UtcNow;
-    public IHostInfo HostInfo => FxLink.Abstractions.Contexts.HostInfo.Current;
+    public IHostInfo HostInfo => FxLink.Contexts.HostInfo.Current;
     public TInstance Instance { get; } = instance;
     public Guid CorrelationId { get; } = correlationId;
     public IHeaders Headers { get; } = headers;

@@ -1,4 +1,4 @@
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 using Shouldly;
 using Xunit;
 

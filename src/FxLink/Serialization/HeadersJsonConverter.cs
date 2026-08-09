@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FxLink.Abstractions.Contexts;
+using FxLink.Contexts;
 
 namespace FxLink.Serialization;
 

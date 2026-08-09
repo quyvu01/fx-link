@@ -1,4 +1,4 @@
-namespace FxLink.Abstractions.Contexts;
+namespace FxLink.Contexts;
 
 internal interface IInternalContext
 {

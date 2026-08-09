@@ -1,6 +1,6 @@
 using FxLink.Statics;
 
-namespace FxLink.Abstractions.Contexts;
+namespace FxLink.Contexts;
 
 public sealed class PublisherContext : AbstractContext, IPublisherContext
 {

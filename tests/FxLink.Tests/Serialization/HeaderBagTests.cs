@@ -1,6 +1,6 @@
 using System.Text.Json;
-using FxLink.Abstractions.Contexts;
 using FxLink.Configurators;
+using FxLink.Contexts;
 using Shouldly;
 using Xunit;
 
