@@ -99,7 +99,7 @@ public sealed class StateMachineConfigurator(IServiceCollection services) : ISta
         {
             var serviceType = typeof(IConsumer<>).MakeGenericType(eventType);
             var implementType = typeof(StateMachineConsumer<>).MakeGenericType(eventType);
-            services.TryAddEnumerable(new ServiceDescriptor(serviceType, serviceKey: typeof(TStateMachine),
+            services.TryAddEnumerable(new ServiceDescriptor(serviceType, serviceKey,
                 implementationType: implementType, ServiceLifetime.Scoped));
             var keys = _messageKeys.GetOrAdd(eventType, _ => []);
             keys.Add(serviceKey);

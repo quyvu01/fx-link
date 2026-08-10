@@ -13,7 +13,7 @@ internal sealed class MessageKeys : IMessageKeys
         keys.Add(messageKey);
     }
 
-    public Type[] GetKeysByMessageType(Type messageType) => _messageKeys.GetValueOrDefault(messageType, []).ToArray();
+    public Type[] GetKeysByMessageType(Type messageType) => [.. _messageKeys.GetValueOrDefault(messageType, [])];
 
     public IReadOnlyDictionary<Type, Type[]> GetMessageKeys() =>
         _messageKeys.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());

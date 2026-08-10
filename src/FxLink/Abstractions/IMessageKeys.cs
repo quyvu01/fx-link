@@ -1,6 +1,6 @@
 namespace FxLink.Abstractions;
 
-public interface IMessageKeys
+internal interface IMessageKeys
 {
     void AddMessageKey(Type messageType, Type messageKey);
     Type[] GetKeysByMessageType(Type messageType);
