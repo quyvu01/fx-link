@@ -7,7 +7,6 @@ namespace FxLink.Registries;
 public interface IConfigurator
 {
     IServiceCollection Services { get; }
-    IMessageKeys MessageKeys { get; }
     void AddConsumer<TConsumer>() where TConsumer : IConsumer;
     void AddConsumerDefinition<TConsumerDefinition>() where TConsumerDefinition : IConsumerConfigurator;
     void UseInMemory();

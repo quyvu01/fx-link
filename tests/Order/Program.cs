@@ -2,8 +2,10 @@ using Contracts.Messages;
 using FxLink.Abstractions;
 using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
+using FxLink.RoutingSlip.Extensions;
 using Microsoft.OpenApi.Models;
 using Order.Dtos.Orders;
+using Order.TestRoutingSlip.Activities;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,6 +45,11 @@ builder.Services.AddFxLink(opts =>
         config.PrefetchCount(1);
         config.ConcurrentMessageLimit(1);
     });
+
+    opts.AddRoutingSlip(cfg => cfg
+        .AddActivity<AddOrderActivity>()
+        .AddActivity<ConfirmOrderActivity>()
+    );
 });
 
 var app = builder.Build();
@@ -74,7 +81,7 @@ app.MapPost("/orders/place", async (IPublisher publisher, ILogger<Program> logge
 //     })
 //     .WithOpenApi();
 
-app.MapPost("/orders/get-test", async (IRequester<IOrderCreated> requester, ILogger<Program> logger) =>
+app.MapPost("/orders/get-test", async (IRequester<IOrderCreated> requester) =>
     {
         var result = await requester
             .RequestAsync<IOrderResponse>(new { OrderId = "1123", Price = 123 });

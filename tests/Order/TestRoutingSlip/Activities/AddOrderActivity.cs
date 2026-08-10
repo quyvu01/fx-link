@@ -10,7 +10,7 @@ public sealed class AddOrderActivity(ILogger<AddOrderActivity> logger) : IExecut
     public async Task<IExecuteResult> ExecuteAsync(IExecuteContext<AddOrderArgs> context,
         CancellationToken token = default)
     {
-        logger.LogInformation("Received args: {@Args}", context.Arguments);
+        logger.LogInformation("[AddOrderActivity] args: {@Args}", context.Arguments);
         await Task.Delay(TimeSpan.FromSeconds(2), token);
         return context.Completed(new AddOrderLogs { Name = context.Arguments.Name, ActionTime = DateTime.UtcNow });
     }
@@ -19,7 +19,7 @@ public sealed class AddOrderActivity(ILogger<AddOrderActivity> logger) : IExecut
         CancellationToken token = default)
     {
         await Task.Delay(TimeSpan.FromSeconds(2), token);
-        logger.LogInformation("Before compensated: {@Logs}", context.Logs);
+        logger.LogInformation("[AddOrderActivity] compensated: {@Logs}", context.Logs);
         return context.Compensated();
     }
 }
