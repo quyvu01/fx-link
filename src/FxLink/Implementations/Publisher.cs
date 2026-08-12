@@ -10,7 +10,12 @@ internal sealed class Publisher(IServiceProvider serviceProvider) : IPublisher, 
     public async Task PublishAsync<TMessage>(TMessage message, Action<IPublisherContext> contextOptions = null,
         CancellationToken token = default) where TMessage : class
     {
-        var context = Context is null ? PublisherContext.New() : new PublisherContext(Context);
+        var context = Context switch
+        {
+            null => PublisherContext.New(),
+            IPublisherContext publisherContext => publisherContext,
+            { } ctx => new PublisherContext(ctx)
+        };
         contextOptions?.Invoke(context);
         var publisherOrchestrator = serviceProvider
             .GetRequiredService<PublisherPipelineBehaviorOrchestrator<TMessage>>();
