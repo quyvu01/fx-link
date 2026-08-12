@@ -5,13 +5,14 @@ namespace FxLink.RoutingSlip.Abstractions;
 
 public interface IExecuteActivity : IConsumer;
 
-public interface IExecuteActivity<in TArguments> : IExecuteActivity where TArguments : class
+public interface IExecuteActivity<in TArgument> : IExecuteActivity where TArgument : class
 {
-    Task<IExecuteResult> ExecuteAsync(IExecuteContext<TArguments> context, CancellationToken token = default);
+    Task<IExecuteResult> ExecuteAsync(IExecuteContext<TArgument> context, CancellationToken token = default);
 }
 
-public interface IExecuteActivity<in TArguments, in TLogs> : IExecuteActivity<TArguments>
-    where TArguments : class where TLogs : class
+public interface IExecuteActivity<in TArgument, TLog> : IExecuteActivity
+    where TArgument : class where TLog : class
 {
-    Task<ICompensateResult> CompensateAsync(ICompensateContext<TLogs> context, CancellationToken token = default);
+    Task<IExecuteResult> ExecuteAsync(IExecuteContext<TArgument, TLog> context, CancellationToken token = default);
+    Task<ICompensateResult> CompensateAsync(ICompensateContext<TLog> context, CancellationToken token = default);
 }

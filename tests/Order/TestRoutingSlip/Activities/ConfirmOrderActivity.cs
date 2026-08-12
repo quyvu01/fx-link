@@ -9,8 +9,8 @@ public sealed class ConfirmOrderActivity(ILogger<ConfirmOrderActivity> logger) :
     public async Task<IExecuteResult> ExecuteAsync(IExecuteContext<ConfirmOrderArgs> context,
         CancellationToken token = default)
     {
-        logger.LogInformation("[ConfirmOrderActivity] with args: {@Args}", context.Arguments);
+        logger.LogInformation("[ConfirmOrderActivity] with args: {@Args}", context.Argument);
         await Task.Delay(TimeSpan.FromSeconds(5), token);
-        return context.Arguments.IsFaultSimulation ? context.Fault() : context.Completed();
+        return context.Argument.IsFaultSimulation ? context.Fault() : context.Completed();
     }
 }

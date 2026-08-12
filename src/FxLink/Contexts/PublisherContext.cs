@@ -2,7 +2,7 @@ using FxLink.Statics;
 
 namespace FxLink.Contexts;
 
-public sealed class PublisherContext : AbstractContext, IPublisherContext
+public class PublisherContext : AbstractContext, IPublisherContext
 {
     internal PublisherContext(Guid correlationId, IHeaders headers)
         : base(correlationId, headers)

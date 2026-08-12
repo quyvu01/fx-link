@@ -22,6 +22,7 @@ public static class DependencyExtensions
         routingSlipConfigurator.MessageKeys
             .ForEach(mk => mk.Value
                 .ForEach(v => messageKeys.AddMessageKey(mk.Key, v)));
-        services.AddSingleton<IRoutingSlipExecutor, RoutingSlipExecutor>();
+        services.AddScoped<IRoutingSlipExecutor, RoutingSlipExecutor>();
+        services.AddScoped(typeof(IRoutingSlipPublisher<>), typeof(RoutingSlipPublisher<>));
     }
 }

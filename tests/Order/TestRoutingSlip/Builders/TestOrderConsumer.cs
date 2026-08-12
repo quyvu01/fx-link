@@ -11,13 +11,12 @@ public class TestOrderConsumer(ILogger<TestOrderConsumer> logger, IRoutingSlipEx
 {
     public async Task ConsumeAsync(IConsumerContext<IActiveRoutingSlip> context, CancellationToken token = default)
     {
-        await Task.Yield();
         var message = context.Message;
         logger.LogInformation("[TestOrderConsumer] message: {@Message}", message);
         await executor.RunAsync(cfg => cfg
             .AddArgument(new AddOrderArgs { Name = message.Name })
             .AddArgument(
                 new ConfirmOrderArgs { Name = message.Name, IsFaultSimulation = message.IsFaultSimulation })
-            .SetVariable("customerId", 123));
+            .SetVariable("customerId", 123), token);
     }
 }

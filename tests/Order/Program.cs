@@ -6,6 +6,7 @@ using FxLink.RoutingSlip.Extensions;
 using Microsoft.OpenApi.Models;
 using Order.Dtos.Orders;
 using Order.TestRoutingSlip.Activities;
+using Order.TestRoutingSlip.Contracts;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -122,10 +123,10 @@ app.MapPost("/orders/{orderId:guid}/refund", async (IPublisher publisher, Guid o
     .WithSummary("Cross-service plain pub/sub (Order -> Payment), fire and forget")
     .WithOpenApi();
 
-app.MapPost("/test-no-consumers", async (IPublisher publisher) =>
+app.MapPost("/test-routing-slip", async (IPublisher publisher) =>
 {
-    await publisher.PublishAsync(new MessageWithoutConsumer { OrderId = "123" });
-    return "Publisher unknow consumer";
+    await publisher.PublishAsync<IActiveRoutingSlip>(new { Name = "123", IsFaultSimulation = false });
+    return "Publisher active routing slip";
 });
 
 app.Run();
