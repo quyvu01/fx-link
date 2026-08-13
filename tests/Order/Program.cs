@@ -48,8 +48,11 @@ builder.Services.AddFxLink(opts =>
     });
 
     opts.AddRoutingSlip(cfg => cfg
+        .AddActivity<ReserveInventoryActivity>()
         .AddActivity<AddOrderActivity>()
+        .AddActivity<ChargeOrderPaymentActivity>()
         .AddActivity<ConfirmOrderActivity>()
+        .AddActivity<NotifyCustomerActivity>()
     );
 });
 
@@ -123,10 +126,16 @@ app.MapPost("/orders/{orderId:guid}/refund", async (IPublisher publisher, Guid o
     .WithSummary("Cross-service plain pub/sub (Order -> Payment), fire and forget")
     .WithOpenApi();
 
-app.MapPost("/test-routing-slip", async (IPublisher publisher) =>
-{
-    await publisher.PublishAsync<IActiveRoutingSlip>(new { Name = "123", IsFaultSimulation = true });
-    return "Publisher active routing slip";
-});
+app.MapPost("/test-routing-slip", async (IPublisher publisher, string name = "test-order",
+        bool isFaultSimulation = false) =>
+    {
+        await publisher.PublishAsync<IActiveRoutingSlip>(new { Name = name, IsFaultSimulation = isFaultSimulation });
+        return $"Routing slip started for '{name}' (isFaultSimulation={isFaultSimulation})";
+    })
+    .WithTags("RoutingSlip")
+    .WithSummary("5-step order saga: ReserveInventory -> AddOrder -> ChargeOrderPayment -> ConfirmOrder -> " +
+                 "NotifyCustomer. isFaultSimulation=true faults at ConfirmOrder, triggering compensate back " +
+                 "through ChargeOrderPayment -> AddOrder -> ReserveInventory (NotifyCustomer never runs).")
+    .WithOpenApi();
 
 app.Run();

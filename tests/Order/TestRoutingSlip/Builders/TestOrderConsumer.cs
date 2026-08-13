@@ -13,10 +13,17 @@ public class TestOrderConsumer(ILogger<TestOrderConsumer> logger, IRoutingSlipEx
     {
         var message = context.Message;
         logger.LogInformation("[TestOrderConsumer] message: {@Message}", message);
+
+        // 5-step order saga: ReserveInventory -> AddOrder -> ChargeOrderPayment (all compensatable)
+        // -> ConfirmOrder (fault-simulation point, no logs) -> NotifyCustomer (no logs, terminal).
+        // isFaultSimulation=true faults at ConfirmOrder, so the backward-walk has 3 real entries to
+        // compensate: ChargeOrderPayment -> AddOrder -> ReserveInventory. NotifyCustomer never runs.
         await executor.RunAsync(cfg => cfg
+            .AddArgument(new ReserveInventoryArgs { Name = message.Name, Quantity = 1 })
             .AddArgument(new AddOrderArgs { Name = message.Name })
-            .AddArgument(
-                new ConfirmOrderArgs { Name = message.Name, IsFaultSimulation = message.IsFaultSimulation })
+            .AddArgument(new ChargeOrderPaymentArgs { Name = message.Name, Amount = 100 })
+            .AddArgument(new ConfirmOrderArgs { Name = message.Name, IsFaultSimulation = message.IsFaultSimulation })
+            .AddArgument(new NotifyCustomerArgs { Name = message.Name })
             .SetVariable("customerId", 123), token);
     }
 }
