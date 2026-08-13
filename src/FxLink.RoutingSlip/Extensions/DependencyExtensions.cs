@@ -24,5 +24,7 @@ public static class DependencyExtensions
                 .ForEach(v => messageKeys.AddMessageKey(mk.Key, v)));
         services.AddScoped<IRoutingSlipExecutor, RoutingSlipExecutor>();
         services.AddScoped(typeof(IRoutingSlipPublisher<>), typeof(RoutingSlipPublisher<>));
+        services.AddScoped(typeof(IExecuteActivityProxy<>), typeof(ExecuteActivityProxy<>));
+        services.AddScoped(typeof(IExecuteActivityProxy<,>), typeof(ExecuteActivityProxy<,>));
     }
 }
