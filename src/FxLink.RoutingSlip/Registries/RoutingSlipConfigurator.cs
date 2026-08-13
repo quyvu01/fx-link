@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using FxLink.Abstractions;
 using FxLink.RoutingSlip.Abstractions;
+using FxLink.RoutingSlip.Entities;
 using FxLink.RoutingSlip.Implementations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -41,7 +42,7 @@ internal sealed class RoutingSlipConfigurator(IServiceCollection services) : IRo
         foreach (var activityData in _activitiesData)
         {
             RegisterConsumer(activityData);
-            
+
             if (activityData.LogsType is null)
             {
                 var singleArgsServiceType = typeof(IExecuteActivity<>)
@@ -62,7 +63,7 @@ internal sealed class RoutingSlipConfigurator(IServiceCollection services) : IRo
     {
         var (activityType, argumentsType, logsType) = activityData;
         RegisterConsumer(activityType, argumentsType);
-        if (logsType is not null) RegisterConsumer(activityType, logsType);
+        if (logsType is not null) RegisterConsumer(activityType, typeof(ActivityLogEntry));
     }
 
     private void RegisterConsumer(Type serviceKey, Type messageType)

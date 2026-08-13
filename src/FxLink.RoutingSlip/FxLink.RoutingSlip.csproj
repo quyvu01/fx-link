@@ -28,4 +28,10 @@
         <ProjectReference Include="..\FxLink\FxLink.csproj"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <Reference Include="FxLink.RoutingSlip">
+        <HintPath>..\..\tests\Order\bin\Debug\net8.0\FxLink.RoutingSlip.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
 </Project>

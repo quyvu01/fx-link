@@ -13,6 +13,6 @@ public interface IExecuteActivity<in TArgument> : IExecuteActivity where TArgume
 public interface IExecuteActivity<in TArgument, TLog> : IExecuteActivity
     where TArgument : class where TLog : class
 {
-    Task<IExecuteResult> ExecuteAsync(IExecuteContext<TArgument, TLog> context, CancellationToken token = default);
-    Task<ICompensateResult> CompensateAsync(ICompensateContext<TLog> context, CancellationToken token = default);
+    Task<IExecuteResult<TLog>> ExecuteAsync(IExecuteContext<TArgument, TLog> context, CancellationToken token = default);
+    Task<ICompensatedResult> CompensateAsync(ICompensateContext<TLog> context, CancellationToken token = default);
 }

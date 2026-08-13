@@ -1,3 +1,6 @@
 namespace FxLink.RoutingSlip.Entities;
 
-public sealed record ActivityLogEntry(string AssemblyQualifiedName, string Json);
+public sealed record ActivityLogEntry(
+    string ArgumentAssemblyQualifiedName,
+    string LogAssemblyQualifiedName,
+    string LogJson);
