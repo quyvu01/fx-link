@@ -1,5 +1,6 @@
 using FxLink.Contexts;
 using FxLink.RoutingSlip.Abstractions;
+using FxLink.RoutingSlip.Exceptions;
 using FxLink.RoutingSlip.Implementations;
 
 namespace FxLink.RoutingSlip.Contexts;
@@ -22,7 +23,7 @@ internal class ExecuteContext<TArgument> : AbstractContext, IExecuteContext<TArg
     public IExecuteResult Fault()
     {
         var executionResult = new ExecuteResult(false);
-        executionResult.Fault();
+        executionResult.Fault(new RoutingSlipException.ExecuteFaultedWithoutException(typeof(TArgument)));
         return executionResult;
     }
 
@@ -50,7 +51,7 @@ internal sealed class ExecuteContext<TArgument, TLog> : AbstractContext, IExecut
     public IExecuteResult Fault()
     {
         var executionResult = new ExecuteResult(false);
-        executionResult.Fault();
+        executionResult.Fault(new RoutingSlipException.ExecuteFaultedWithoutException(typeof(TArgument)));
         return executionResult;
     }
 

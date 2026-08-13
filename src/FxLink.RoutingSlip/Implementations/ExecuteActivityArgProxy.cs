@@ -25,11 +25,20 @@ internal class ExecuteActivityProxy<TArgument>(IExecuteActivity<TArgument> activ
     public Task<IExecuteResult> ExecuteAsync(IExecuteContext<TArgument> context,
         CancellationToken token = default) => activity.ExecuteAsync(context, token);
 
-    internal override Task<IExecuteResult> ExecuteAsync(object argument, IContext context,
+    internal override async Task<IExecuteResult> ExecuteAsync(object argument, IContext context,
         CancellationToken token = default)
     {
-        var executeContext = new ExecuteContext<TArgument>((TArgument)argument, context);
-        return ExecuteAsync(executeContext, token);
+        try
+        {
+            var executeContext = new ExecuteContext<TArgument>((TArgument)argument, context);
+            return await ExecuteAsync(executeContext, token);
+        }
+        catch (Exception e)
+        {
+            var result = new ExecuteResult(false);
+            result.Fault(e);
+            return result;
+        }
     }
 }
 
@@ -46,15 +55,29 @@ internal class ExecuteActivityProxy<TArgument, TLog>(IExecuteActivity<TArgument,
     internal override async Task<ExecuteResultWithLog> ExecuteAsync(object argument, IContext context,
         CancellationToken token = default)
     {
-        var executeContext = new ExecuteContext<TArgument, TLog>((TArgument)argument, context);
-        var result = await ExecuteAsync(executeContext, token);
-        return new ExecuteResultWithLog(result.IsCompleted, result.Log, result.Exception);
+        try
+        {
+            var executeContext = new ExecuteContext<TArgument, TLog>((TArgument)argument, context);
+            var result = await ExecuteAsync(executeContext, token);
+            return new ExecuteResultWithLog(result.IsCompleted, result.Log, result.Exception);
+        }
+        catch (Exception e)
+        {
+            return new ExecuteResultWithLog(false, null, e);
+        }
     }
 
-    internal override Task<ICompensatedResult> CompensateAsync(object log, IContext context,
+    internal override async Task<ICompensatedResult> CompensateAsync(object log, IContext context,
         CancellationToken token = default)
     {
-        var compensateContext = new CompensateContext<TLog>((TLog)log, context);
-        return CompensateAsync(compensateContext, token);
+        try
+        {
+            var compensateContext = new CompensateContext<TLog>((TLog)log, context);
+            return await CompensateAsync(compensateContext, token);
+        }
+        catch (Exception e)
+        {
+            return new CompensatedResult(false, e);
+        }
     }
 }

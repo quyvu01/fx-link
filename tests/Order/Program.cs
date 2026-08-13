@@ -125,7 +125,7 @@ app.MapPost("/orders/{orderId:guid}/refund", async (IPublisher publisher, Guid o
 
 app.MapPost("/test-routing-slip", async (IPublisher publisher) =>
 {
-    await publisher.PublishAsync<IActiveRoutingSlip>(new { Name = "123", IsFaultSimulation = false });
+    await publisher.PublishAsync<IActiveRoutingSlip>(new { Name = "123", IsFaultSimulation = true });
     return "Publisher active routing slip";
 });
 

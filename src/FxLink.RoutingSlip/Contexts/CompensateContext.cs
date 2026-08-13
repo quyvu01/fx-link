@@ -1,5 +1,6 @@
 using FxLink.Contexts;
 using FxLink.RoutingSlip.Abstractions;
+using FxLink.RoutingSlip.Exceptions;
 using FxLink.RoutingSlip.Implementations;
 
 namespace FxLink.RoutingSlip.Contexts;
@@ -17,6 +18,6 @@ internal sealed class CompensateContext<TLog>
 
     public ICompensatedResult Compensated() => new CompensatedResult(true, null);
 
-    public ICompensatedResult Fault() => Fault(new Exception()); // Todo: update exception as well
+    public ICompensatedResult Fault() => Fault(new RoutingSlipException.CompensateFaultedWithoutException(typeof(TLog)));
     public ICompensatedResult Fault(Exception exception) => new CompensatedResult(false, exception);
 }

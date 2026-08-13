@@ -73,7 +73,7 @@ internal sealed class RoutingSlipConfigurator(IServiceCollection services) : IRo
         services.TryAddEnumerable(new ServiceDescriptor(serviceType, serviceKey,
             implementationType: implementType, ServiceLifetime.Scoped));
         var keys = _messageKeys.GetOrAdd(messageType, _ => []);
-        keys.Add(serviceKey);
+        if (!keys.Contains(serviceKey)) keys.Add(serviceKey);
     }
 
     private record ActivityData(Type ActivityType, Type ArgumentsType, Type LogsType = null);
