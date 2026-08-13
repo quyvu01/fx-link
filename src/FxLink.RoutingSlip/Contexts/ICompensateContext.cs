@@ -6,7 +6,7 @@ namespace FxLink.RoutingSlip.Contexts;
 public interface ICompensateContext<out TLog> : IContext where TLog : class
 {
     TLog Log { get; }
-    ICompensateResult Compensated();
-    ICompensateResult Fault();
-    ICompensateResult Fault(Exception exception);
+    ICompensatedResult Compensated();
+    ICompensatedResult Fault();
+    ICompensatedResult Fault(Exception exception);
 }

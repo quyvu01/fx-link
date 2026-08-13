@@ -7,7 +7,7 @@ namespace Order.TestRoutingSlip.Activities;
 
 public sealed class AddOrderActivity(ILogger<AddOrderActivity> logger) : IExecuteActivity<AddOrderArgs, AddOrderLogs>
 {
-    public async Task<IExecuteResult> ExecuteAsync(IExecuteContext<AddOrderArgs, AddOrderLogs> context,
+    public async Task<IExecuteResult<AddOrderLogs>> ExecuteAsync(IExecuteContext<AddOrderArgs, AddOrderLogs> context,
         CancellationToken token = default)
     {
         logger.LogInformation("[AddOrderActivity] args: {@Args}", context.Argument);
@@ -15,7 +15,7 @@ public sealed class AddOrderActivity(ILogger<AddOrderActivity> logger) : IExecut
         return context.Completed(new AddOrderLogs { Name = context.Argument.Name, ActionTime = DateTime.UtcNow });
     }
 
-    public async Task<ICompensateResult> CompensateAsync(ICompensateContext<AddOrderLogs> context,
+    public async Task<ICompensatedResult> CompensateAsync(ICompensateContext<AddOrderLogs> context,
         CancellationToken token = default)
     {
         await Task.Delay(TimeSpan.FromSeconds(2), token);
