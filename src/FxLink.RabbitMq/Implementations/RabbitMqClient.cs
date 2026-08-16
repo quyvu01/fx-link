@@ -287,14 +287,15 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                     foreach (var messageType in messageTypes)
                     {
-                        var exchangeName = messageType.GetExchangeName();
+                        var exchangeName = GetExchangeName(messageType);
+                        // var exchangeName = messageType.GetExchangeName();
                         // Declare main exchanges and queues
                         await declareChannel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout,
                             durable: false, cancellationToken: cancellationToken);
                         await declareChannel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,
                             cancellationToken: cancellationToken);
 
-                        var retryExchange = messageType.GetRetryExchangeName();
+                        var retryExchange = exchangeName.GetRetryExchangeName();
 
                         // Declare retry exchanges and queues
                         await declareChannel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout,
@@ -310,7 +311,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         await declareChannel.QueueBindAsync(retryQueue, retryExchange, string.Empty,
                             cancellationToken: cancellationToken);
 
-                        var deadLetterExchange = messageType.GetDeadLetterExchangeName();
+                        var deadLetterExchange = exchangeName.GetDeadLetterExchangeName();
 
                         // Declare dead letter exchanges and queues
                         await declareChannel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Fanout,
@@ -376,7 +377,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     }
 
     private TMessageConfigurator GetConfigurator<TMessageConfigurator>(Type consumerType)
-        where TMessageConfigurator : IMessageConfigurator
+        where TMessageConfigurator : IConsumeConfigurator
     {
         var method = GetConfiguratorInternalMethodCache.GetOrAdd((consumerType, typeof(TMessageConfigurator)),
             static key => BuildGetConfiguratorInternalMethod(key.ConsumerType, key.ConfiguratorType));
@@ -391,13 +392,21 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         return openMethod.MakeGenericMethod(consumerType, configuratorType);
     }
 
-    private TMessageConfigurator GetConfigurator<TConsumer, TMessageConfigurator>() where TConsumer : IConsumer
-        where TMessageConfigurator : IMessageConfigurator
+    private TConsumerConfigurator GetConfigurator<TConsumer, TConsumerConfigurator>() where TConsumer : IConsumer
+        where TConsumerConfigurator : IConsumeConfigurator
     {
         var configurator = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
         return configurator?.ConsumerConfigurator is not ConsumerConfigurator<TConsumer> consumerConfigurator
             ? default
-            : consumerConfigurator.GetConfigurator<TMessageConfigurator>(typeof(TConsumer));
+            : consumerConfigurator.GetConfigurator<TConsumerConfigurator>(typeof(TConsumer));
+    }
+
+    private string GetExchangeName(Type messageType)
+    {
+        var messageDefinition = serviceProvider.GetService(typeof(IMessageDefinition<>).MakeGenericType(messageType));
+        return messageDefinition is not IMessageDefinition definition
+            ? messageType.GetExchangeName()
+            : definition.MessageConfigurator.GetName();
     }
 
     private sealed record QueueConfiguration(string QueueName, bool AutoDelete);

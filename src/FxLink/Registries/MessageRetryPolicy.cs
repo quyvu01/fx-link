@@ -5,7 +5,7 @@ namespace FxLink.Registries;
 internal sealed class MessageRetryPolicy : IMessageRetryPolicy
 {
     internal TimeSpan[] RetryIntervals { get; private set; }
-    internal Type[] IgnoreExceptions => _ignoreExceptions.ToArray();
+    internal Type[] IgnoreExceptions => [.. _ignoreExceptions];
     private readonly HashSet<Type> _ignoreExceptions = [];
 
     public IMessageRetryPolicy Intervals(params TimeSpan[] intervals)

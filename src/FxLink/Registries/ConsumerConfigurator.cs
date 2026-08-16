@@ -7,7 +7,7 @@ internal class ConsumerConfigurator<TConsumer> :
     IMessageConfiguratorBehavior,
     IConsumerConfigurator<TConsumer> where TConsumer : IConsumer
 {
-    private readonly ConcurrentDictionary<Type, List<IMessageConfigurator>> _messageConfigurators = [];
+    private readonly ConcurrentDictionary<Type, List<IConsumeConfigurator>> _messageConfigurators = [];
 
     public void UseMessageRetry(Action<IMessageRetryPolicy> options)
     {
@@ -16,17 +16,17 @@ internal class ConsumerConfigurator<TConsumer> :
         AddConfigurator(typeof(TConsumer), retryPolicy);
     }
 
-    public void AddConfigurator(Type targetType, IMessageConfigurator configurator)
+    public void AddConfigurator(Type targetType, IConsumeConfigurator configurator)
     {
         var configurators = _messageConfigurators.GetOrAdd(targetType, _ => []);
         configurators.Add(configurator);
     }
 
-    public IMessageConfigurator[] GetConfigurators(Type targetType) =>
+    public IConsumeConfigurator[] GetConfigurators(Type targetType) =>
         [.. _messageConfigurators.GetValueOrDefault(targetType, [])];
 
     public TMessageConfigurator GetConfigurator<TMessageConfigurator>(Type targetType)
-        where TMessageConfigurator : IMessageConfigurator
+        where TMessageConfigurator : IConsumeConfigurator
     {
         var configurators = _messageConfigurators.GetValueOrDefault(targetType, []);
         return configurators.OfType<TMessageConfigurator>().LastOrDefault();

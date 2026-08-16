@@ -2,9 +2,9 @@ namespace FxLink.Registries;
 
 internal interface IMessageConfiguratorBehavior
 {
-    void AddConfigurator(Type targetType, IMessageConfigurator configurator);
-    IMessageConfigurator[] GetConfigurators(Type targetType);
+    void AddConfigurator(Type targetType, IConsumeConfigurator configurator);
+    IConsumeConfigurator[] GetConfigurators(Type targetType);
 
     TMessageConfigurator GetConfigurator<TMessageConfigurator>(Type targetType)
-        where TMessageConfigurator : IMessageConfigurator;
+        where TMessageConfigurator : IConsumeConfigurator;
 }

@@ -18,9 +18,11 @@ internal class Configurator(IServiceCollection services) : IConfigurator
     public void AddConsumer<TConsumer>()
         where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
-    public void AddConsumerDefinition<TConsumerDefinition>()
-        where TConsumerDefinition : IConsumerConfigurator =>
-        AddConsumerTypeDefinition(typeof(TConsumerDefinition));
+    public void AddConsumerDefinition<TConsumerDefinition>() where TConsumerDefinition : IConsumerDefinition
+        => AddConsumerTypeDefinition(typeof(TConsumerDefinition));
+
+    public void AddMessageDefinition<TMessageDefinition>() where TMessageDefinition : IMessageDefinition
+        => AddMessageTypeDefinition(typeof(TMessageDefinition));
 
     public void AddConsumersFromAssemblies(Assembly assembly)
     {
@@ -67,6 +69,15 @@ internal class Configurator(IServiceCollection services) : IConfigurator
         var serviceType = typeof(IConsumerDefinition<>)
             .MakeGenericType(configForConsumer.GetGenericArguments());
         Services.TryAddEnumerable(new ServiceDescriptor(serviceType, consumerDefinition,
+            ServiceLifetime.Singleton));
+    }
+
+    internal void AddMessageTypeDefinition(Type messageDefinition)
+    {
+        if (messageDefinition.GetGenericBaseType(typeof(MessageDefinition<>)) is not { } configForMessage) return;
+        var serviceType = typeof(IMessageDefinition<>)
+            .MakeGenericType(configForMessage.GetGenericArguments());
+        Services.TryAddEnumerable(new ServiceDescriptor(serviceType, messageDefinition,
             ServiceLifetime.Singleton));
     }
 }
