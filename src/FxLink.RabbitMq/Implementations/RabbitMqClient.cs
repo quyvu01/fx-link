@@ -1,12 +1,10 @@
 using System.Collections.Concurrent;
-using System.Reflection;
 using System.Threading.Channels;
 using FxLink.Abstractions;
 using FxLink.RabbitMq.Abstractions;
 using FxLink.RabbitMq.Entities;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RabbitMq.Registries;
-using FxLink.Registries;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,9 +17,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 {
     private readonly IRabbitMqConfiguration _rabbitMqConfiguration =
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
-
-    private static readonly ConcurrentDictionary<(Type ConsumerType, Type ConfiguratorType), MethodInfo>
-        GetConfiguratorInternalMethodCache = [];
 
     private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = [];
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
@@ -197,8 +192,11 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             {
                 var consumerType = c.Key;
                 var messageTypes = c.Select(g => g.MessageType).ToArray();
+                var consumerConfiguration = (serviceProvider
+                        .GetRequiredService(typeof(IConsumerConfiguratorResolver<>).MakeGenericType(consumerType)) as
+                    ConsumerConfiguratorResolver)!;
 
-                var receiveEndpointDefinition = GetConfigurator<IReceiveEndpointDefinition>(consumerType);
+                var receiveEndpointDefinition = consumerConfiguration.Resolve<IReceiveEndpointDefinition>();
 
                 var (queueName, autoDelete) = receiveEndpointDefinition switch
                 {
@@ -210,7 +208,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                 await DeclareTopologyAsync();
 
-                var dispatchDefinition = GetConfigurator<IConsumerDispatchDefinition>(consumerType)
+                var dispatchDefinition = consumerConfiguration.Resolve<IConsumerDispatchDefinition>()
                                          ?? ConsumerDispatchDefinition.FromConfiguration(_rabbitMqConfiguration);
                 var prefetchCount = dispatchDefinition.PrefetchCount;
                 var concurrentMessageLimit = dispatchDefinition.ConcurrentMessageLimit;
@@ -374,31 +372,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             var channel = await CreatePublishChannelAsync();
             await _channelPool.Writer.WriteAsync(channel);
         }
-    }
-
-    private TMessageConfigurator GetConfigurator<TMessageConfigurator>(Type consumerType)
-        where TMessageConfigurator : IConsumeConfigurator
-    {
-        var method = GetConfiguratorInternalMethodCache.GetOrAdd((consumerType, typeof(TMessageConfigurator)),
-            static key => BuildGetConfiguratorInternalMethod(key.ConsumerType, key.ConfiguratorType));
-        return (TMessageConfigurator)method.Invoke(this, null);
-    }
-
-    private static MethodInfo BuildGetConfiguratorInternalMethod(Type consumerType, Type configuratorType)
-    {
-        var openMethod = typeof(RabbitMqClient)
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
-            .Single(m => m.Name == nameof(GetConfigurator) && m.GetGenericArguments().Length == 2);
-        return openMethod.MakeGenericMethod(consumerType, configuratorType);
-    }
-
-    private TConsumerConfigurator GetConfigurator<TConsumer, TConsumerConfigurator>() where TConsumer : IConsumer
-        where TConsumerConfigurator : IConsumeConfigurator
-    {
-        var configurator = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
-        return configurator?.ConsumerConfigurator is not ConsumerConfigurator<TConsumer> consumerConfigurator
-            ? default
-            : consumerConfigurator.GetConfigurator<TConsumerConfigurator>(typeof(TConsumer));
     }
 
     private string GetExchangeName(Type messageType)
