@@ -23,10 +23,10 @@ internal abstract class AbstractRabbitMqConnector
 
 internal class RabbitMqClientConnector<TMessage>(
     IRabbitMqClient client,
-    IServiceProvider services) :
+    IServiceProvider serviceProvider) :
     AbstractRabbitMqConnector, IClientConnector<TMessage> where TMessage : class
 {
-    private readonly IDelayMessageProvider _delayMessageProvider = services.GetService<IDelayMessageProvider>();
+    private readonly IDelayMessageProvider _delayMessageProvider = serviceProvider.GetService<IDelayMessageProvider>();
 
     public async Task SendAsync(TMessage message, IContext context, CancellationToken token = default)
     {
@@ -85,14 +85,15 @@ internal class RabbitMqClientConnector<TMessage>(
         await client.PublishMessageAsync(new MessagePublisher(exchangeName, routingKey, props, messageBytes), token);
     }
 
-    private static string GetExchangeName(IContext context, string deliveryKind)
+    private string GetExchangeName(IContext context, string deliveryKind)
     {
         if (context is IResponseContext) return string.Empty;
+        var exchangeName = GetExchangeName();
         return deliveryKind switch
         {
-            DistributedConfigurators.DeliveryKinds.Retry => typeof(TMessage).GetRetryExchangeName(),
-            DistributedConfigurators.DeliveryKinds.DeadLetter => typeof(TMessage).GetDeadLetterExchangeName(),
-            _ => typeof(TMessage).GetExchangeName()
+            DistributedConfigurators.DeliveryKinds.Retry => exchangeName.GetRetryExchangeName(),
+            DistributedConfigurators.DeliveryKinds.DeadLetter => exchangeName.GetDeadLetterExchangeName(),
+            _ => exchangeName
         };
     }
 
@@ -106,7 +107,7 @@ internal class RabbitMqClientConnector<TMessage>(
 
         if (envelope is null) return;
 
-        using var scope = services.CreateScope();
+        using var scope = serviceProvider.CreateScope();
         var serverConnector = scope.ServiceProvider.GetRequiredService<IConsumerConnector<TMessage>>();
         var headers = envelope.Context.Headers;
         if (args.BasicProperties.ReplyTo is { Length: > 0 } replyTo)
@@ -135,8 +136,16 @@ internal class RabbitMqClientConnector<TMessage>(
             });
         if (serviceType is null) return Task.CompletedTask;
         var jsonBody = Encoding.UTF8.GetString(args.Body.Span);
-        var wireResultDispatcher = services.GetRequiredService(serviceType) as WireResultDispatcher;
+        var wireResultDispatcher = serviceProvider.GetRequiredService(serviceType) as WireResultDispatcher;
         wireResultDispatcher?.SetResult(jsonBody, args.CancellationToken);
         return Task.CompletedTask;
+    }
+
+    private string GetExchangeName()
+    {
+        var messageDefinition = serviceProvider.GetService<IMessageDefinition<TMessage>>();
+        return messageDefinition is not IMessageDefinition definition
+            ? typeof(TMessage).GetExchangeName()
+            : definition.MessageConfigurator.GetName();
     }
 }

@@ -4,6 +4,7 @@ using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RoutingSlip.Extensions;
 using Microsoft.OpenApi.Models;
+using Order.Dtos.MessageDefinitions;
 using Order.Dtos.Orders;
 using Order.TestRoutingSlip.Activities;
 using Order.TestRoutingSlip.Contracts;
@@ -39,6 +40,8 @@ builder.Services.AddFxLink(opts =>
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
 
     opts.AddConsumerDefinitionsFromAssemblies(typeof(Program).Assembly);
+
+    opts.AddMessageDefinitionsFromAssemblies(typeof(Program).Assembly);
 
     opts.AddRabbitMq(config =>
     {
@@ -136,6 +139,14 @@ app.MapPost("/test-routing-slip", async (IPublisher publisher, string name = "te
     .WithSummary("5-step order saga: ReserveInventory -> AddOrder -> ChargeOrderPayment -> ConfirmOrder -> " +
                  "NotifyCustomer. isFaultSimulation=true faults at ConfirmOrder, triggering compensate back " +
                  "through ChargeOrderPayment -> AddOrder -> ReserveInventory (NotifyCustomer never runs).")
+    .WithOpenApi();
+
+app.MapPost("/calendar/created", async (IPublisher publisher, Guid id, string name) =>
+    {
+        await publisher.PublishAsync<ICalendarCreated>(new { Id = id, Name = name });
+        return "Calendar created";
+    })
+    .WithTags("Calendar")
     .WithOpenApi();
 
 app.Run();

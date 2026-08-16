@@ -15,7 +15,7 @@ namespace FxLink.RabbitMq.Implementations;
 /// Default IDelayMessageProvider for FxLink.RabbitMq, backed by the RabbitMQ
 /// delayed-message-exchange plugin. Registered via IConfigurator.UseRabbitMqDelayScheduler().
 /// </summary>
-internal sealed class RabbitMqScheduleExchangeProvider(IRabbitMqClient client) :
+internal sealed class RabbitMqScheduleExchangeProvider(IRabbitMqClient client, IServiceProvider serviceProvider) :
     IDelayMessageProvider, IRabbitMqDelayTopology
 {
     private const string DelayedMessageExchangeType = "x-delayed-message";
@@ -23,7 +23,8 @@ internal sealed class RabbitMqScheduleExchangeProvider(IRabbitMqClient client) :
     public async Task DeclareTopologyAsync(IChannel channel, Type messageType, string queueName,
         CancellationToken cancellationToken = default)
     {
-        var delayExchange = messageType.GetDelayExchangeName();
+        var exchangeName = GetExchangeName(messageType);
+        var delayExchange = exchangeName.GetDelayExchangeName();
         await channel.ExchangeDeclareAsync(delayExchange, DelayedMessageExchangeType, durable: false,
             arguments: new Dictionary<string, object> { ["x-delayed-type"] = ExchangeType.Fanout },
             cancellationToken: cancellationToken);
@@ -34,7 +35,8 @@ internal sealed class RabbitMqScheduleExchangeProvider(IRabbitMqClient client) :
     public Task PublishDelayedAsync<TMessage>(TMessage message, IContext context, long delayInMs,
         CancellationToken cancellationToken = default) where TMessage : class
     {
-        var nativeHeaders = context.Headers.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+        var nativeHeaders =
+            context.Headers.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
         nativeHeaders["x-delay"] = delayInMs;
         var props = new BasicProperties
         {
@@ -50,13 +52,21 @@ internal sealed class RabbitMqScheduleExchangeProvider(IRabbitMqClient client) :
         var envelope = new Envelope<TMessage>(message, context);
         var serializedMessage = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
         var messageBytes = Encoding.UTF8.GetBytes(serializedMessage);
-
-        var delayExchange = typeof(TMessage).GetDelayExchangeName();
+        var exchangeName = GetExchangeName(typeof(TMessage));
+        var delayExchange = exchangeName.GetDelayExchangeName();
         // mandatory: false — the delayed-message-exchange plugin always reports NO_ROUTE for a
         // delayed publish (routing only happens after the delay elapses), even when the message
         // is delivered correctly. See MessagePublisher.Mandatory for details.
         return client.PublishMessageAsync(
             new MessagePublisher(delayExchange, routingKey, props, messageBytes, Mandatory: false),
             cancellationToken);
+    }
+
+    private string GetExchangeName(Type messageType)
+    {
+        var definition = serviceProvider.GetService(typeof(IMessageDefinition<>).MakeGenericType(messageType));
+        return definition is not IMessageDefinition messageDefinition
+            ? messageType.GetExchangeName()
+            : messageDefinition.MessageConfigurator.GetName();
     }
 }

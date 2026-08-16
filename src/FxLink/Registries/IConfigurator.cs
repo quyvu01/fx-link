@@ -8,7 +8,8 @@ public interface IConfigurator
 {
     IServiceCollection Services { get; }
     void AddConsumer<TConsumer>() where TConsumer : IConsumer;
-    void AddConsumerDefinition<TConsumerDefinition>() where TConsumerDefinition : IConsumerConfigurator;
+    void AddConsumerDefinition<TConsumerDefinition>() where TConsumerDefinition : IConsumerDefinition;
+    void AddMessageDefinition<TMessageDefinition>() where TMessageDefinition : IMessageDefinition;
     void UseInMemory();
     void ConfigureSupervisor(Action<ISupervisorOptions> options);
 }
