@@ -1,6 +1,3 @@
-using System.Collections.Concurrent;
-using System.Linq.Expressions;
-using System.Reflection;
 using FxLink.Abstractions;
 using FxLink.Configurators;
 using FxLink.Contexts;
@@ -16,9 +13,6 @@ namespace FxLink.InternalPipelineBehaviors;
 internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider serviceProvider)
     : IConsumerPipelineBehavior<TMessage> where TMessage : class
 {
-    private static readonly ConcurrentDictionary<Type, Func<RetryPipelineBehavior<TMessage>, IMessageRetryPolicy>>
-        RetryPolicyDelegateCache = new();
-
     public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
@@ -108,47 +102,12 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
 
     private IMessageRetryPolicy GetRetryPolicy(Type consumerType)
     {
-        var getter = RetryPolicyDelegateCache
-            .GetOrAdd(consumerType, BuildGetRetryPolicyDelegate);
-        return getter(this);
-    }
-
-    private static Func<RetryPipelineBehavior<TMessage>, IMessageRetryPolicy> BuildGetRetryPolicyDelegate(
-        Type consumerType)
-    {
-        var openMethod = typeof(RetryPipelineBehavior<TMessage>).GetMethod(
-            nameof(GetRetryPolicy),
-            BindingFlags.NonPublic | BindingFlags.Instance,
-            binder: null,
-            types: Type.EmptyTypes,
-            modifiers: null)!;
-
-        var closedMethod = openMethod.MakeGenericMethod(consumerType);
-
-        var instanceParam = Expression.Parameter(typeof(RetryPipelineBehavior<TMessage>), "instance");
-        var call = Expression.Call(instanceParam, closedMethod);
-
-        return Expression.Lambda<Func<RetryPipelineBehavior<TMessage>, IMessageRetryPolicy>>(call, instanceParam)
-            .Compile();
-    }
-
-    private IMessageRetryPolicy GetRetryPolicy<TConsumer>() where TConsumer : IConsumer
-    {
-        var consumerDefinition = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
-        switch (consumerDefinition)
-        {
-            case null:
-                return MessageRetryPolicy.DefaultMessageRetryPolicy;
-            case { ConsumerConfigurator: ConsumerConfigurator<TConsumer> cForConsumer }:
-            {
-                var messageRetryConfig = cForConsumer.GetConfigurator<IMessageRetryPolicy>(typeof(TMessage));
-                if (messageRetryConfig is not null) return messageRetryConfig;
-                var consumerRetryConfig = cForConsumer.GetConfigurator<IMessageRetryPolicy>(typeof(TConsumer));
-                if (consumerRetryConfig is not null) return consumerRetryConfig;
-                break;
-            }
-        }
-
+        var consumerDefinitionResolver = (IConsumerConfiguratorResolver)serviceProvider
+            .GetRequiredService(typeof(IConsumerConfiguratorResolver<>).MakeGenericType(consumerType));
+        var messageRetryConfigurator = consumerDefinitionResolver.Resolve<IMessageRetryPolicy>(typeof(TMessage));
+        if (messageRetryConfigurator is not null) return messageRetryConfigurator;
+        var consumerConfigurator = consumerDefinitionResolver.Resolve<IMessageRetryPolicy>(consumerType);
+        if (consumerConfigurator is not null) return consumerConfigurator;
         return MessageRetryPolicy.DefaultMessageRetryPolicy;
     }
 }

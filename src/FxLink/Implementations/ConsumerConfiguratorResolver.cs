@@ -1,19 +1,19 @@
 using FxLink.Abstractions;
-using FxLink.RabbitMq.Abstractions;
 using FxLink.Registries;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.RabbitMq.Implementations;
+namespace FxLink.Implementations;
 
 internal sealed class ConsumerConfiguratorResolver<TConsumer>(IServiceProvider serviceProvider)
     : IConsumerConfiguratorResolver<TConsumer>
     where TConsumer : IConsumer
 {
-    public TConsumerConfigurator Resolve<TConsumerConfigurator>() where TConsumerConfigurator : IConsumeConfigurator
+    public TConsumerConfigurator Resolve<TConsumerConfigurator>(Type targetType = null)
+        where TConsumerConfigurator : IConsumeConfigurator
     {
         var configurator = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
         return configurator?.ConsumerConfigurator is not ConsumerConfigurator<TConsumer> consumerConfigurator
             ? default
-            : consumerConfigurator.GetConfigurator<TConsumerConfigurator>(typeof(TConsumer));
+            : consumerConfigurator.GetConfigurator<TConsumerConfigurator>(targetType ?? typeof(TConsumer));
     }
 }
