@@ -194,7 +194,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 var messageTypes = c.Select(g => g.MessageType).ToArray();
                 var consumerConfiguration = (serviceProvider
                         .GetRequiredService(typeof(IConsumerConfiguratorResolver<>).MakeGenericType(consumerType)) as
-                    ConsumerConfiguratorResolver)!;
+                    IConsumerConfiguratorResolver)!;
 
                 var receiveEndpointDefinition = consumerConfiguration.Resolve<IReceiveEndpointDefinition>();
 
