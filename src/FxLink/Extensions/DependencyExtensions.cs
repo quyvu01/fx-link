@@ -10,33 +10,34 @@ namespace FxLink.Extensions;
 
 public static class DependencyExtensions
 {
-    public static IDistributedConfigurator AddFxLink(this IServiceCollection serviceCollection,
+    public static IDistributedConfigurator AddFxLink(this IServiceCollection services,
         Action<IConfigurator> options)
     {
-        var configurator = new Configurator(serviceCollection);
+        var configurator = new Configurator(services);
         options?.Invoke(configurator);
-        serviceCollection.AddSingleton(configurator.MessageKeys);
-        serviceCollection.AddScoped<IPublisher, Publisher>();
-        serviceCollection.AddScoped(typeof(IConsumerConnector<>), typeof(ConsumerConnector<>));
-        serviceCollection.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
-        serviceCollection.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));
-        serviceCollection.AddSingleton(configurator.SupervisorOptions);
-        serviceCollection.AddSingleton<InMemoryResponseProcessor>();
+        services.AddSingleton(configurator.MessageKeys);
+        services.AddScoped<IPublisher, Publisher>();
+        services.AddScoped(typeof(IConsumerConnector<>), typeof(ConsumerConnector<>));
+        services.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
+        services.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));
+        services.AddSingleton(configurator.SupervisorOptions);
+        services.AddSingleton<InMemoryResponseProcessor>();
 
-        serviceCollection.AddSingleton<IInMemoryResponseSetter>(sp =>
-            sp.GetRequiredService<InMemoryResponseProcessor>());
-        serviceCollection.AddSingleton<IInMemoryResponseGetter>(sp =>
-            sp.GetRequiredService<InMemoryResponseProcessor>());
+        services.AddSingleton<IInMemoryResponseSetter>(sp => sp.GetRequiredService<InMemoryResponseProcessor>());
+        services.AddSingleton<IInMemoryResponseGetter>(sp => sp.GetRequiredService<InMemoryResponseProcessor>());
 
-        serviceCollection.AddSingleton(typeof(IRequester<>), typeof(Requester<>));
+        services.AddSingleton(typeof(IRequester<>), typeof(Requester<>));
+
+        services.AddSingleton(typeof(IConsumerConfiguratorResolver<>), typeof(ConsumerConfiguratorResolver<>));
 
         configurator.AddConsumerPipelineBehaviors(c => c
             .Of(typeof(RetryPipelineBehavior<>))
         );
 
         configurator.AddPublisherPipelineBehaviors(c => c
-            .Of(typeof(PublisherErrorPipelineBehavior<>)));
+            .Of(typeof(PublisherErrorPipelineBehavior<>))
+        );
 
-        return new DistributedConfigurator(serviceCollection);
+        return new DistributedConfigurator(services);
     }
 }
