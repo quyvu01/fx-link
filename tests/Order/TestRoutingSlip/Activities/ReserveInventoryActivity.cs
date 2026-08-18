@@ -14,7 +14,6 @@ public sealed class ReserveInventoryActivity(ILogger<ReserveInventoryActivity> l
         logger.LogInformation("[ReserveInventoryActivity] args: {@Args}", context.Argument);
         await Task.Delay(TimeSpan.FromSeconds(1), token);
         var reservationId = Guid.NewGuid();
-        logger.LogInformation("[ReserveInventoryActivity] reserved: {ReservationId}", reservationId);
         return context.Completed(new ReserveInventoryLog
         {
             Name = context.Argument.Name, ReservationId = reservationId

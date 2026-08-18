@@ -1,6 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Contexts;
 using FxLink.RoutingSlip.Abstractions;
+using FxLink.RoutingSlip.Extensions;
 using Order.TestRoutingSlip.Arguments;
 using Order.TestRoutingSlip.Contracts;
 
@@ -20,6 +21,7 @@ public class TestOrderConsumer(ILogger<TestOrderConsumer> logger, IRoutingSlipEx
         // compensate: ChargeOrderPayment -> AddOrder -> ReserveInventory. NotifyCustomer never runs.
         await executor.RunAsync(cfg => cfg
             .AddArgument(new ReserveInventoryArgs { Name = message.Name, Quantity = 1 })
+            .AddArgument(new Uri("queue:reverse-inventory-args"), new { message.Name })
             .AddArgument(new AddOrderArgs { Name = message.Name })
             .AddArgument(new ChargeOrderPaymentArgs { Name = message.Name, Amount = 100 })
             .AddArgument(new ConfirmOrderArgs { Name = message.Name, IsFaultSimulation = message.IsFaultSimulation })

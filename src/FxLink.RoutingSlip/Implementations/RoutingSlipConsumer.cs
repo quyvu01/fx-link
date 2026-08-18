@@ -8,18 +8,29 @@ using FxLink.RoutingSlip.Configurators;
 using FxLink.RoutingSlip.Contexts;
 using FxLink.RoutingSlip.Entities;
 using FxLink.RoutingSlip.Extensions;
+using FxLink.RoutingSlip.Registries;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FxLink.RoutingSlip.Implementations;
 
-internal class RoutingSlipConsumer<TVariable>(IServiceProvider services, ILogger<RoutingSlipConsumer<TVariable>> logger)
+internal class RoutingSlipConsumer<TVariable>(
+    IServiceProvider services,
+    IDynamicActivityRegistry dynamicActivityRegistry,
+    ILogger<RoutingSlipConsumer<TVariable>> logger)
     : IConsumer<TVariable> where TVariable : class
 {
     private static readonly ConcurrentDictionary<(Type ArgumentType, Type ConsumerType), Type> ActivityLookup = [];
-    
+
     private static readonly ConcurrentDictionary<Type, (Type ArgumentType, Type LogType)?> CompensateShapeLookup = [];
+
+    // Same shape as CompensateShapeLookup, generalized to also cover the no-logs case (LogType can
+    // itself be null even when a match is found). Only the DynamicRoutingMessage branch needs
+    // this: there, argumentType isn't known upfront the way it is for a normal typed delivery
+    // (there, the wire's own exchange already implies TVariable) — it has to be discovered from
+    // consumerType's own IExecuteActivity<>/IExecuteActivity<,> shape, same as compensate does.
+    private static readonly ConcurrentDictionary<Type, (Type ArgumentType, Type LogType)?> DynamicShapeLookup = [];
 
     public async Task ConsumeAsync(IConsumerContext<TVariable> context, CancellationToken token = default)
     {
@@ -32,9 +43,17 @@ internal class RoutingSlipConsumer<TVariable>(IServiceProvider services, ILogger
         var consumerContextWrapped = context.GetPayload<ConsumerContextWrapped>();
         var consumerType = consumerContextWrapped.ConsumerType;
         if (!typeof(IExecuteActivity).IsAssignableFrom(consumerType)) return;
+
         if (context.Message is ActivityLogEntry logEntry)
         {
             await CompensateAsync(logEntry, consumerType, activityLog, variables, context, token);
+            return;
+        }
+
+        if (context.Message is DynamicRoutingMessage dynamicMessage)
+        {
+            await ConsumeDynamicAsync(dynamicMessage, consumerType, remainingItinerary, activityLog, variables,
+                context, token);
             return;
         }
 
@@ -62,27 +81,78 @@ internal class RoutingSlipConsumer<TVariable>(IServiceProvider services, ILogger
                 return proxyOpenType.MakeGenericType(genericArguments);
             });
         if (activityProxyType is null) return;
-        var activity = services.GetService(activityProxyType);
-        switch (activity)
+        var activityProxy = services.GetService(activityProxyType);
+        await DispatchExecuteAsync(activityProxy, context.Message, argumentType, remainingItinerary, activityLog,
+            variables, context, token);
+    }
+
+    // Entry point for a Uri-addressed step. consumerType is already correctly resolved (each
+    // dynamically-addressed activity gets its own queue on DynamicRoutingMessage's shared exchange,
+    // per RoutingSlipConfigurator), so this only needs to (a) confirm the message is actually meant
+    // for THIS activityType — several activities share the fanout, same as ActivityLogEntry — and
+    // (b) recover the real argument type/shape that AddActivity<TActivity>(uri) discovered via
+    // reflection at startup, since the sender never had (or wanted) a compile-time reference to it.
+    private async Task ConsumeDynamicAsync(DynamicRoutingMessage message, Type consumerType,
+        IReadOnlyList<ItineraryStep> remainingItineraries, IReadOnlyList<ActivityLogEntry> activityLogs,
+        IHeaders variables, IContext context, CancellationToken token)
+    {
+        var myDestination = dynamicActivityRegistry.GetDestination(consumerType);
+        if (myDestination is null || myDestination != message.Destination)
+            return; // this call belongs to a different activity sharing the fanout exchange
+
+        var shape = DynamicShapeLookup.GetOrAdd(consumerType, static type =>
+        {
+            var executeActivityInterface = type.GetInterfaces()
+                .Where(a => a.IsGenericType)
+                .FirstOrDefault(a => a.GetGenericTypeDefinition() == typeof(IExecuteActivity<>) ||
+                                     a.GetGenericTypeDefinition() == typeof(IExecuteActivity<,>));
+            if (executeActivityInterface is null) return null;
+            var genericArguments = executeActivityInterface.GetGenericArguments();
+            return (genericArguments[0], genericArguments.Length == 2 ? genericArguments[1] : null);
+        });
+        if (shape is not { } resolvedShape) return;
+
+        var (argumentType, logType) = resolvedShape;
+        var argument = JsonSerializer.Deserialize(message.Json, argumentType,
+            DistributedConfigurators.JsonSerializerOptions);
+
+        var activityProxyType = logType is null
+            ? typeof(IExecuteActivityProxy<>).MakeGenericType(argumentType)
+            : typeof(IExecuteActivityProxy<,>).MakeGenericType(argumentType, logType);
+        var activityProxy = services.GetService(activityProxyType);
+
+        await DispatchExecuteAsync(activityProxy, argument, argumentType, remainingItineraries, activityLogs,
+            variables, context, token);
+    }
+
+    // Shared by the normal typed path and the dynamic (Uri) path once each has resolved: the real
+    // argument object, its real type, and the matching activity proxy instance. Everything past
+    // that point — call Execute, branch on Completed/Fault, advance or compensate — is identical
+    // regardless of how the caller found its way here.
+    private async Task DispatchExecuteAsync(object activityProxy, object argument, Type argumentType,
+        IReadOnlyList<ItineraryStep> remainingItineraries, IReadOnlyList<ActivityLogEntry> activityLogs,
+        IHeaders variables, IContext context, CancellationToken token)
+    {
+        switch (activityProxy)
         {
             case ExecuteActivityArgProxy executeActivityArgProxy:
             {
-                var result = await executeActivityArgProxy.ExecuteAsync(context.Message, context, token);
+                var result = await executeActivityArgProxy.ExecuteAsync(argument, context, token);
                 if (result.IsCompleted)
                 {
-                    await PublishNextAsync(remainingItinerary, activityLog, variables, context, token);
+                    await PublishNextAsync(remainingItineraries, activityLogs, variables, context, token);
                     return;
                 }
 
                 logger.LogWarning(result.Exception,
                     "[RoutingSlipConsumer] Execute faulted for {ArgumentType} on routing slip " +
                     "{CorrelationId}; starting compensate.", argumentType.Name, context.CorrelationId);
-                await PublishCompensateAsync(activityLog, variables, context, token);
+                await PublishCompensateAsync(activityLogs, variables, context, token);
                 return;
             }
             case ExecuteActivityArgLogProxy executeActivityArgLogProxy:
             {
-                var result = await executeActivityArgLogProxy.ExecuteAsync(context.Message, context, token);
+                var result = await executeActivityArgLogProxy.ExecuteAsync(argument, context, token);
                 if (result.IsCompleted)
                 {
                     var completedEntry = new ActivityLogEntry(
@@ -90,16 +160,16 @@ internal class RoutingSlipConsumer<TVariable>(IServiceProvider services, ILogger
                         result.Log?.GetType().AssemblyQualifiedName,
                         JsonSerializer.Serialize(result.Log, result.Log?.GetType() ?? typeof(object),
                             DistributedConfigurators.JsonSerializerOptions));
-                    ActivityLogEntry[] updatedActivityLog = [.. activityLog ?? [], completedEntry];
+                    ActivityLogEntry[] updatedActivityLog = [.. activityLogs ?? [], completedEntry];
 
-                    await PublishNextAsync(remainingItinerary, updatedActivityLog, variables, context, token);
+                    await PublishNextAsync(remainingItineraries, updatedActivityLog, variables, context, token);
                     return;
                 }
 
                 logger.LogWarning(result.Exception,
                     "[RoutingSlipConsumer] Execute faulted for {ArgumentType} on routing slip " +
                     "{CorrelationId}; starting compensate.", argumentType.Name, context.CorrelationId);
-                await PublishCompensateAsync(activityLog, variables, context, token);
+                await PublishCompensateAsync(activityLogs, variables, context, token);
                 return;
             }
         }
