@@ -13,9 +13,17 @@ internal sealed class RoutingSlipConfigurator(IServiceCollection services) : IRo
     internal IReadOnlyDictionary<Type, List<Type>> MessageKeys => _messageKeys;
     private readonly ConcurrentDictionary<Type, List<Type>> _messageKeys = [];
     private readonly HashSet<ActivityData> _activitiesData = [];
+    private readonly Dictionary<Type, string> _dynamicDestinations = [];
 
     public IRoutingSlipConfigurator AddActivity<TActivity>() where TActivity : IExecuteActivity =>
         AddActivityInternal(typeof(TActivity));
+
+    public IRoutingSlipConfigurator AddActivity<TActivity>(Uri uri) where TActivity : IExecuteActivity
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        _dynamicDestinations[typeof(TActivity)] = uri.ToString();
+        return AddActivityInternal(typeof(TActivity));
+    }
 
     private IRoutingSlipConfigurator AddActivityInternal(Type activityType)
     {
@@ -39,6 +47,8 @@ internal sealed class RoutingSlipConfigurator(IServiceCollection services) : IRo
 
     internal void Build()
     {
+        services.AddSingleton<IDynamicActivityRegistry>(new DynamicActivityRegistry(_dynamicDestinations));
+
         foreach (var activityData in _activitiesData)
         {
             RegisterConsumer(activityData);
@@ -64,6 +74,9 @@ internal sealed class RoutingSlipConfigurator(IServiceCollection services) : IRo
         var (activityType, argumentsType, logsType) = activityData;
         RegisterConsumer(activityType, argumentsType);
         if (logsType is not null) RegisterConsumer(activityType, typeof(ActivityLogEntry));
+        // Opted into Uri addressing (AddActivity<TActivity>(uri)) — also give it a queue on the
+        // shared DynamicRoutingMessage exchange, alongside its normal typed-argument one.
+        if (_dynamicDestinations.ContainsKey(activityType)) RegisterConsumer(activityType, typeof(DynamicRoutingMessage));
     }
 
     private void RegisterConsumer(Type serviceKey, Type messageType)

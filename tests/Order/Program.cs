@@ -52,6 +52,7 @@ builder.Services.AddFxLink(opts =>
 
     opts.AddRoutingSlip(cfg => cfg
         .AddActivity<ReserveInventoryActivity>()
+        .AddActivity<DynamicActivity>(new Uri("queue:reverse-inventory-args"))
         .AddActivity<AddOrderActivity>()
         .AddActivity<ChargeOrderPaymentActivity>()
         .AddActivity<ConfirmOrderActivity>()
