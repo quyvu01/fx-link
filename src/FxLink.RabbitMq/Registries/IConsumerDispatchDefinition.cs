@@ -2,7 +2,7 @@ using FxLink.Registries;
 
 namespace FxLink.RabbitMq.Registries;
 
-internal interface IConsumerDispatchDefinition : IConsumeConfigurator
+internal interface IConsumerDispatchDefinition : IOption
 {
     public ushort PrefetchCount { get; }
     public ushort ConcurrentMessageLimit { get; }

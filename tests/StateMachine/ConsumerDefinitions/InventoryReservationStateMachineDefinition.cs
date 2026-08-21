@@ -1,5 +1,4 @@
 using FxLink.Abstractions;
-using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.Registries;
 using StateMachine.Dtos.Inventory;

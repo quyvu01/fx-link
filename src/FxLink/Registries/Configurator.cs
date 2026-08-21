@@ -59,9 +59,21 @@ internal class Configurator(IServiceCollection services) : IConfigurator
                 var messageType = serviceType.GetGenericArguments()[0];
                 Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey: consumerType,
                     implementationType: consumerType, ServiceLifetime.Scoped));
-                MessageKeys.AddMessageKey(messageType, consumerType);
+
+                // A batch consumer (IConsumer<IBatch<TMessage>>) still receives TMessage off the
+                // wire one at a time — IBatch<TMessage> is a purely in-process accumulation wrapper,
+                // never published/serialized. Transports (e.g. RabbitMqClient, driven by
+                // IMessageKeys.GetMessageKeys()) must subscribe using the unwrapped TMessage, not
+                // IBatch<TMessage>, or they'd try to bind a queue for a type that never arrives.
+                var wireMessageType = UnwrapBatchMessageType(messageType);
+                MessageKeys.AddMessageKey(wireMessageType, consumerType);
             });
     }
+
+    private static Type UnwrapBatchMessageType(Type messageType) =>
+        messageType.IsGenericType && messageType.GetGenericTypeDefinition() == typeof(IBatch<>)
+            ? messageType.GetGenericArguments()[0]
+            : messageType;
 
     internal void AddConsumerTypeDefinition(Type consumerDefinition)
     {

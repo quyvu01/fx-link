@@ -9,7 +9,7 @@ internal sealed class ConsumerConfiguratorResolver<TConsumer>(IServiceProvider s
     where TConsumer : IConsumer
 {
     public TConsumerConfigurator Resolve<TConsumerConfigurator>(Type targetType = null)
-        where TConsumerConfigurator : IConsumeConfigurator
+        where TConsumerConfigurator : IOption
     {
         var configurator = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
         return configurator?.ConsumerConfigurator is not AbstractConsumerConfigurator consumerConfigurator
