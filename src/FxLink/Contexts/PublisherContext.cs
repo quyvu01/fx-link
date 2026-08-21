@@ -4,13 +4,13 @@ namespace FxLink.Contexts;
 
 public class PublisherContext : AbstractContext, IPublisherContext
 {
-    internal PublisherContext(Guid correlationId, IHeaders headers)
-        : base(correlationId, headers)
+    internal PublisherContext(IHeaders headers, Guid correlationId)
+        : base(headers, correlationId)
     {
     }
 
     public PublisherContext(IContext context)
-        : this(context.CorrelationId, new HeaderBag(context.Headers))
+        : this(new HeaderBag(context.Headers), context.CorrelationId)
     {
         if (context is not IPublisherContext p) return;
         DelayTime = p.DelayTime;
@@ -25,5 +25,5 @@ public class PublisherContext : AbstractContext, IPublisherContext
     public Guid? RequesterId { get; set; }
 
     internal static PublisherContext New(IDictionary<string, object> headers = null) =>
-        new(Id.New(), new HeaderBag(headers ?? new Dictionary<string, object>()));
+        new(new HeaderBag(headers ?? new Dictionary<string, object>()), Id.New());
 }

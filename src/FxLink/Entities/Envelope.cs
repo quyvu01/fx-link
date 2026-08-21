@@ -12,6 +12,7 @@ public sealed record ConsumerContextEnvelope<TMessage> where TMessage : class
 
 public sealed record ConsumerContextSerializable
 {
+    public Guid MessageId { get; set; }
     public Guid? RequesterId { get; set; }
     public Guid CorrelationId { get; set; }
     public IHeaders Headers { get; set; }

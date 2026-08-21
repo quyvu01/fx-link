@@ -2,8 +2,8 @@ namespace FxLink.Contexts;
 
 public class ResponseContext : AbstractContext, IResponseContext
 {
-    internal ResponseContext(Guid requesterId, Guid correlationId, IHeaders headers, TimeSpan? timeToLive = null)
-        : base(correlationId, headers)
+    internal ResponseContext(IHeaders headers, Guid correlationId, Guid requesterId, TimeSpan? timeToLive = null)
+        : base(headers, correlationId)
     {
         RequesterId = requesterId;
         TimeToLive = timeToLive;
@@ -14,8 +14,8 @@ public class ResponseContext : AbstractContext, IResponseContext
     // originating request's TimeToLive (if the source context is a consumed request, i.e.
     // IConsumerContext) so RabbitMqClientConnector can set the same wire-level expiration on the way
     // back.
-    public ResponseContext(Guid requesterId, IContext context)
-        : this(requesterId, context.CorrelationId, new HeaderBag(context.Headers),
+    public ResponseContext(IContext context, Guid requesterId)
+        : this(new HeaderBag(context.Headers), context.CorrelationId, requesterId,
             (context as IConsumerContext)?.TimeToLive)
     {
     }
@@ -27,12 +27,12 @@ public class ResponseContext : AbstractContext, IResponseContext
 internal sealed class ResponseContext<TResponse> : ResponseContext, IResponseContext<TResponse>
     where TResponse : class
 {
-    internal ResponseContext(TResponse message, Guid requesterId, Guid correlationId, IHeaders headers,
+    internal ResponseContext(TResponse message, IHeaders headers, Guid correlationId, Guid requesterId,
         TimeSpan? timeToLive = null)
-        : base(requesterId, correlationId, headers, timeToLive) => Message = message;
+        : base(headers, correlationId, requesterId, timeToLive) => Message = message;
 
-    public ResponseContext(TResponse message, Guid requesterId, IContext context)
-        : this(message, requesterId, context.CorrelationId, new HeaderBag(context.Headers),
+    public ResponseContext(TResponse message, IContext context, Guid requesterId)
+        : this(message, new HeaderBag(context.Headers), context.CorrelationId, requesterId,
             (context as IConsumerContext)?.TimeToLive)
     {
     }

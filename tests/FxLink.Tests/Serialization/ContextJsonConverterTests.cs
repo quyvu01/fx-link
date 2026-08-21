@@ -65,8 +65,8 @@ public class ContextJsonConverterTests
         var received = JsonSerializer.Deserialize<ConsumerContextEnvelope<Payload>>(json,
             DistributedConfigurators.JsonSerializerOptions);
 
-        var consumerContext = new ConsumerContext<Payload>(received.Message, received.Context.RequesterId,
-            received.Context.CorrelationId, received.Context.Headers,
+        var consumerContext = new ConsumerContext<Payload>(received.Message, received.Context.Headers,
+            received.Context.CorrelationId, received.Context.RequesterId,
             received.Context.SentTime, received.Context.HostInfo);
 
         consumerContext.SentTime.ShouldBe(senderContext.SentTime);

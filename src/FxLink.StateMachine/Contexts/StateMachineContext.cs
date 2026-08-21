@@ -1,23 +1,27 @@
 using FxLink.Contexts;
 using FxLink.StateMachine.Abstractions;
+using FxLink.Statics;
 
 namespace FxLink.StateMachine.Contexts;
 
 internal class StateMachineContext<TInstance, TMessage>(
     TInstance instance,
     TMessage message,
-    Guid? requesterId,
+    IHeaders headers,
     Guid correlationId,
-    IHeaders headers)
+    Guid? requesterId,
+    Guid? messageId = null)
     : StateMachineContextPayload, IStateMachineContext<TInstance, TMessage>
     where TInstance : IStateMachineInstance
     where TMessage : class
 {
-    public StateMachineContext(TInstance instance, TMessage message, Guid? requesterId, IContext context) :
-        this(instance, message, requesterId, context.CorrelationId, new HeaderBag(context.Headers))
+    public StateMachineContext(TInstance instance, TMessage message, IContext context, Guid? requesterId) :
+        this(instance, message, new HeaderBag(context.Headers), context.CorrelationId, requesterId,
+            context.MessageId)
     {
     }
 
+    public Guid MessageId { get; } = messageId ?? Id.New();
     public Guid? RequesterId { get; } = requesterId;
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Contexts.HostInfo.Current;
@@ -29,17 +33,19 @@ internal class StateMachineContext<TInstance, TMessage>(
 
 internal class StateMachineContext<TInstance>(
     TInstance instance,
-    Guid? requesterId,
+    IHeaders headers,
     Guid correlationId,
-    IHeaders headers)
+    Guid? requesterId,
+    Guid? messageId = null)
     : StateMachineContextPayload, IStateMachineContext<TInstance>
     where TInstance : IStateMachineInstance
 {
-    internal StateMachineContext(TInstance instance, Guid? requesterId, IContext context) :
-        this(instance, requesterId, context.CorrelationId, new HeaderBag(context.Headers))
+    internal StateMachineContext(TInstance instance, IContext context, Guid? requesterId) :
+        this(instance, new HeaderBag(context.Headers), context.CorrelationId, requesterId, context.MessageId)
     {
     }
 
+    public Guid MessageId { get; } = messageId ?? Id.New();
     public Guid? RequesterId { get; } = requesterId;
     public DateTime? SentTime { get; } = DateTime.UtcNow;
     public IHostInfo HostInfo => FxLink.Contexts.HostInfo.Current;

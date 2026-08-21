@@ -8,10 +8,10 @@ namespace FxLink.RoutingSlip.Contexts;
 internal sealed class CompensateContext<TLog>
     : AbstractContext, ICompensateContext<TLog> where TLog : class
 {
-    public CompensateContext(TLog log, Guid correlationId, IHeaders headers)
-        : base(correlationId, headers) => Log = log;
+    public CompensateContext(TLog log, IHeaders headers, Guid correlationId)
+        : base(headers, correlationId) => Log = log;
 
-    public CompensateContext(TLog log, IContext context) : base(context.CorrelationId, context.Headers)
+    public CompensateContext(TLog log, IContext context) : base(context.Headers, context.CorrelationId)
         => Log = log;
 
     public TLog Log { get; }
