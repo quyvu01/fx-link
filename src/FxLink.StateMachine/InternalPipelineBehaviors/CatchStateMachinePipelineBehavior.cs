@@ -14,7 +14,7 @@ internal sealed class CatchStateMachinePipelineBehavior<TMessage>(
     ILogger<CatchStateMachinePipelineBehavior<TMessage>> logger)
     : IConsumerPipelineBehavior<TMessage> where TMessage : class
 {
-    public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
+    public async Task ConsumeAsync(IConsumeContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
         try

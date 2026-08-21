@@ -12,7 +12,7 @@ internal sealed class ConsumerConfiguratorResolver<TConsumer>(IServiceProvider s
         where TConsumerConfigurator : IConsumeConfigurator
     {
         var configurator = serviceProvider.GetService<IConsumerDefinition<TConsumer>>();
-        return configurator?.ConsumerConfigurator is not ConsumerConfigurator<TConsumer> consumerConfigurator
+        return configurator?.ConsumerConfigurator is not AbstractConsumerConfigurator consumerConfigurator
             ? default
             : consumerConfigurator.GetConfigurator<TConsumerConfigurator>(targetType ?? typeof(TConsumer));
     }

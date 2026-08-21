@@ -8,12 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Contexts;
 
-public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMessage>
+public class ConsumeContext<TMessage> : AbstractContext, IConsumeContext<TMessage>
     where TMessage : class
 {
     private readonly ConcurrentDictionary<Type, Lazy<object>> _contextPayloads = [];
 
-    internal ConsumerContext(TMessage message, IHeaders headers, Guid correlationId, Guid? requesterId,
+    internal ConsumeContext(TMessage message, IHeaders headers, Guid correlationId, Guid? requesterId,
         DateTime? sentTime = null, IHostInfo hostInfo = null, TimeSpan? timeToLive = null, Guid? messageId = null)
         : base(headers, correlationId, sentTime, hostInfo, messageId)
     {
@@ -22,9 +22,9 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
         TimeToLive = timeToLive;
     }
 
-    public ConsumerContext(TMessage message, IContext context, Guid? requesterId)
+    public ConsumeContext(TMessage message, IContext context, Guid? requesterId)
         : this(message, new HeaderBag(context.Headers), context.CorrelationId, requesterId,
-            context.SentTime, context.HostInfo, (context as IConsumerContext)?.TimeToLive, context.MessageId)
+            context.SentTime, context.HostInfo, (context as IConsumeContext)?.TimeToLive, context.MessageId)
     {
     }
 
@@ -44,7 +44,7 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
     public Task ResponseAsync<TResponse>(object message, CancellationToken token = default) where TResponse : class =>
         ResponseAsync(MessageContractActivator.CreateFrom<TResponse>(message), token);
 
-    public async Task PublishAsync<T>(T message, Action<IPublisherContext> contextOptions,
+    public async Task PublishAsync<T>(T message, Action<IPublishContext> contextOptions,
         CancellationToken token = default) where T : class
     {
         var services = GetPayload<IServiceProvider>();

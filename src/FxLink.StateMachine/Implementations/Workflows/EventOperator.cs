@@ -172,7 +172,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
         async Task ActionAsync(IStateMachineContext<TInstance, TMessage> context, CancellationToken ct)
         {
             var message = await messageFactoryAsync.Invoke(context, ct);
-            var consumerContext = new ConsumerContext<TMessage>
+            var consumerContext = new ConsumeContext<TMessage>
                 (context.Message, context.Headers, context.CorrelationId, context.RequesterId,
                     messageId: context.MessageId);
             await consumerContext.ResponseAsync(message, ct);
@@ -224,7 +224,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
             var headers = new HeaderBag(context.Headers)
                 .With(DistributedConfigurators.Headers.DeliveryKindKey, DistributedConfigurators.DeliveryKinds.Delay)
                 .With(DistributedConfigurators.Headers.MessageRoutingKey, schedule.Name);
-            var publisherContext = new PublisherContext(headers, context.CorrelationId)
+            var publisherContext = new PublishContext(headers, context.CorrelationId)
             {
                 DelayTime = delay,
                 ScheduleToken = tokenId
@@ -304,7 +304,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
                 var server = sp.GetRequiredService<IConsumerConnector<TResponse>>();
                 var headers = new HeaderBag(context.Headers)
                     .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
-                var consumerContext = new ConsumerContext<TResponse>(response,
+                var consumerContext = new ConsumeContext<TResponse>(response,
                     headers, context.CorrelationId, requestContext.RequesterId);
                 await server.ConsumeAsync(consumerContext, consumerType, ct);
             }, async (sp, rq, ex) =>
@@ -313,7 +313,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
                 var faultResponse = new Fault<TRequest>(rq).FromException(ex);
                 var headers = new HeaderBag(context.Headers)
                     .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
-                var ctx = new ConsumerContext<Fault<TRequest>>(faultResponse, headers,
+                var ctx = new ConsumeContext<Fault<TRequest>>(faultResponse, headers,
                     context.CorrelationId, requestContext.RequesterId);
                 await server.ConsumeAsync(ctx, consumerType, ct);
             }, async (sp, rq) =>
@@ -323,7 +323,7 @@ internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event
                     DateTime.UtcNow.Add(timeout), context.RequesterId);
                 var headers = new HeaderBag(context.Headers)
                     .With(DistributedConfigurators.Headers.MessageRoutingKey, request.Name);
-                var ctx = new ConsumerContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
+                var ctx = new ConsumeContext<RequestTimeoutExpired<TRequest>>(timeoutResponse,
                     headers, context.CorrelationId, requestContext.RequesterId);
                 await server.ConsumeAsync(ctx, consumerType, ct);
             }, ct);

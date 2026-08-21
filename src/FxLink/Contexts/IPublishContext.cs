@@ -1,6 +1,6 @@
 namespace FxLink.Contexts;
 
-public interface IPublisherContext : IContext
+public interface IPublishContext : IContext
 {
     TimeSpan? DelayTime { get; set; }
     TimeSpan? TimeToLive { get; set; }

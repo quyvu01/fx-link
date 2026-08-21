@@ -4,7 +4,7 @@ namespace FxLink.Abstractions;
 
 public interface IPublisher : IMessageAction
 {
-    Task PublishAsync<TMessage>(TMessage message, Action<IPublisherContext> contextOptions,
+    Task PublishAsync<TMessage>(TMessage message, Action<IPublishContext> contextOptions,
         CancellationToken token = default) where TMessage : class;
 
     Task PublishAsync<TMessage>(TMessage message, CancellationToken token = default) where TMessage : class;

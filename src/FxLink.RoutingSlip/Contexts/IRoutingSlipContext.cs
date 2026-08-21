@@ -3,7 +3,7 @@ using FxLink.RoutingSlip.Entities;
 
 namespace FxLink.RoutingSlip.Contexts;
 
-public interface IRoutingSlipContext : IPublisherContext
+public interface IRoutingSlipContext : IPublishContext
 {
     IReadOnlyList<ItineraryStep> RemainingItineraries { get; }                                                                                                                                                      
     IReadOnlyList<ActivityLogEntry> ActivityLogs { get; }                                                                                                                                                          

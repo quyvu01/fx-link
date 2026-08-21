@@ -18,7 +18,7 @@ internal class InMemoryInMemoryMessage<TMessage>
     private void PushToDelayChannel(MessageData<TMessage> item, TimeSpan delay) => _ = Task.Run(async () =>
     {
         var token = CancellationToken.None;
-        if (item.Context is IPublisherContext { ScheduleToken: { } scheduleToken })
+        if (item.Context is IPublishContext { ScheduleToken: { } scheduleToken })
             token = _dispatcher.AcquiredToken(scheduleToken, delay);
 
         await Task.Delay(delay, token);
@@ -34,7 +34,7 @@ internal class InMemoryInMemoryMessage<TMessage>
             {
                 await _inboundRing.WaitAsync();
                 if (!_inboundMessages.TryDequeue(out var messageData)) continue;
-                if (messageData.Context is IPublisherContext { DelayTime: { } delay })
+                if (messageData.Context is IPublishContext { DelayTime: { } delay })
                 {
                     PushToDelayChannel(messageData, delay);
                     continue;

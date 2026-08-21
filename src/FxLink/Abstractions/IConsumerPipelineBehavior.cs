@@ -7,6 +7,6 @@ public interface IConsumerPipelineBehavior;
 
 public interface IConsumerPipelineBehavior<in TMessage> : IConsumerPipelineBehavior where TMessage : class
 {
-    Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
+    Task ConsumeAsync(IConsumeContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default);
 }

@@ -11,6 +11,6 @@ public interface IStateMachine : IConsumer
     IState[] States { get; }
     IReadOnlyDictionary<IActivity, IActivityConfigurator> InternalActivityConfigurators { get; }
 
-    Task RaiseEventAsync<TMessage>(IConsumerContext<TMessage> context, CancellationToken token = default)
+    Task RaiseEventAsync<TMessage>(IConsumeContext<TMessage> context, CancellationToken token = default)
         where TMessage : class;
 }

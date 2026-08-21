@@ -9,7 +9,7 @@ internal sealed class PublisherPipelineBehaviorOrchestrator<TMessage>(IServicePr
     where TMessage : class
 {
     // Just lazy load pipeline behaviors and client because sometimes we want to defer services loaded on pipelines and client
-    public async Task ExecuteAsync(TMessage message, IPublisherContext context, CancellationToken token = default)
+    public async Task ExecuteAsync(TMessage message, IPublishContext context, CancellationToken token = default)
     {
         var client = serviceProvider.GetRequiredService<IClientConnector<TMessage>>();
         var pipelineBehaviors = serviceProvider

@@ -5,7 +5,7 @@ using FxLink.RoutingSlip.Extensions;
 
 namespace FxLink.RoutingSlip.Contexts;
 
-internal sealed class RoutingSlipContext : PublisherContext, IRoutingSlipContext
+internal sealed class RoutingSlipContext : PublishContext, IRoutingSlipContext
 {
     public RoutingSlipContext(IHeaders headers, Guid correlationId) : base(headers, correlationId)
     {

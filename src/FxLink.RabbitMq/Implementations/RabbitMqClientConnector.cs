@@ -31,7 +31,7 @@ internal class RabbitMqClientConnector<TMessage>(
     public async Task SendAsync(TMessage message, IContext context, CancellationToken token = default)
     {
         var deliveryKind = context.Headers.Get<string>(DistributedConfigurators.Headers.DeliveryKindKey);
-        var delay = (context as IPublisherContext)?.DelayTime;
+        var delay = (context as IPublishContext)?.DelayTime;
 
         if (deliveryKind == DistributedConfigurators.DeliveryKinds.Delay)
         {
@@ -62,11 +62,11 @@ internal class RabbitMqClientConnector<TMessage>(
             case IResponseContext { TimeToLive: { } ttl }:
                 props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
                 break;
-            case IPublisherContext
+            case IPublishContext
                 when deliveryKind == DistributedConfigurators.DeliveryKinds.Retry && delay is { } retryDelay:
                 props.Expiration = ((long)retryDelay.TotalMilliseconds).ToString();
                 break;
-            case IPublisherContext publisherContext:
+            case IPublishContext publisherContext:
             {
                 if (publisherContext.TimeToLive is { } ttl)
                     props.Expiration = ((long)ttl.TotalMilliseconds).ToString();
@@ -112,7 +112,7 @@ internal class RabbitMqClientConnector<TMessage>(
         var headers = envelope.Context.Headers;
         if (args.BasicProperties.ReplyTo is { Length: > 0 } replyTo)
             headers.Set(DistributedConfigurators.Headers.ReplyToKey, replyTo);
-        var consumerContext = new ConsumerContext<TMessage>(envelope.Message, headers, envelope.Context.CorrelationId,
+        var consumerContext = new ConsumeContext<TMessage>(envelope.Message, headers, envelope.Context.CorrelationId,
             envelope.Context.RequesterId, envelope.Context.SentTime, envelope.Context.HostInfo,
             envelope.Context.TimeToLive, envelope.Context.MessageId);
         await serverConnector.ConsumeAsync(consumerContext, consumerType, args.CancellationToken);

@@ -16,7 +16,7 @@ public class ResponseContext : AbstractContext, IResponseContext
     // back.
     public ResponseContext(IContext context, Guid requesterId)
         : this(new HeaderBag(context.Headers), context.CorrelationId, requesterId,
-            (context as IConsumerContext)?.TimeToLive)
+            (context as IConsumeContext)?.TimeToLive)
     {
     }
 
@@ -33,7 +33,7 @@ internal sealed class ResponseContext<TResponse> : ResponseContext, IResponseCon
 
     public ResponseContext(TResponse message, IContext context, Guid requesterId)
         : this(message, new HeaderBag(context.Headers), context.CorrelationId, requesterId,
-            (context as IConsumerContext)?.TimeToLive)
+            (context as IConsumeContext)?.TimeToLive)
     {
     }
 
