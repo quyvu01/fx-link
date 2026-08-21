@@ -12,10 +12,10 @@ public class MissingInstanceConfigurator<TInstance, TMessage>
     where TInstance : IStateMachineInstance where TMessage : class
 {
     // Silent, do nothing
-    public IDispatcher<IConsumerContext<TMessage>> Discard() => new Dispatcher<IConsumerContext<TMessage>>(null);
+    public IDispatcher<IConsumeContext<TMessage>> Discard() => new Dispatcher<IConsumeContext<TMessage>>(null);
 
-    public IDispatcher<IConsumerContext<TMessage>> Fault()
-        => new Dispatcher<IConsumerContext<TMessage>>((_, _) =>
+    public IDispatcher<IConsumeContext<TMessage>> Fault()
+        => new Dispatcher<IConsumeContext<TMessage>>((_, _) =>
         {
             try
             {
@@ -27,11 +27,11 @@ public class MissingInstanceConfigurator<TInstance, TMessage>
             }
         });
 
-    public IDispatcher<IConsumerContext<TMessage>> ExecuteAsync(MissingInstanceActionAsync<TMessage> actionAsync) =>
-        new Dispatcher<IConsumerContext<TMessage>>(async (context, ct) =>
-            await actionAsync.Invoke((IConsumerContext<TMessage>)context, ct));
+    public IDispatcher<IConsumeContext<TMessage>> ExecuteAsync(MissingInstanceActionAsync<TMessage> actionAsync) =>
+        new Dispatcher<IConsumeContext<TMessage>>(async (context, ct) =>
+            await actionAsync.Invoke((IConsumeContext<TMessage>)context, ct));
 
-    public IDispatcher<IConsumerContext<TMessage>> Execute(MissingInstanceAction<TMessage> action) =>
+    public IDispatcher<IConsumeContext<TMessage>> Execute(MissingInstanceAction<TMessage> action) =>
         ExecuteAsync((context, _) =>
         {
             action.Invoke(context);

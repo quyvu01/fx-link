@@ -26,7 +26,7 @@ public class InMemoryInterfaceMessageTests
 
     private sealed class RecordingConsumer(TestMessageRecorder recorder) : IConsumer<IOrderCreatedContract>
     {
-        public Task ConsumeAsync(IConsumerContext<IOrderCreatedContract> context, CancellationToken token = default)
+        public Task ConsumeAsync(IConsumeContext<IOrderCreatedContract> context, CancellationToken token = default)
         {
             recorder.Complete(context.Message);
             return Task.CompletedTask;

@@ -11,7 +11,7 @@ public sealed class PaymentConsumers(ILogger<PaymentConsumers> logger) :
     // Cross-service request/reply: Order -> Payment. Amount <= 0 throws, which exercises the
     // default retry policy (see ConsumerDefinition<T>) and eventually the dead-letter queue -
     // Order's IRequester<ChargePayment> call then simply times out.
-    public async Task ConsumeAsync(IConsumerContext<ChargePayment> context, CancellationToken token = default)
+    public async Task ConsumeAsync(IConsumeContext<ChargePayment> context, CancellationToken token = default)
     {
         logger.LogInformation("Charging payment: {@Message}", context.Message);
         await Task.Delay(TimeSpan.FromMilliseconds(300), token);
@@ -28,7 +28,7 @@ public sealed class PaymentConsumers(ILogger<PaymentConsumers> logger) :
     }
 
     // Cross-service plain pub/sub: Order -> Payment, fire and forget.
-    public Task ConsumeAsync(IConsumerContext<PaymentRefundRequested> context, CancellationToken token = default)
+    public Task ConsumeAsync(IConsumeContext<PaymentRefundRequested> context, CancellationToken token = default)
     {
         logger.LogInformation("Refund requested: {@Message}", context.Message);
         return Task.CompletedTask;

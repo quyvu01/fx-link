@@ -13,7 +13,7 @@ namespace FxLink.InternalPipelineBehaviors;
 internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider serviceProvider)
     : IConsumerPipelineBehavior<TMessage> where TMessage : class
 {
-    public async Task ConsumeAsync(IConsumerContext<TMessage> context, ConsumerHandlerDelegate next,
+    public async Task ConsumeAsync(IConsumeContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
         var services = context.GetPayload<IServiceProvider>();
@@ -85,7 +85,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
         }
     }
 
-    private static void SetExceptionHeaders(IConsumerContext context, Exception ex)
+    private static void SetExceptionHeaders(IConsumeContext context, Exception ex)
     {
         context.Headers.Set(DistributedConfigurators.Headers.ExceptionTypeKey,
             ex.GetType().FullName ?? ex.GetType().Name);

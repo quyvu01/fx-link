@@ -8,7 +8,7 @@ namespace FxLink.PipelineBehaviors;
 
 internal class ConsumerPipelineBehaviorOrchestrator<TMessage>(IServiceProvider serviceProvider) where TMessage : class
 {
-    internal async Task ExecuteAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
+    internal async Task ExecuteAsync(IConsumeContext<TMessage> context, CancellationToken token = default)
     {
         var consumerType = context.GetPayload<ConsumerContextWrapped>().ConsumerType;
         if (consumerType is null)

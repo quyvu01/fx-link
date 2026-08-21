@@ -32,7 +32,7 @@ internal class RoutingSlipConsumer<TVariable>(
     // consumerType's own IExecuteActivity<>/IExecuteActivity<,> shape, same as compensate does.
     private static readonly ConcurrentDictionary<Type, (Type ArgumentType, Type LogType)?> DynamicShapeLookup = [];
 
-    public async Task ConsumeAsync(IConsumerContext<TVariable> context, CancellationToken token = default)
+    public async Task ConsumeAsync(IConsumeContext<TVariable> context, CancellationToken token = default)
     {
         var remainingItinerary = context.Headers
             .Get<IReadOnlyList<ItineraryStep>>(RoutingSlipHeaders.RemainingItineraryKey);

@@ -9,7 +9,7 @@ internal sealed class PublisherErrorPipelineBehavior<TMessage>(ILogger<Publisher
     : IPublisherPipelineBehavior<TMessage>
     where TMessage : class
 {
-    public async Task PublishAsync(TMessage message, IPublisherContext context, PublisherHandlerDelegate next,
+    public async Task PublishAsync(TMessage message, IPublishContext context, PublisherHandlerDelegate next,
         CancellationToken token = default)
     {
         try

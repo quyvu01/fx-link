@@ -7,14 +7,14 @@ namespace FxLink.Implementations;
 
 internal sealed class Publisher(IServiceProvider serviceProvider) : IPublisher, IInternalContext
 {
-    public async Task PublishAsync<TMessage>(TMessage message, Action<IPublisherContext> contextOptions = null,
+    public async Task PublishAsync<TMessage>(TMessage message, Action<IPublishContext> contextOptions = null,
         CancellationToken token = default) where TMessage : class
     {
         var context = Context switch
         {
-            null => PublisherContext.New(),
-            IPublisherContext publisherContext => publisherContext,
-            { } ctx => new PublisherContext(ctx)
+            null => PublishContext.New(),
+            IPublishContext publisherContext => publisherContext,
+            { } ctx => new PublishContext(ctx)
         };
         contextOptions?.Invoke(context);
         var publisherOrchestrator = serviceProvider

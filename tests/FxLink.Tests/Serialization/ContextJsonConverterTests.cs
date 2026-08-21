@@ -14,7 +14,7 @@ public class ContextJsonConverterTests
     [Fact]
     public void Envelope_serializes_IContext_by_runtime_type_not_the_4_member_contract()
     {
-        var context = PublisherContext.New();
+        var context = PublishContext.New();
         context.DelayTime = TimeSpan.FromSeconds(30);
         var envelope = new Envelope<Payload>(new Payload("x"), context);
 
@@ -31,7 +31,7 @@ public class ContextJsonConverterTests
     [Fact]
     public void Envelope_deserialize_throws_because_IContext_is_write_only_on_the_wire()
     {
-        var envelope = new Envelope<Payload>(new Payload("x"), PublisherContext.New());
+        var envelope = new Envelope<Payload>(new Payload("x"), PublishContext.New());
         var json = JsonSerializer.Serialize(envelope, DistributedConfigurators.JsonSerializerOptions);
 
         Should.Throw<NotSupportedException>(() =>
@@ -57,7 +57,7 @@ public class ContextJsonConverterTests
     [Fact]
     public void ConsumerContext_preserves_the_original_SentTime_HostInfo_and_TimeToLive_instead_of_generating_fresh_ones()
     {
-        var senderContext = PublisherContext.New();
+        var senderContext = PublishContext.New();
         senderContext.TimeToLive = TimeSpan.FromSeconds(5);
         var envelope = new Envelope<Payload>(new Payload("x"), senderContext);
 
@@ -65,7 +65,7 @@ public class ContextJsonConverterTests
         var received = JsonSerializer.Deserialize<ConsumerContextEnvelope<Payload>>(json,
             DistributedConfigurators.JsonSerializerOptions);
 
-        var consumerContext = new ConsumerContext<Payload>(received.Message, received.Context.Headers,
+        var consumerContext = new ConsumeContext<Payload>(received.Message, received.Context.Headers,
             received.Context.CorrelationId, received.Context.RequesterId,
             received.Context.SentTime, received.Context.HostInfo);
 

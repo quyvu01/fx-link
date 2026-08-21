@@ -6,7 +6,7 @@ namespace StateMachine.Tests.Consumers;
 
 public sealed class GetNameConsumer(ILogger<GetNameConsumer> logger) : IConsumer<IGetName>
 {
-    public async Task ConsumeAsync(IConsumerContext<IGetName> context, CancellationToken token = default)
+    public async Task ConsumeAsync(IConsumeContext<IGetName> context, CancellationToken token = default)
     {
         logger.LogInformation("Received: {@Context}", context.Message);
         await Task.Delay(TimeSpan.FromSeconds(1), token);

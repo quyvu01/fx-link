@@ -10,7 +10,7 @@ namespace Order.TestRoutingSlip.Builders;
 public class TestOrderConsumer(ILogger<TestOrderConsumer> logger, IRoutingSlipExecutor executor)
     : IConsumer<IActiveRoutingSlip>
 {
-    public async Task ConsumeAsync(IConsumerContext<IActiveRoutingSlip> context, CancellationToken token = default)
+    public async Task ConsumeAsync(IConsumeContext<IActiveRoutingSlip> context, CancellationToken token = default)
     {
         var message = context.Message;
         logger.LogInformation("[TestOrderConsumer] message: {@Message}", message);

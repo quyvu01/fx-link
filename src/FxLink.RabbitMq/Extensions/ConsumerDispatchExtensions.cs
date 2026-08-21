@@ -11,7 +11,7 @@ public static class ConsumerDispatchExtensions
         public void PrefetchCount(ushort prefetchCount)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(prefetchCount, 0);
-            var consumerConfigurator = (ConsumerConfigurator<TConsumer>)configurator;
+            var consumerConfigurator = (AbstractConsumerConfigurator)configurator;
             var currentConfigurator = consumerConfigurator
                 .GetConfigurator<IConsumerDispatchDefinition>(typeof(TConsumer));
             if (currentConfigurator is null)
@@ -27,7 +27,7 @@ public static class ConsumerDispatchExtensions
         public void ConcurrentMessageLimit(ushort limitCount)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(limitCount, 0);
-            var consumerConfigurator = (ConsumerConfigurator<TConsumer>)configurator;
+            var consumerConfigurator = (AbstractConsumerConfigurator)configurator;
             var currentConfigurator = consumerConfigurator
                 .GetConfigurator<IConsumerDispatchDefinition>(typeof(TConsumer));
             if (currentConfigurator is null)
@@ -42,7 +42,7 @@ public static class ConsumerDispatchExtensions
 
         public void ReceivedEndpoint(string endpoint, Action<IReceivedEndpointConfigurator> options = null)
         {
-            var consumerConfigurator = (ConsumerConfigurator<TConsumer>)configurator;
+            var consumerConfigurator = (AbstractConsumerConfigurator)configurator;
             var currentConfigurator = consumerConfigurator
                 .GetConfigurator<IReceiveEndpointDefinition>(typeof(TConsumer));
             var receivedEndpointConfigurator = new ReceivedEndpointConfigurator();

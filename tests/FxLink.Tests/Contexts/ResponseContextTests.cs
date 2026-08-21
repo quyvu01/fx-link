@@ -12,7 +12,7 @@ public class ResponseContextTests
     public void ResponseContext_carries_forward_TimeToLive_from_the_consumed_request()
     {
         var requestTimeToLive = TimeSpan.FromSeconds(7);
-        var consumedRequest = new ConsumerContext<Payload>(new Payload("x"), requesterId: Guid.NewGuid(),
+        var consumedRequest = new ConsumeContext<Payload>(new Payload("x"), requesterId: Guid.NewGuid(),
             correlationId: Guid.NewGuid(), headers: new HeaderBag(), sentTime: null, hostInfo: null,
             timeToLive: requestTimeToLive);
 
@@ -24,7 +24,7 @@ public class ResponseContextTests
     [Fact]
     public void ResponseContext_TimeToLive_is_null_when_the_source_context_is_not_a_consumer_context()
     {
-        var publisherContext = PublisherContext.New();
+        var publisherContext = PublishContext.New();
 
         var responseContext = new ResponseContext(publisherContext, Guid.NewGuid());
 

@@ -8,7 +8,7 @@ namespace FxLink.StateMachine.Implementations;
 public sealed class StateMachineConsumer<TMessage>(IServiceProvider serviceProvider)
     : IConsumer<TMessage> where TMessage : class
 {
-    public async Task ConsumeAsync(IConsumerContext<TMessage> context, CancellationToken token = default)
+    public async Task ConsumeAsync(IConsumeContext<TMessage> context, CancellationToken token = default)
     {
         var consumerType = context.GetPayload<ConsumerContextWrapped>().ConsumerType;
         if (serviceProvider.GetService(consumerType) is IStateMachine stateMachine)

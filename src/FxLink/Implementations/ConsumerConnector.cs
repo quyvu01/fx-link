@@ -10,7 +10,7 @@ internal class ConsumerConnector<TMessage>(
     IServiceProvider serviceProvider)
     : IConsumerConnector<TMessage> where TMessage : class
 {
-    public async Task ConsumeAsync(IConsumerContext<TMessage> context, Type consumerType,
+    public async Task ConsumeAsync(IConsumeContext<TMessage> context, Type consumerType,
         CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(context);

@@ -61,7 +61,7 @@ public abstract partial class StateMachine<TInstance>
     }
 
     // Note this raise event may have a lot of edge cases like race condition, state fall -> outbox and inbox
-    public async Task RaiseEventAsync<TMessage>(IConsumerContext<TMessage> context, CancellationToken token = default)
+    public async Task RaiseEventAsync<TMessage>(IConsumeContext<TMessage> context, CancellationToken token = default)
         where TMessage : class
     {
         var @event = new Event<TMessage>();
