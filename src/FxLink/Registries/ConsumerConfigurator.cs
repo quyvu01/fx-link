@@ -6,17 +6,17 @@ namespace FxLink.Registries;
 
 internal abstract class AbstractConsumerConfigurator
 {
-    internal abstract void AddConfigurator(Type targetType, IConsumeConfigurator configurator);
+    internal abstract void AddConfigurator(Type targetType, IOption configurator);
 
     internal abstract TMessageConfigurator GetConfigurator<TMessageConfigurator>(Type targetType)
-        where TMessageConfigurator : IConsumeConfigurator;
+        where TMessageConfigurator : IOption;
 }
 
 internal class ConsumerConfigurator<TConsumer> :
     AbstractConsumerConfigurator,
     IConsumerConfigurator<TConsumer> where TConsumer : IConsumer
 {
-    private readonly ConcurrentDictionary<Type, List<IConsumeConfigurator>> _messageConfigurators = [];
+    private readonly ConcurrentDictionary<Type, List<IOption>> _messageConfigurators = [];
 
     public void UseMessageRetry([NotNull] Action<IMessageRetryPolicy> options)
     {
@@ -25,7 +25,22 @@ internal class ConsumerConfigurator<TConsumer> :
         AddConfigurator(typeof(TConsumer), configurator.RetryPolicy);
     }
 
-    internal override void AddConfigurator(Type targetType, IConsumeConfigurator configurator)
+    public void UseMessageRetry<TMessage>(Action<IMessageRetryPolicy> options) where TMessage : class
+    {
+        var configurator = new ConsumerConfigurator();
+        configurator.UseMessageRetry(options);
+        AddConfigurator(typeof(TMessage), configurator.RetryPolicy);
+    }
+
+    public void UseBatching<TMessage>(Action<IMessageBatchOption<TMessage>> options) where TMessage : class
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var policy = new MessageBatchOption<TMessage>();
+        options.Invoke(policy);
+        AddConfigurator(typeof(TMessage), policy);
+    }
+
+    internal override void AddConfigurator(Type targetType, IOption configurator)
     {
         var configurators = _messageConfigurators.GetOrAdd(targetType, _ => []);
         configurators.Add(configurator);
