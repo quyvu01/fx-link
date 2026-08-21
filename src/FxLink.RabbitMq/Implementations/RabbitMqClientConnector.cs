@@ -112,9 +112,9 @@ internal class RabbitMqClientConnector<TMessage>(
         var headers = envelope.Context.Headers;
         if (args.BasicProperties.ReplyTo is { Length: > 0 } replyTo)
             headers.Set(DistributedConfigurators.Headers.ReplyToKey, replyTo);
-        var consumerContext = new ConsumerContext<TMessage>(envelope.Message, envelope.Context.RequesterId,
-            envelope.Context.CorrelationId, headers, envelope.Context.SentTime, envelope.Context.HostInfo,
-            envelope.Context.TimeToLive);
+        var consumerContext = new ConsumerContext<TMessage>(envelope.Message, headers, envelope.Context.CorrelationId,
+            envelope.Context.RequesterId, envelope.Context.SentTime, envelope.Context.HostInfo,
+            envelope.Context.TimeToLive, envelope.Context.MessageId);
         await serverConnector.ConsumeAsync(consumerContext, consumerType, args.CancellationToken);
     }
 

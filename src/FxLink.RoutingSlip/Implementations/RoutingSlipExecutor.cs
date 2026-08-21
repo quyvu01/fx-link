@@ -13,7 +13,7 @@ namespace FxLink.RoutingSlip.Implementations;
 internal sealed class RoutingSlipExecutor(IServiceProvider serviceProvider) : IRoutingSlipExecutor
 {
     public async Task RunAsync([NotNull] Action<IRoutingSlipBuilder> builder, CancellationToken token = default) =>
-        await RunAsync(builder, new RoutingSlipContext(Id.New(), new HeaderBag()), token);
+        await RunAsync(builder, new RoutingSlipContext(new HeaderBag(), Id.New()), token);
 
     public async Task RunAsync(Action<IRoutingSlipBuilder> builder, IContext context, CancellationToken token = default)
     {

@@ -22,6 +22,6 @@ internal class WireResultDispatcher<TResponse>(IInMemoryResponseSetter inMemoryR
             DistributedConfigurators.JsonSerializerOptions);
         if (envelope?.Context.RequesterId is not { } requesterId) return;
         inMemoryResponseSetter.TrySetResult(requesterId, new MessageData<Result<TResponse>>(envelope.Message,
-            new ResponseContext(requesterId, envelope.Context.CorrelationId, envelope.Context.Headers), token));
+            new ResponseContext(envelope.Context.Headers, envelope.Context.CorrelationId, requesterId), token));
     }
 }

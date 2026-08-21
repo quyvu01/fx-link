@@ -16,7 +16,7 @@ public class ResponseContextTests
             correlationId: Guid.NewGuid(), headers: new HeaderBag(), sentTime: null, hostInfo: null,
             timeToLive: requestTimeToLive);
 
-        var responseContext = new ResponseContext(Guid.NewGuid(), consumedRequest);
+        var responseContext = new ResponseContext(consumedRequest, Guid.NewGuid());
 
         responseContext.TimeToLive.ShouldBe(requestTimeToLive);
     }
@@ -26,7 +26,7 @@ public class ResponseContextTests
     {
         var publisherContext = PublisherContext.New();
 
-        var responseContext = new ResponseContext(Guid.NewGuid(), publisherContext);
+        var responseContext = new ResponseContext(publisherContext, Guid.NewGuid());
 
         responseContext.TimeToLive.ShouldBeNull();
     }

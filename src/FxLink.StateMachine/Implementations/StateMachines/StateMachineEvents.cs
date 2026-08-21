@@ -145,7 +145,7 @@ public abstract partial class StateMachine<TInstance>
         }
 
         var stateMachineContext = new StateMachineContext<TInstance, TMessage>
-            (instance, context.Message, context.RequesterId, context);
+            (instance, context.Message, context, context.RequesterId);
         stateMachineContext.SetPayload(services);
         stateMachineContext.SetPayload(context.GetPayload<ConsumerContextWrapped>());
         await eventOperator.ExecuteAsync(stateMachineContext, token);

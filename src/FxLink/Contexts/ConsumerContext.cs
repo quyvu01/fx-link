@@ -13,18 +13,18 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
 {
     private readonly ConcurrentDictionary<Type, Lazy<object>> _contextPayloads = [];
 
-    internal ConsumerContext(TMessage message, Guid? requesterId, Guid correlationId, IHeaders headers,
-        DateTime? sentTime = null, IHostInfo hostInfo = null, TimeSpan? timeToLive = null)
-        : base(correlationId, headers, sentTime, hostInfo)
+    internal ConsumerContext(TMessage message, IHeaders headers, Guid correlationId, Guid? requesterId,
+        DateTime? sentTime = null, IHostInfo hostInfo = null, TimeSpan? timeToLive = null, Guid? messageId = null)
+        : base(headers, correlationId, sentTime, hostInfo, messageId)
     {
         RequesterId = requesterId;
         Message = message;
         TimeToLive = timeToLive;
     }
 
-    public ConsumerContext(TMessage message, Guid? requesterId, IContext context)
-        : this(message, requesterId, context.CorrelationId, new HeaderBag(context.Headers),
-            context.SentTime, context.HostInfo, (context as IConsumerContext)?.TimeToLive)
+    public ConsumerContext(TMessage message, IContext context, Guid? requesterId)
+        : this(message, new HeaderBag(context.Headers), context.CorrelationId, requesterId,
+            context.SentTime, context.HostInfo, (context as IConsumerContext)?.TimeToLive, context.MessageId)
     {
     }
 
@@ -38,7 +38,7 @@ public class ConsumerContext<TMessage> : AbstractContext, IConsumerContext<TMess
         var services = GetPayload<IServiceProvider>();
         var client = services.GetService<IClientConnector<Result<TResponse>>>();
         if (client is null || RequesterId is not { } requesterId) return;
-        await client.SendAsync(Result<TResponse>.Success(message), new ResponseContext(requesterId, this), token);
+        await client.SendAsync(Result<TResponse>.Success(message), new ResponseContext(this, requesterId), token);
     }
 
     public Task ResponseAsync<TResponse>(object message, CancellationToken token = default) where TResponse : class =>

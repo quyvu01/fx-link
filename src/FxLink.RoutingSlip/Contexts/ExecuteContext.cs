@@ -7,10 +7,10 @@ namespace FxLink.RoutingSlip.Contexts;
 
 internal class ExecuteContext<TArgument> : AbstractContext, IExecuteContext<TArgument> where TArgument : class
 {
-    public ExecuteContext(TArgument argument, Guid correlationId, IHeaders headers)
-        : base(correlationId, headers) => Argument = argument;
+    public ExecuteContext(TArgument argument, IHeaders headers, Guid correlationId)
+        : base(headers, correlationId) => Argument = argument;
 
-    public ExecuteContext(TArgument argument, IContext context) : base(context.CorrelationId, context.Headers)
+    public ExecuteContext(TArgument argument, IContext context) : base(context.Headers, context.CorrelationId)
         => Argument = argument;
 
     public IExecuteResult Fault(Exception exception)
@@ -35,10 +35,10 @@ internal class ExecuteContext<TArgument> : AbstractContext, IExecuteContext<TArg
 internal sealed class ExecuteContext<TArgument, TLog> : AbstractContext, IExecuteContext<TArgument, TLog>
     where TArgument : class where TLog : class
 {
-    public ExecuteContext(TArgument argument, Guid correlationId, IHeaders headers)
-        : base(correlationId, headers) => Argument = argument;
+    public ExecuteContext(TArgument argument, IHeaders headers, Guid correlationId)
+        : base(headers, correlationId) => Argument = argument;
 
-    public ExecuteContext(TArgument argument, IContext context) : base(context.CorrelationId, context.Headers)
+    public ExecuteContext(TArgument argument, IContext context) : base(context.Headers, context.CorrelationId)
         => Argument = argument;
 
     public IExecuteResult Fault(Exception exception)

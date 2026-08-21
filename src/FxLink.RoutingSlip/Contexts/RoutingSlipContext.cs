@@ -7,7 +7,7 @@ namespace FxLink.RoutingSlip.Contexts;
 
 internal sealed class RoutingSlipContext : PublisherContext, IRoutingSlipContext
 {
-    public RoutingSlipContext(Guid correlationId, IHeaders headers) : base(correlationId, headers)
+    public RoutingSlipContext(IHeaders headers, Guid correlationId) : base(headers, correlationId)
     {
     }
 
