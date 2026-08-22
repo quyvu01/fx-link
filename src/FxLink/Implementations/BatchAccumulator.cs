@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using FxLink.Abstractions;
-using FxLink.Configurators;
 using FxLink.Contexts;
+using FxLink.Extensions;
 using FxLink.Registries;
+using static FxLink.Configurators.DistributedConfigurators;
 
 namespace FxLink.Implementations;
 
@@ -13,15 +15,14 @@ namespace FxLink.Implementations;
 // Lifetime: must be a singleton for a given (TMessage, consumerType) — every AddAsync call has to
 // see the same buffers, or nothing ever accumulates. See ConsumerPipelineBehaviorOrchestrator for
 // why a per-message DI scope would break this.
-internal sealed class BatchAccumulator<TMessage> : IBatchAccumulator<TMessage>, IDisposable
-    where TMessage : class
+internal sealed class BatchAccumulator<TMessage> : IBatchAccumulator<TMessage>, IDisposable where TMessage : class
 {
     private static readonly object UngroupedKey = new();
 
     private readonly MessageBatchConfigurator _config;
     private readonly Func<IReadOnlyList<IConsumeContext<TMessage>>, CancellationToken, Task> _flushHandler;
     private readonly SemaphoreSlim _concurrencyGate;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<object, BatchState> _states = new();
+    private readonly ConcurrentDictionary<object, BatchState> _states = new();
 
     public BatchAccumulator(MessageBatchConfigurator config,
         Func<IReadOnlyList<IConsumeContext<TMessage>>, CancellationToken, Task> flushHandler)
@@ -39,7 +40,7 @@ internal sealed class BatchAccumulator<TMessage> : IBatchAccumulator<TMessage>, 
 
         var key = ResolveKey(context);
         var state = _states.GetOrAdd(key, _ => new BatchState());
-        var forceFlush = context.Headers.Get<int>(DistributedConfigurators.Headers.RetryCountKey) > 0;
+        var forceFlush = context.Headers.Get<int>(Headers.RetryCountKey) > 0;
 
         IReadOnlyList<IConsumeContext<TMessage>> snapshot = null;
         lock (state.Lock)
@@ -56,8 +57,7 @@ internal sealed class BatchAccumulator<TMessage> : IBatchAccumulator<TMessage>, 
                 snapshot = TakeBufferAndStopTimer(state);
         }
 
-        if (snapshot is { Count: > 0 })
-            _ = FlushAsync(snapshot, token);
+        if (snapshot is { Count: > 0 }) FlushAsync(snapshot, token).Forget();
 
         return Task.CompletedTask;
     }
@@ -73,7 +73,7 @@ internal sealed class BatchAccumulator<TMessage> : IBatchAccumulator<TMessage>, 
             snapshot = TakeBufferAndStopTimer(state);
         }
 
-        _ = FlushAsync(snapshot, token);
+        FlushAsync(snapshot, token).Forget();
     }
 
     private static List<IConsumeContext<TMessage>> TakeBufferAndStopTimer(BatchState state)

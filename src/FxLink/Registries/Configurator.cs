@@ -16,8 +16,7 @@ internal class Configurator(IServiceCollection services) : IConfigurator
     public IMessageKeys MessageKeys { get; } = new MessageKeys();
     internal ISupervisorOptions SupervisorOptions { get; private set; } = new SupervisorOptions();
 
-    public void AddConsumer<TConsumer>()
-        where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
+    public void AddConsumer<TConsumer>() where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
     public void AddConsumerDefinition<TConsumerDefinition>() where TConsumerDefinition : IConsumerDefinition
         => AddConsumerTypeDefinition(typeof(TConsumerDefinition));
@@ -48,43 +47,40 @@ internal class Configurator(IServiceCollection services) : IConfigurator
         SupervisorOptions = supervisorOptions;
     }
 
-    public void AddConsumer(Type consumerType)
-    {
-        consumerType
-            .GetInterfaces()
-            .Where(a => a.IsGenericType && a.GetGenericTypeDefinition() == typeof(IConsumer<>))
-            .ForEach(serviceType =>
-            {
-                var messageType = serviceType.GetGenericArguments()[0];
-                Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey: consumerType,
-                    implementationType: consumerType, ServiceLifetime.Scoped));
-                
-                if (TryUnwrapBatchMessageType(messageType, out var wireMessageType))
-                {
-                    MessageKeys.AddMessageKey(wireMessageType, consumerType);
-                    
-                    Services.AddKeyedSingleton(typeof(IBatchAccumulator<>).MakeGenericType(wireMessageType),
-                        consumerType, (sp, _) => BatchAccumulatorFactory.Create(consumerType, wireMessageType, sp));
-                    
-                    var batchPipelineServiceType = typeof(IConsumerPipelineBehavior<>)
-                        .MakeGenericType(typeof(IBatch<>).MakeGenericType(wireMessageType));
-                    
-                    var batchRetryImplType = typeof(BatchRetryPipelineBehavior<>).MakeGenericType(wireMessageType);
-                    
-                    Services.TryAddEnumerable(
-                        new ServiceDescriptor(batchPipelineServiceType, batchRetryImplType, ServiceLifetime.Scoped));
-                    return;
-                }
+    public void AddConsumer(Type consumerType) => consumerType
+        .GetInterfaces()
+        .Where(a => a.IsGenericType && a.GetGenericTypeDefinition() == typeof(IConsumer<>))
+        .ForEach(serviceType =>
+        {
+            var messageType = serviceType.GetGenericArguments()[0];
+            Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey: consumerType,
+                implementationType: consumerType, ServiceLifetime.Scoped));
 
-                MessageKeys.AddMessageKey(messageType, consumerType);
-            });
-    }
+            if (TryUnwrapBatchMessageType(messageType, out var wireMessageType))
+            {
+                MessageKeys.AddMessageKey(wireMessageType, consumerType);
+
+                Services.AddKeyedSingleton(typeof(IBatchAccumulator<>).MakeGenericType(wireMessageType),
+                    consumerType, (sp, _) => BatchAccumulatorFactory.Create(consumerType, wireMessageType, sp));
+
+                var batchPipelineServiceType = typeof(IConsumerPipelineBehavior<>)
+                    .MakeGenericType(typeof(IBatch<>).MakeGenericType(wireMessageType));
+
+                var batchRetryImplType = typeof(BatchRetryPipelineBehavior<>).MakeGenericType(wireMessageType);
+
+                Services.TryAddEnumerable(
+                    new ServiceDescriptor(batchPipelineServiceType, batchRetryImplType, ServiceLifetime.Scoped));
+                return;
+            }
+
+            MessageKeys.AddMessageKey(messageType, consumerType);
+        });
 
     private static bool TryUnwrapBatchMessageType(Type messageType, out Type innerType)
     {
         if (messageType.IsGenericType && messageType.GetGenericTypeDefinition() == typeof(IBatch<>))
         {
-            innerType = messageType.GetGenericArguments()[0];
+            innerType = messageType.GetGenericArguments().First();
             return true;
         }
 

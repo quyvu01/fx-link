@@ -67,8 +67,7 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
     {
         context.Headers.Set(Headers.RetryCountKey, retryCount + 1);
         context.Headers.Set(Headers.DeliveryKindKey, DeliveryKinds.Retry);
-        logger?.LogWarning(
-            "Message: {@Message} in a failed batch will be retried after: {@TimeSpan}",
+        logger?.LogWarning("Message: {@Message} in a failed batch will be retried after: {@TimeSpan}",
             context.Message, nextRetry);
 
         publisher.SetContext(context);
@@ -94,8 +93,7 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
 
     private static void SetExceptionHeaders(IConsumeContext context, Exception ex)
     {
-        context.Headers.Set(Headers.ExceptionTypeKey,
-            ex.GetType().FullName ?? ex.GetType().Name);
+        context.Headers.Set(Headers.ExceptionTypeKey, ex.GetType().FullName ?? ex.GetType().Name);
         context.Headers.Set(Headers.ExceptionMessageKey, ex.Message);
         context.Headers.Set(Headers.ExceptionStackTraceKey, ex.StackTrace ?? string.Empty);
     }
