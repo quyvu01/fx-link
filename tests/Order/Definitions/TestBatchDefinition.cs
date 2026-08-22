@@ -11,7 +11,7 @@ public sealed class TestBatchDefinition : ConsumerDefinition<TestBatchConsumer>
     {
         options.UseBatching<IInventoryCreated>(c => c
             .GroupBy(x => x.Message.Name)
-            .SetMessageLimit(10)
+            .SetMessageLimit(3)
             .SetTimeLimit(TimeSpan.FromSeconds(5))
             .SetConcurrencyLimit(2)
         );

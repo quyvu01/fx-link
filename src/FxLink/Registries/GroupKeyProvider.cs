@@ -11,4 +11,17 @@ internal class GroupKeyProvider<TMessage, TKey>(Func<IConsumeContext<TMessage>, 
         key = selector.Invoke(context);
         return key != null;
     }
+
+    bool IGroupKeyProvider.TryGetKey(object context, out object key)
+    {
+        if (context is not IConsumeContext<TMessage> typedContext)
+        {
+            key = null;
+            return false;
+        }
+
+        var found = TryGetKey(typedContext, out var typedKey);
+        key = typedKey;
+        return found;
+    }
 }

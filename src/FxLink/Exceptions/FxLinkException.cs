@@ -45,4 +45,9 @@ public static class FxLinkException
     /// <summary>GetPayload&lt;T&gt; was called on a context but no payload of that type was ever set via SetPayload&lt;T&gt;.</summary>
     public sealed class ContextPayloadNotFound(Type payloadType) :
         DistributedException($"No payload of type {payloadType.Name} has been set on this context. Call SetPayload<{payloadType.Name}>() before GetPayload<{payloadType.Name}>().");
+
+    /// <summary>A consumer implements IConsumer&lt;IBatch&lt;TMessage&gt;&gt; but its ConsumerDefinition never called UseBatching&lt;TMessage&gt;.</summary>
+    public sealed class BatchConsumerMissingBatchOptions(Type messageType, Type consumerType) :
+        DistributedException(
+            $"{consumerType.Name} consumes IBatch<{messageType.Name}> but never configured batching. Call UseBatching<{messageType.Name}>(...) in its ConsumerDefinition.Configure().");
 }
