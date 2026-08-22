@@ -4,6 +4,7 @@ using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RoutingSlip.Extensions;
 using Microsoft.OpenApi.Models;
+using Order.Dtos.Batches;
 using Order.Dtos.MessageDefinitions;
 using Order.Dtos.Orders;
 using Order.TestRoutingSlip.Activities;
@@ -148,6 +149,19 @@ app.MapPost("/calendar/created", async (IPublisher publisher, Guid id, string na
         return "Calendar created";
     })
     .WithTags("Calendar")
+    .WithOpenApi();
+
+app.MapPost("/batch/test", async (IPublisher publisher) =>
+    {
+        var random = new Random();
+        var next = random.Next(3);
+        await publisher.PublishAsync<IInventoryCreated>(new { Name = $"SomeName: {next}", RandomNumber = next }, c =>
+        {
+            c.Headers.Set("token", $"Current tick: {DateTime.UtcNow.Ticks}");
+        });
+        return $"IInventoryCreated with random: {next}";
+    })
+    .WithTags("Batch consumer")
     .WithOpenApi();
 
 app.Run();

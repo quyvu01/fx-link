@@ -3,6 +3,7 @@ using FxLink.Abstractions;
 using FxLink.Extensions;
 using FxLink.Implementations;
 using FxLink.InMemory;
+using FxLink.InternalPipelineBehaviors;
 using FxLink.Supervision;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -47,8 +48,6 @@ internal class Configurator(IServiceCollection services) : IConfigurator
         SupervisorOptions = supervisorOptions;
     }
 
-
-    // Need to check if we have edge cases here!
     public void AddConsumer(Type consumerType)
     {
         consumerType
@@ -59,21 +58,40 @@ internal class Configurator(IServiceCollection services) : IConfigurator
                 var messageType = serviceType.GetGenericArguments()[0];
                 Services.TryAddEnumerable(new ServiceDescriptor(serviceType: serviceType, serviceKey: consumerType,
                     implementationType: consumerType, ServiceLifetime.Scoped));
+                
+                if (TryUnwrapBatchMessageType(messageType, out var wireMessageType))
+                {
+                    MessageKeys.AddMessageKey(wireMessageType, consumerType);
+                    
+                    Services.AddKeyedSingleton(typeof(IBatchAccumulator<>).MakeGenericType(wireMessageType),
+                        consumerType, (sp, _) => BatchAccumulatorFactory.Create(consumerType, wireMessageType, sp));
+                    
+                    // Todo: need to check again about the sequence of pipeline behaviors
+                    var batchPipelineServiceType = typeof(IConsumerPipelineBehavior<>)
+                        .MakeGenericType(typeof(IBatch<>).MakeGenericType(wireMessageType));
+                    
+                    var batchRetryImplType = typeof(BatchRetryPipelineBehavior<>).MakeGenericType(wireMessageType);
+                    
+                    Services.TryAddEnumerable(
+                        new ServiceDescriptor(batchPipelineServiceType, batchRetryImplType, ServiceLifetime.Scoped));
+                    return;
+                }
 
-                // A batch consumer (IConsumer<IBatch<TMessage>>) still receives TMessage off the
-                // wire one at a time — IBatch<TMessage> is a purely in-process accumulation wrapper,
-                // never published/serialized. Transports (e.g. RabbitMqClient, driven by
-                // IMessageKeys.GetMessageKeys()) must subscribe using the unwrapped TMessage, not
-                // IBatch<TMessage>, or they'd try to bind a queue for a type that never arrives.
-                var wireMessageType = UnwrapBatchMessageType(messageType);
-                MessageKeys.AddMessageKey(wireMessageType, consumerType);
+                MessageKeys.AddMessageKey(messageType, consumerType);
             });
     }
 
-    private static Type UnwrapBatchMessageType(Type messageType) =>
-        messageType.IsGenericType && messageType.GetGenericTypeDefinition() == typeof(IBatch<>)
-            ? messageType.GetGenericArguments()[0]
-            : messageType;
+    private static bool TryUnwrapBatchMessageType(Type messageType, out Type innerType)
+    {
+        if (messageType.IsGenericType && messageType.GetGenericTypeDefinition() == typeof(IBatch<>))
+        {
+            innerType = messageType.GetGenericArguments()[0];
+            return true;
+        }
+
+        innerType = null;
+        return false;
+    }
 
     internal void AddConsumerTypeDefinition(Type consumerDefinition)
     {

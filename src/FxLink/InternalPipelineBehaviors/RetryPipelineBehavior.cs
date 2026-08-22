@@ -16,6 +16,20 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
     public async Task ConsumeAsync(IConsumeContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
+        // Open-generic registration (see AddFxLink/ConsumerPipelineBehaviorConfigurator) matches
+        // ANY closed TMessage, including IBatch<TMessage> for a batch dispatch — DI substitutes
+        // TMessage directly with no awareness of IBatch<>'s special meaning. BatchRetryPipelineBehavior
+        // owns retry/dead-letter for batches (registered as its own closed-generic service per
+        // consumer, since IConsumerPipelineBehavior<IBatch<T>> can't be matched by an open-generic
+        // registration at all — verified empirically, .NET's DI throws on that shape). This instance
+        // must stay out of the way entirely rather than try to republish an IBatch<TMessage> as if
+        // it were a single wire message.
+        if (typeof(TMessage).IsGenericType && typeof(TMessage).GetGenericTypeDefinition() == typeof(IBatch<>))
+        {
+            await next.Invoke(token);
+            return;
+        }
+
         var services = context.GetPayload<IServiceProvider>();
         var logger = services.GetService<ILogger<RetryPipelineBehavior<TMessage>>>();
         try

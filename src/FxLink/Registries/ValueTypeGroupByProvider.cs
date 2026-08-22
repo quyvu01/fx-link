@@ -17,4 +17,17 @@ internal sealed class ValueTypeGroupByProvider<TMessage, TKey>(Func<IConsumeCont
         key = default;
         return false;
     }
+
+    bool IGroupKeyProvider.TryGetKey(object context, out object key)
+    {
+        if (context is not IConsumeContext<TMessage> typedContext)
+        {
+            key = null;
+            return false;
+        }
+
+        var found = TryGetKey(typedContext, out var typedKey);
+        key = found ? typedKey : null;
+        return found;
+    }
 }
