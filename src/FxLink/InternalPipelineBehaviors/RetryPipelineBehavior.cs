@@ -1,5 +1,4 @@
 using FxLink.Abstractions;
-using FxLink.Configurators;
 using FxLink.Contexts;
 using FxLink.Delegates;
 using FxLink.Extensions;
@@ -7,6 +6,7 @@ using FxLink.Registries;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using static FxLink.Configurators.DistributedConfigurators;
 
 namespace FxLink.InternalPipelineBehaviors;
 
@@ -16,14 +16,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
     public async Task ConsumeAsync(IConsumeContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
-        // Open-generic registration (see AddFxLink/ConsumerPipelineBehaviorConfigurator) matches
-        // ANY closed TMessage, including IBatch<TMessage> for a batch dispatch — DI substitutes
-        // TMessage directly with no awareness of IBatch<>'s special meaning. BatchRetryPipelineBehavior
-        // owns retry/dead-letter for batches (registered as its own closed-generic service per
-        // consumer, since IConsumerPipelineBehavior<IBatch<T>> can't be matched by an open-generic
-        // registration at all — verified empirically, .NET's DI throws on that shape). This instance
-        // must stay out of the way entirely rather than try to republish an IBatch<TMessage> as if
-        // it were a single wire message.
+        // Todo: think more about this handling... Hmmm, think about responsibility
         if (typeof(TMessage).IsGenericType && typeof(TMessage).GetGenericTypeDefinition() == typeof(IBatch<>))
         {
             await next.Invoke(token);
@@ -44,14 +37,13 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             var ignoreExceptions = retryPolicy.IgnoreExceptions;
 
             var publisher = services.GetRequiredService<IPublisher>();
-            var requestSemantics = context.Headers.Get<string>(DistributedConfigurators.Headers.RequestSemanticsKey);
-            var requestAsPublisher = requestSemantics is DistributedConfigurators.RequestSemantics.RequestAsPublisher;
+            var requestSemantics = context.Headers.Get<string>(Headers.RequestSemanticsKey);
+            var requestAsPublisher = requestSemantics is RequestSemantics.RequestAsPublisher;
 
             if (ShouldIgnore(ex, ignoreExceptions))
             {
                 if (requestAsPublisher) throw;
-                context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
-                    DistributedConfigurators.DeliveryKinds.DeadLetter);
+                context.Headers.Set(Headers.DeliveryKindKey, DeliveryKinds.DeadLetter);
                 SetExceptionHeaders(context, ex);
                 publisher.SetContext(context);
                 logger?.LogError(
@@ -61,7 +53,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 return;
             }
 
-            var retryCount = context.Headers.Get<int>(DistributedConfigurators.Headers.RetryCountKey);
+            var retryCount = context.Headers.Get<int>(Headers.RetryCountKey);
 
             if (retryCount < intervals.Length)
             {
@@ -71,9 +63,8 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 // immediately instead of blocking it for the whole backoff duration — see
                 // RabbitMqClient's retry exchange/queue (TTL + x-dead-letter-exchange) topology.
                 var nextRetry = intervals[retryCount];
-                context.Headers.Set(DistributedConfigurators.Headers.RetryCountKey, retryCount + 1);
-                context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
-                    DistributedConfigurators.DeliveryKinds.Retry);
+                context.Headers.Set(Headers.RetryCountKey, retryCount + 1);
+                context.Headers.Set(Headers.DeliveryKindKey, DeliveryKinds.Retry);
                 logger?.LogWarning(
                     "Message: {@Message} processed failed with exception: {@Exception}. Retry will be processed after: {@TimeSpan}",
                     context.Message, new { ex.Message, ex.StackTrace }, nextRetry);
@@ -88,8 +79,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             }
 
             if (requestAsPublisher) throw;
-            context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
-                DistributedConfigurators.DeliveryKinds.DeadLetter);
+            context.Headers.Set(Headers.DeliveryKindKey, DeliveryKinds.DeadLetter);
             SetExceptionHeaders(context, ex);
             publisher.SetContext(context);
             logger?.LogError(
@@ -101,10 +91,9 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
 
     private static void SetExceptionHeaders(IConsumeContext context, Exception ex)
     {
-        context.Headers.Set(DistributedConfigurators.Headers.ExceptionTypeKey,
-            ex.GetType().FullName ?? ex.GetType().Name);
-        context.Headers.Set(DistributedConfigurators.Headers.ExceptionMessageKey, ex.Message);
-        context.Headers.Set(DistributedConfigurators.Headers.ExceptionStackTraceKey, ex.StackTrace ?? string.Empty);
+        context.Headers.Set(Headers.ExceptionTypeKey, ex.GetType().FullName ?? ex.GetType().Name);
+        context.Headers.Set(Headers.ExceptionMessageKey, ex.Message);
+        context.Headers.Set(Headers.ExceptionStackTraceKey, ex.StackTrace ?? string.Empty);
     }
 
     private static bool ShouldIgnore(Exception ex, Type[] ignoreExceptions)
