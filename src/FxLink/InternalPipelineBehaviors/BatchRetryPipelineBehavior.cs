@@ -1,5 +1,4 @@
 using FxLink.Abstractions;
-using FxLink.Configurators;
 using FxLink.Contexts;
 using FxLink.Delegates;
 using FxLink.Extensions;
@@ -7,31 +6,16 @@ using FxLink.Registries;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using static FxLink.Configurators.DistributedConfigurators;
 
 namespace FxLink.InternalPipelineBehaviors;
 
-// Runs when a batch dispatch (IConsumer<IBatch<TMessage>>) throws. Unlike RetryPipelineBehavior,
-// which owns exactly one message, a batch failure has no single origin — the consumer processed
-// every message together (e.g. one bulk insert), so there is no way to know which entry actually
-// caused it. Every message in the batch is treated the same: republished individually, each judged
-// against its OWN accumulated RetryCountKey — messages can enter a batch with different retry
-// counts already, if they were re-buffered after a previous batch's failure (see
-// BatchAccumulator's force-flush-on-retry).
-//
-// Deliberately NOT registered via the open-generic IConsumerPipelineBehavior<> mechanism
-// (AddConsumerPipelineBehaviors) — verified empirically that .NET's DI container can't match an
-// open-generic registration whose implementation closes over IConsumerPipelineBehavior<IBatch<T>>
-// (nested generic construction), it throws ArgumentException at resolution time. Registered instead
-// as a closed-generic service per batch consumer in Configurator.AddConsumer, the same way
-// IBatchAccumulator<TMessage> is.
 internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serviceProvider)
     : IConsumerPipelineBehavior<IBatch<TMessage>> where TMessage : class
 {
     public async Task ConsumeAsync(IConsumeContext<IBatch<TMessage>> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
-        var services = context.GetPayload<IServiceProvider>();
-        var logger = services.GetService<ILogger<BatchRetryPipelineBehavior<TMessage>>>();
         try
         {
             await next.Invoke(token);
@@ -40,25 +24,22 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
         {
             var consumerType = context.GetPayload<ConsumerContextWrapped>().ConsumerType;
             var retryPolicy = (GetRetryPolicy(consumerType) as MessageRetryPolicy)!;
-            var publisher = services.GetRequiredService<IPublisher>();
+            var publisher = serviceProvider.GetRequiredService<IPublisher>();
+            var logger = serviceProvider.GetService<ILogger<BatchRetryPipelineBehavior<TMessage>>>();
 
             foreach (var messageContext in context.Message)
                 await HandleOneAsync(messageContext, ex, retryPolicy, publisher, logger, token);
         }
     }
 
-    // Mirrors RetryPipelineBehavior<TMessage>'s single-message decision, applied to one entry of
-    // the batch at a time. Kept as its own copy rather than a shared extraction — RetryPipelineBehavior
-    // has no dedicated tests today, so refactoring it to share code here would add risk to an
-    // already-relied-upon path for no behavioral benefit.
     private static async Task HandleOneAsync(IConsumeContext<TMessage> context, Exception ex,
         MessageRetryPolicy retryPolicy, IPublisher publisher, ILogger logger, CancellationToken token)
     {
         var intervals = retryPolicy.RetryIntervals;
         var ignoreExceptions = retryPolicy.IgnoreExceptions;
 
-        var requestSemantics = context.Headers.Get<string>(DistributedConfigurators.Headers.RequestSemanticsKey);
-        var requestAsPublisher = requestSemantics is DistributedConfigurators.RequestSemantics.RequestAsPublisher;
+        var requestSemantics = context.Headers.Get<string>(Headers.RequestSemanticsKey);
+        var requestAsPublisher = requestSemantics is RequestSemantics.RequestAsPublisher;
 
         if (ShouldIgnore(ex, ignoreExceptions))
         {
@@ -70,7 +51,7 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
             return;
         }
 
-        var retryCount = context.Headers.Get<int>(DistributedConfigurators.Headers.RetryCountKey);
+        var retryCount = context.Headers.Get<int>(Headers.RetryCountKey);
         if (retryCount < intervals.Length)
         {
             await RetryAsync(context, intervals[retryCount], retryCount, publisher, logger, token);
@@ -84,9 +65,8 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
     private static async Task RetryAsync(IConsumeContext<TMessage> context, TimeSpan nextRetry, int retryCount,
         IPublisher publisher, ILogger logger, CancellationToken token)
     {
-        context.Headers.Set(DistributedConfigurators.Headers.RetryCountKey, retryCount + 1);
-        context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
-            DistributedConfigurators.DeliveryKinds.Retry);
+        context.Headers.Set(Headers.RetryCountKey, retryCount + 1);
+        context.Headers.Set(Headers.DeliveryKindKey, DeliveryKinds.Retry);
         logger?.LogWarning(
             "Message: {@Message} in a failed batch will be retried after: {@TimeSpan}",
             context.Message, nextRetry);
@@ -102,8 +82,8 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
     private static async Task DeadLetterAsync(IConsumeContext<TMessage> context, Exception ex, IPublisher publisher,
         ILogger logger, CancellationToken token)
     {
-        context.Headers.Set(DistributedConfigurators.Headers.DeliveryKindKey,
-            DistributedConfigurators.DeliveryKinds.DeadLetter);
+        context.Headers.Set(Headers.DeliveryKindKey,
+            DeliveryKinds.DeadLetter);
         SetExceptionHeaders(context, ex);
         publisher.SetContext(context);
         logger?.LogError(ex,
@@ -114,10 +94,10 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
 
     private static void SetExceptionHeaders(IConsumeContext context, Exception ex)
     {
-        context.Headers.Set(DistributedConfigurators.Headers.ExceptionTypeKey,
+        context.Headers.Set(Headers.ExceptionTypeKey,
             ex.GetType().FullName ?? ex.GetType().Name);
-        context.Headers.Set(DistributedConfigurators.Headers.ExceptionMessageKey, ex.Message);
-        context.Headers.Set(DistributedConfigurators.Headers.ExceptionStackTraceKey, ex.StackTrace ?? string.Empty);
+        context.Headers.Set(Headers.ExceptionMessageKey, ex.Message);
+        context.Headers.Set(Headers.ExceptionStackTraceKey, ex.StackTrace ?? string.Empty);
     }
 
     private static bool ShouldIgnore(Exception ex, Type[] ignoreExceptions)

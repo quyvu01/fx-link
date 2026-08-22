@@ -119,7 +119,6 @@ internal sealed class BatchAccumulator<TMessage> : IBatchAccumulator<TMessage>, 
     // forever) — flagged as a known limitation, not solved here.
     private sealed class BatchState
     {
-        // A plain object lock is used (not System.Threading.Lock) so this still compiles under net8.0.
         public readonly object Lock = new();
         public List<IConsumeContext<TMessage>> Buffer = [];
         public Timer Timer;
