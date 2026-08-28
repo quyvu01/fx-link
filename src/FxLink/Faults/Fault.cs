@@ -35,7 +35,7 @@ public class Fault
             FaultId = Guid.NewGuid().ToString(),
             FaultedMessageId = faultedMessageId,
             Timestamp = DateTime.UtcNow,
-            Exceptions = exceptions.ToArray(),
+            Exceptions = [.. exceptions],
             Host = HostInfo.Current
         };
     }
