@@ -1,5 +1,6 @@
 using System.Reflection;
 using FxLink.Abstractions;
+using FxLink.BackgroundServices;
 using FxLink.Extensions;
 using FxLink.Implementations;
 using FxLink.InMemory;
@@ -15,6 +16,7 @@ internal class Configurator(IServiceCollection services) : IConfigurator
     public IServiceCollection Services { get; } = services;
     public IMessageKeys MessageKeys { get; } = new MessageKeys();
     internal ISupervisorOptions SupervisorOptions { get; private set; } = new SupervisorOptions();
+    internal IOutboxRegistry OutboxRegistry { get; } = new OutboxRegistry();
 
     public void AddConsumer<TConsumer>() where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
@@ -38,6 +40,28 @@ internal class Configurator(IServiceCollection services) : IConfigurator
         Services.AddSingleton<InMemoryMessageUnPublisherDispatcher>();
         Services.TryAddSingleton(typeof(IClientConnector<>), typeof(InMemoryClientConnector<>));
         Services.AddSingleton<InMemoryResponseProcessor>();
+    }
+
+    public void UseOutbox(Action<IOutboxConfigurator> option)
+    {
+        ArgumentNullException.ThrowIfNull(option);
+        var outboxConfig = new OutboxConfigurator(Services, OutboxRegistry);
+        option.Invoke(outboxConfig);
+
+        this.AddPublisherPipelineBehaviors(c => c
+            .Of(typeof(OutboxPublisherPipelineBehavior<>))
+        );
+
+        // TryAdd: only takes effect if the callback above never called DispatcherOptions(...) —
+        // OutboxDispatcherWorker/OutboxCleanupWorker require IOutboxDispatcherOptions unconditionally,
+        // so it must resolve to sensible defaults even when the caller never touches it.
+        Services.TryAddSingleton<IOutboxDispatcherOptions, OutboxDispatcherOptions>();
+
+        Services.AddSingleton(OutboxRegistry);
+        Services.AddSingleton(typeof(OutboxTypedRowSender<>));
+        Services.AddSingleton<OutboxRowSender>();
+        Services.AddHostedService<OutboxDispatcherWorker>();
+        Services.AddHostedService<OutboxCleanupWorker>();
     }
 
     public void ConfigureSupervisor(Action<ISupervisorOptions> options)
@@ -100,8 +124,7 @@ internal class Configurator(IServiceCollection services) : IConfigurator
     internal void AddMessageTypeDefinition(Type messageDefinition)
     {
         if (messageDefinition.GetGenericBaseType(typeof(MessageDefinition<>)) is not { } configForMessage) return;
-        var serviceType = typeof(IMessageDefinition<>)
-            .MakeGenericType(configForMessage.GetGenericArguments());
+        var serviceType = typeof(IMessageDefinition<>).MakeGenericType(configForMessage.GetGenericArguments());
         Services.TryAddEnumerable(new ServiceDescriptor(serviceType, messageDefinition,
             ServiceLifetime.Singleton));
     }

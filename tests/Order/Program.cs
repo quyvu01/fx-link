@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using Order.Dtos.Batches;
 using Order.Dtos.MessageDefinitions;
 using Order.Dtos.Orders;
+using Order.Outboxes.Messages;
 using Order.TestRoutingSlip.Activities;
 using Order.TestRoutingSlip.Contracts;
 using Serilog;
@@ -43,6 +44,20 @@ builder.Services.AddFxLink(opts =>
     opts.AddConsumerDefinitionsFromAssemblies(typeof(Program).Assembly);
 
     opts.AddMessageDefinitionsFromAssemblies(typeof(Program).Assembly);
+
+    opts.UseOutbox(c =>
+    {
+        c.InMemoryOutbox();
+        c.DispatcherOptions(x =>
+        {
+            x.PollInterval = TimeSpan.FromSeconds(1);
+            x.RetentionPeriod = TimeSpan.FromDays(3);
+        });
+        c.MessageOutbox<IStockCreated>(cfg =>
+        {
+            cfg.InMemoryOutbox();
+        });
+    });
 
     opts.AddRabbitMq(config =>
     {
@@ -155,13 +170,20 @@ app.MapPost("/batch/test", async (IPublisher publisher) =>
     {
         var random = new Random();
         var next = random.Next(3);
-        await publisher.PublishAsync<IInventoryCreated>(new { Name = $"SomeName: {next}", RandomNumber = next }, c =>
-        {
-            c.Headers.Set("token", $"Current tick: {DateTime.UtcNow.Ticks}");
-        });
+        await publisher.PublishAsync<IInventoryCreated>(new { Name = $"SomeName: {next}", RandomNumber = next },
+            c => { c.Headers.Set("token", $"Current tick: {DateTime.UtcNow.Ticks}"); });
         return $"IInventoryCreated with random: {next}";
     })
     .WithTags("Batch consumer")
+    .WithOpenApi();
+
+app.MapPost("/outbox/test", async (IPublisher publisher) =>
+    {
+        await publisher.PublishAsync<IStockCreated>(new { Name = "SomeName", Code = "SomeCode" },
+            c => { c.Headers.Set("token", $"Current tick: {DateTime.UtcNow.Ticks}"); });
+        return "IStockCreated created";
+    })
+    .WithTags("Outbox test")
     .WithOpenApi();
 
 app.Run();
