@@ -54,14 +54,18 @@ internal sealed class StateMachineInstanceRepository<TInstance> :
 
     public async Task SaveInstanceAsync(CancellationToken token = default)
     {
+        var stateMachineAsVersions = _dbContext.ChangeTracker.Entries()
+            .Where(c => c is { Entity: IVersion, State: EntityState.Modified })
+            .Select(a => a.Entity as IVersion);
+
+        foreach (var entry in stateMachineAsVersions) entry!.Version++;
+
         try
         {
             await _dbContext.SaveChangesAsync(token);
         }
         catch (DbUpdateException ex)
         {
-            // Covers both optimistic-concurrency mismatches (DbUpdateConcurrencyException) and
-            // duplicate-key violations from two concurrent CreateInstanceAsync calls racing.
             throw new StateMachineEntityFrameworkCoreException.ConcurrentInstanceSaveConflict(ex);
         }
     }

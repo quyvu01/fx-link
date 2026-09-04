@@ -48,7 +48,7 @@ namespace StateMachine.Migrations
 
                     b.HasKey("CorrelationId");
 
-                    b.ToTable("InventoryReservations");
+                    b.ToTable("InventoryReservations", (string)null);
                 });
 #pragma warning restore 612, 618
         }

@@ -2,14 +2,20 @@ using FxLink.Abstractions;
 using FxLink.Entities;
 using FxLink.Implementations;
 using FxLink.Registries;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace FxLink.BackgroundServices;
 
 // Dispatch-path half of the Outbox pattern. Runs one independent polling loop per registered
-// IOutboxStore (the default one, plus one per TMessage that opted into its own via MessageOutbox) —
-// see IOutboxRegistry for why it has to be discovered this way instead of via IEnumerable<T>.
+// outbox (the default one, plus one per TMessage that opted into its own via MessageOutbox) — see
+// IOutboxRegistry for why it has to be discovered this way instead of via IEnumerable<T>.
+//
+// Each tick opens its own scope and re-resolves IOutboxStore/IPartitionLeaseStore from it, rather
+// than resolving once for the worker's whole lifetime — a scope-aware backend (e.g. EF Core, backed
+// by a Scoped DbContext) can't safely be held by this Singleton hosted service across ticks the way
+// InMemory's Singleton store can.
 internal sealed class OutboxDispatcherWorker(
     IOutboxRegistry registry,
     IServiceProvider serviceProvider,
@@ -19,22 +25,31 @@ internal sealed class OutboxDispatcherWorker(
 {
     private readonly string _instanceId = Guid.NewGuid().ToString("N");
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var stores = registry.ResolveOutboxStoresWithLeases(serviceProvider).ToList();
-        if (stores.Count == 0) return;
+        var loops = new List<Task>();
+        if (registry.HasDefault) loops.Add(RunStoreLoopAsync(null, stoppingToken));
+        loops.AddRange(registry.KeyedMessageTypes.Select(messageType => RunStoreLoopAsync(messageType, stoppingToken)));
 
-        var loops = stores.Select(store => RunStoreLoopAsync(store.Outbox, store.Leases, stoppingToken));
-        await Task.WhenAll(loops);
+        return loops.Count == 0 ? Task.CompletedTask : Task.WhenAll(loops);
     }
 
-    private async Task RunStoreLoopAsync(IOutboxStore store, IPartitionLeaseStore leases,
-        CancellationToken stoppingToken)
+    // messageType null = the default/unkeyed outbox.
+    private static (IOutboxStore Outbox, IPartitionLeaseStore Leases) ResolveStore(IServiceProvider provider,
+        Type messageType) => messageType is null
+        ? (provider.GetRequiredService<IOutboxStore>(), provider.GetRequiredService<IPartitionLeaseStore>())
+        : (provider.GetRequiredKeyedService<IOutboxStore>(messageType),
+            provider.GetRequiredKeyedService<IPartitionLeaseStore>(messageType));
+
+    private async Task RunStoreLoopAsync(Type messageType, CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                using var scope = serviceProvider.CreateScope();
+                var (store, leases) = ResolveStore(scope.ServiceProvider, messageType);
+
                 var partitionKeys = await store
                     .GetPendingPartitionKeysAsync(outboxDispatcherOptions.MaxPartitionsPerTick, stoppingToken);
                 var tasks = partitionKeys.Select(key => DispatchPartitionAsync(store, leases, key, stoppingToken));
@@ -65,7 +80,7 @@ internal sealed class OutboxDispatcherWorker(
     {
         var version = await leases.TryAcquireAsync(partitionKey, _instanceId, outboxDispatcherOptions.LeaseDuration,
             stoppingToken);
-        if (version is null) return; // another instance currently owns this partition
+        if (version is not { } leasesVersion) return; // another instance currently owns this partition
 
         try
         {
@@ -79,20 +94,21 @@ internal sealed class OutboxDispatcherWorker(
 
                 if (DateTime.UtcNow - lastRenewal > outboxDispatcherOptions.LeaseRenewInterval)
                 {
-                    var renewed = await leases.RenewAsync(partitionKey, _instanceId, version.Value,
+                    var renewed = await leases.RenewAsync(partitionKey, _instanceId, leasesVersion,
                         outboxDispatcherOptions.LeaseDuration, stoppingToken);
-                    if (renewed is null) return; // lease was reclaimed mid-batch — stop touching this partition
-                    version = renewed;
+                    if (renewed is not { } renewedVersion)
+                        return; // lease was reclaimed mid-batch — stop touching this partition
+                    leasesVersion = renewedVersion;
                     lastRenewal = DateTime.UtcNow;
                 }
 
-                if (!await TryDispatchOneAsync(store, message, version.Value, stoppingToken))
+                if (!await TryDispatchOneAsync(store, message, leasesVersion, stoppingToken))
                     return; // either fencing rejected the write, or ordering requires stopping here
             }
         }
         finally
         {
-            await leases.ReleaseAsync(partitionKey, _instanceId, version.Value, CancellationToken.None);
+            await leases.ReleaseAsync(partitionKey, _instanceId, leasesVersion, CancellationToken.None);
         }
     }
 

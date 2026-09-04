@@ -12,7 +12,6 @@ using Serilog;
 using StateMachine.Databases;
 using StateMachine.Dtos.Inventory;
 using StateMachine.StateMachines.Inventory;
-using StateMachine.Tests;
 using StateMachine.Tests.Events;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -73,7 +72,6 @@ builder.Services.AddFxLink(opts =>
                 config.DbContextFactory(sp => sp.GetRequiredService<StateMachineDbContext>());
             });
         });
-        c.Of<SagaStateMachine>(cfg => { cfg.InMemoryRepository(); });
     });
 });
 

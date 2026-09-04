@@ -370,3 +370,6 @@ FodyWeavers.xsd
 .DS_Store
 .DS_Store?
 .idea
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

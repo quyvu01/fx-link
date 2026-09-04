@@ -9,9 +9,6 @@ public sealed class OutboxMessage
 {
     public Guid Id { get; init; } = Statics.Id.New();
     public Guid PartitionKey { get; init; }
-
-    // Assigned by IOutboxStore.EnqueueAsync — deliberately mutable (not init) since the store, not
-    // the caller, owns handing out the monotonic value. Whatever the caller sets is overwritten.
     public long Sequence { get; set; }
     public string MessageType { get; init; }
     public string Payload { get; init; }

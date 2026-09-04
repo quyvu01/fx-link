@@ -6,10 +6,11 @@ namespace FxLink.Registries;
 
 internal sealed class OutboxConfigurator(IServiceCollection services, IOutboxRegistry registry) : IOutboxConfigurator
 {
+    public IServiceCollection Services => services;
+    public IOutboxRegistry Registry => registry;
+
     public void InMemoryOutbox()
     {
-        // Registered as the same singleton instance so InMemoryOutboxStore's fencing checks
-        // (IsCurrentVersion) see the exact lease state IPartitionLeaseStore callers mutate.
         services.AddSingleton<InMemoryPartitionLeaseStore>();
         services.AddSingleton<IPartitionLeaseStore>(sp => sp.GetRequiredService<InMemoryPartitionLeaseStore>());
         services.AddSingleton<IOutboxStore, InMemoryOutboxStore>();

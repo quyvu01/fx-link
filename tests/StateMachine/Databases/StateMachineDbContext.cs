@@ -1,3 +1,4 @@
+using FxLink.StateMachine.EntityFrameworkCore.Extensions;
 using Microsoft.EntityFrameworkCore;
 using StateMachine.StateMachines.Inventory;
 
@@ -9,10 +10,7 @@ public sealed class StateMachineDbContext(DbContextOptions<StateMachineDbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.AddStateMachineInstance<InventoryReservationInstance>();
         base.OnModelCreating(modelBuilder);
-
-        // Pessimistic mode (InventoryReservationStateMachine): no concurrency token needed - the
-        // advisory lock acquired in BeginScopeAsync is what serializes concurrent writers.
-        modelBuilder.Entity<InventoryReservationInstance>(e => e.HasKey(x => x.CorrelationId));
     }
 }

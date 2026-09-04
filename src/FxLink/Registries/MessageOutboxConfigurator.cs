@@ -8,12 +8,12 @@ namespace FxLink.Registries;
 internal sealed class MessageOutboxConfigurator<TMessage>(IServiceCollection services, IOutboxRegistry registry)
     : IMessageOutboxConfigurator where TMessage : class
 {
+    public IServiceCollection Services => services;
+    public IOutboxRegistry Registry => registry;
+    public Type MessageType => typeof(TMessage);
+
     public void InMemoryOutbox()
     {
-        // Same pairing as OutboxConfigurator.InMemoryOutbox(), but keyed by TMessage — explicit
-        // factories because DI won't auto-resolve a keyed constructor dependency without
-        // [FromKeyedServices], which InMemoryOutboxStore can't use since it's shared with the
-        // unkeyed registration path too.
         services.TryAddKeyedSingleton<InMemoryPartitionLeaseStore>(typeof(TMessage));
         services.TryAddKeyedSingleton<IPartitionLeaseStore>(typeof(TMessage),
             (sp, key) => sp.GetRequiredKeyedService<InMemoryPartitionLeaseStore>(key));

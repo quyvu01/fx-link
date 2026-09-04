@@ -36,7 +36,13 @@ public static class DependencyExtensions
 
         services.AddSingleton(typeof(IRequester<>), typeof(Requester<>));
 
-        services.AddSingleton(typeof(IOutboxStoreResolver<>), typeof(OutboxStoreResolver<>));
+        // Scoped, not Singleton: this resolver's captured IServiceProvider must be the ambient
+        // per-message scope, not the root container — EnqueueAsync needs to land on the exact same
+        // scoped DbContext the consumer's own business write uses (that's the whole point of the
+        // Outbox atomicity guarantee). A Singleton resolver would permanently capture the root
+        // provider instead, silently breaking that guarantee for any scope-aware IOutboxStore
+        // (e.g. an EF Core-backed one — InMemory doesn't care, it has no scoping concerns at all).
+        services.AddScoped(typeof(IOutboxStoreResolver<>), typeof(OutboxStoreResolver<>));
 
         services.AddSingleton(typeof(IConsumerConfiguratorResolver<>), typeof(ConsumerConfiguratorResolver<>));
 
