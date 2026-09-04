@@ -1,6 +1,7 @@
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Extensions;
+using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.EntityFrameworkCore.Exceptions;
 using FxLink.StateMachine.EntityFrameworkCore.Wrappers;
 using FxLink.StateMachine.Implementations.StateMachines;
@@ -18,13 +19,12 @@ internal class StateMachineEntityFrameworkConfigurator : IStateMachineEntityFram
     private Type _dbContextType;
     private int _dbContextConfigurationCallCount;
     internal readonly Type StateMachineInstanceType;
-    private readonly IServiceCollection _sevices;
+    private readonly IServiceCollection _services;
 
     public StateMachineEntityFrameworkConfigurator(IStateMachineSetup stateMachineSetup, IServiceCollection services)
     {
-        _sevices = services;
-        var stateMachineBaseType = stateMachineSetup.StateMachineType
-            .GetGenericBaseType(typeof(StateMachine<>));
+        _services = services;
+        var stateMachineBaseType = stateMachineSetup.StateMachineType.GetGenericBaseType(typeof(StateMachine<>));
         if (stateMachineBaseType is null) return;
         StateMachineInstanceType = stateMachineBaseType.GetGenericArguments().First();
     }
@@ -43,7 +43,7 @@ internal class StateMachineEntityFrameworkConfigurator : IStateMachineEntityFram
     {
         _dbContextType = typeof(TDbContext);
         _dbContextConfigurationCallCount++;
-        _sevices.AddKeyedScoped(StateMachineInstanceType,
+        _services.AddKeyedScoped(StateMachineInstanceType,
             (sp, _) => new DbContextWrapped(sp.GetRequiredService<TDbContext>()));
     }
 
@@ -52,7 +52,7 @@ internal class StateMachineEntityFrameworkConfigurator : IStateMachineEntityFram
     {
         _dbContextType = typeof(TDbContext);
         _dbContextConfigurationCallCount++;
-        _sevices.AddKeyedScoped(StateMachineInstanceType,
+        _services.AddKeyedScoped(StateMachineInstanceType,
             (_, _) => new DbContextWrapped(dbContextFactory.Invoke()));
     }
 
@@ -61,7 +61,7 @@ internal class StateMachineEntityFrameworkConfigurator : IStateMachineEntityFram
     {
         _dbContextType = typeof(TDbContext);
         _dbContextConfigurationCallCount++;
-        _sevices.AddKeyedScoped(StateMachineInstanceType,
+        _services.AddKeyedScoped(StateMachineInstanceType,
             (sp, _) => new DbContextWrapped(dbContextFactory.Invoke(sp)));
     }
 
@@ -73,6 +73,10 @@ internal class StateMachineEntityFrameworkConfigurator : IStateMachineEntityFram
             throw new StateMachineEntityFrameworkCoreException.DbContextNotConfigured();
         if (_concurrencyMode is ConcurrencyMode.Pessimistic && _dialect is null)
             throw new StateMachineEntityFrameworkCoreException.PessimisticModeDialectNotConfigured();
+        if (_concurrencyMode is ConcurrencyMode.Optimistic &&
+            !typeof(IVersion).IsAssignableFrom(StateMachineInstanceType))
+            throw new StateMachineEntityFrameworkCoreException.OptimisticModeVersionNotImplemented(
+                StateMachineInstanceType);
     }
 
     internal StateMachineEntityFrameworkOptions ToOptions() => new(_isolationLevel, _concurrencyMode, _dialect);

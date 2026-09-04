@@ -1,4 +1,5 @@
 using FxLink.Exceptions;
+using FxLink.StateMachine.Abstractions;
 using FxLink.StateMachine.EntityFrameworkCore.Registries;
 
 namespace FxLink.StateMachine.EntityFrameworkCore.Exceptions;
@@ -37,6 +38,20 @@ public static class StateMachineEntityFrameworkCoreException
         : DistributedException(
             $"{nameof(ConcurrencyMode)}.{nameof(ConcurrencyMode.Pessimistic)} requires the correlation id to be resolvable before reading the instance. " +
             "Configure the event with CorrelationId(...) (or CorrelationBy(...) combined with SelectId(...)) so the lock key is known ahead of the query.");
+
+    /// <summary>
+    /// ConcurrencyMode.Optimistic (the default) requires TInstance to implement IVersion so a real
+    /// concurrency-token column can be mapped. Without it, EF Core has nothing to compare against on
+    /// UPDATE and a concurrent write would silently overwrite another instance's changes instead of
+    /// throwing — the same failure mode ConcurrentInstanceSaveConflict exists to catch.
+    /// </summary>
+    public sealed class OptimisticModeVersionNotImplemented(Type instanceType)
+        : DistributedException(
+            $"{instanceType.Name} must implement {nameof(IVersion)} to use {nameof(ConcurrencyMode)}.{nameof(ConcurrencyMode.Optimistic)} " +
+            $"(the default) — otherwise there is no column for EF Core to detect a concurrent write against. " +
+            $"Either implement {nameof(IVersion)} on {instanceType.Name} and call " +
+            $"modelBuilder.AddStateMachineInstanceVersion<{instanceType.Name}>() in your DbContext's OnModelCreating, " +
+            $"or switch to {nameof(ConcurrencyMode)}.{nameof(ConcurrencyMode.Pessimistic)}.");
 
     /// <summary>
     /// SaveInstanceAsync failed with a DbUpdateException: either an optimistic-concurrency mismatch

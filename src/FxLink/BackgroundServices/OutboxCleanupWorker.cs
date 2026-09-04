@@ -1,4 +1,6 @@
+using FxLink.Abstractions;
 using FxLink.Registries;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -9,6 +11,9 @@ namespace FxLink.BackgroundServices;
 // IPartitionLeaseStore coordination — DeleteDispatchedBeforeAsync only ever touches terminal rows,
 // so multiple instances running their own cleanup tick concurrently is naturally safe (deleting an
 // already-deleted row is a no-op, there's no ordering concern for rows nothing reads anymore).
+//
+// Each tick opens its own scope and re-resolves IOutboxStore from it — same reasoning as
+// OutboxDispatcherWorker: a scope-aware backend can't be held across ticks by this Singleton service.
 internal sealed class OutboxCleanupWorker(
     IOutboxRegistry registry,
     IServiceProvider serviceProvider,
@@ -17,16 +22,24 @@ internal sealed class OutboxCleanupWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var stores = registry.ResolveOutboxStores(serviceProvider).ToList();
-        if (stores.Count == 0) return;
+        var hasDefault = registry.HasDefault;
+        var keyedMessageTypes = registry.KeyedMessageTypes.ToList();
+        if (!hasDefault && keyedMessageTypes.Count == 0) return;
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                using var scope = serviceProvider.CreateScope();
                 var cutoff = DateTime.UtcNow - options.RetentionPeriod;
-                foreach (var store in stores)
-                    await store.DeleteDispatchedBeforeAsync(cutoff, stoppingToken);
+
+                if (hasDefault)
+                    await scope.ServiceProvider.GetRequiredService<IOutboxStore>()
+                        .DeleteDispatchedBeforeAsync(cutoff, stoppingToken);
+
+                foreach (var messageType in keyedMessageTypes)
+                    await scope.ServiceProvider.GetRequiredKeyedService<IOutboxStore>(messageType)
+                        .DeleteDispatchedBeforeAsync(cutoff, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

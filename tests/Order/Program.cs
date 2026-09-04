@@ -1,9 +1,13 @@
+using System.Reflection;
 using Contracts.Messages;
 using FxLink.Abstractions;
 using FxLink.Extensions;
+using FxLink.Outbox.EntityFrameworkCore.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RoutingSlip.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Order.Databases;
 using Order.Dtos.Batches;
 using Order.Dtos.MessageDefinitions;
 using Order.Dtos.Orders;
@@ -37,6 +41,16 @@ builder.Services.AddSerilog((services, lc) => lc
     .ReadFrom.Services(services)
     .Enrich.FromLogContext());
 
+builder.Services.AddDbContextPool<OrderDbContext>(options =>
+{
+    options.UseNpgsql("Host=localhost;Username=postgres;Password=Abcd@2021;Database=FxLinkStateMachine_Order", b =>
+    {
+        b.MigrationsAssembly(Assembly.GetExecutingAssembly().GetName().Name);
+        b.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+    });
+});
+
+
 builder.Services.AddFxLink(opts =>
 {
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
@@ -50,12 +64,14 @@ builder.Services.AddFxLink(opts =>
         c.InMemoryOutbox();
         c.DispatcherOptions(x =>
         {
-            x.PollInterval = TimeSpan.FromSeconds(1);
+            x.PollInterval = TimeSpan.FromSeconds(10);
             x.RetentionPeriod = TimeSpan.FromDays(3);
         });
         c.MessageOutbox<IStockCreated>(cfg =>
         {
-            cfg.InMemoryOutbox();
+            cfg.EntityFrameworkOutbox(x => x
+                .AddDbContext<OrderDbContext>()
+            );
         });
     });
 
