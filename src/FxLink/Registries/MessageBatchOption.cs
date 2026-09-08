@@ -43,15 +43,8 @@ internal sealed class MessageBatchOption<TMessage> : MessageBatchOption, IMessag
         return this;
     }
 
-    public IMessageBatchOption<TMessage> GroupBy<TProperty>(Func<IConsumeContext<TMessage>, TProperty?> selector)
-        where TProperty : struct
-    {
-        _groupByProvider = new ValueTypeGroupByProvider<TMessage, TProperty>(selector);
-        return this;
-    }
-
     public IMessageBatchOption<TMessage> GroupBy<TProperty>(Func<IConsumeContext<TMessage>, TProperty> selector)
-        where TProperty : class
+
     {
         _groupByProvider = new GroupKeyProvider<TMessage, TProperty>(selector);
         return this;

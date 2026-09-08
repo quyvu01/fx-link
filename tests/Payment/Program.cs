@@ -20,6 +20,8 @@ builder.Services.AddFxLink(opts =>
     opts.AddConsumersFromAssemblies(typeof(Program).Assembly);
 
     opts.AddConsumerDefinitionsFromAssemblies(typeof(Program).Assembly);
+    
+    opts.AddMessageDefinitionsFromAssemblies(typeof(Program).Assembly);
 
     opts.AddRabbitMq(config => config.Host("localhost", "fxlink"));
 });

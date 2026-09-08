@@ -11,10 +11,4 @@ internal sealed class OutboxStoreResolver<TMessage>(IServiceProvider serviceProv
         var outboxStore = serviceProvider.GetKeyedService<IOutboxStore>(typeof(TMessage));
         return outboxStore ?? serviceProvider.GetService<IOutboxStore>();
     }
-
-    public IPartitionLeaseStore GetPartitionLeaseStore()
-    {
-        var leaseStore = serviceProvider.GetKeyedService<IPartitionLeaseStore>(typeof(TMessage));
-        return leaseStore ?? serviceProvider.GetService<IPartitionLeaseStore>();
-    }
 }

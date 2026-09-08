@@ -32,8 +32,10 @@ internal sealed class InMemoryOutboxStore(InMemoryPartitionLeaseStore leaseStore
             [
                 .. _messages.Values
                     .Where(IsPending)
-                    .Select(m => m.PartitionKey)
-                    .Distinct()
+                    .GroupBy(m => m.PartitionKey)
+                    .Select(g => new { PartitionKey = g.Key, MinSequence = g.Min(m => m.Sequence) })
+                    .OrderBy(x => x.MinSequence)
+                    .Select(x => x.PartitionKey)
                     .Take(max)
             ];
             return Task.FromResult(keys);
@@ -57,7 +59,16 @@ internal sealed class InMemoryOutboxStore(InMemoryPartitionLeaseStore leaseStore
     }
 
     public Task<bool> MarkDispatchedAsync(Guid outboxMessageId, long leaseVersion, CancellationToken token = default)
-        => TryMutate(outboxMessageId, leaseVersion, m => m.DispatchedAt = DateTime.UtcNow);
+    {
+        lock (_gate)
+        {
+            if (!_messages.TryGetValue(outboxMessageId, out var message)) return Task.FromResult(false);
+            if (!leaseStore.IsCurrentVersion(message.PartitionKey, leaseVersion)) return Task.FromResult(false);
+
+            _messages.Remove(outboxMessageId);
+            return Task.FromResult(true);
+        }
+    }
 
     public Task<bool> MarkFailedAsync(Guid outboxMessageId, long leaseVersion, string error,
         CancellationToken token = default) => TryMutate(outboxMessageId, leaseVersion, m =>
@@ -78,8 +89,7 @@ internal sealed class InMemoryOutboxStore(InMemoryPartitionLeaseStore leaseStore
         lock (_gate)
         {
             var expired = _messages.Values
-                .Where(m => (m.DispatchedAt is { } dispatchedAt && dispatchedAt < cutoff) ||
-                            (m.DeadLetteredAt is { } deadLetteredAt && deadLetteredAt < cutoff))
+                .Where(m => m.DeadLetteredAt is { } deadLetteredAt && deadLetteredAt < cutoff)
                 .Select(m => m.Id)
                 .ToList();
 
@@ -89,7 +99,7 @@ internal sealed class InMemoryOutboxStore(InMemoryPartitionLeaseStore leaseStore
         return Task.CompletedTask;
     }
 
-    private static bool IsPending(OutboxMessage m) => m.DispatchedAt is null && m.DeadLetteredAt is null;
+    private static bool IsPending(OutboxMessage m) => m.DeadLetteredAt is null;
 
     // Not on IOutboxStore — test-only visibility into rows regardless of pending/terminal state,
     // since the public surface only ever exposes pending rows.

@@ -1,13 +1,15 @@
 using System.Reflection;
 using Contracts.Messages;
+using Contracts.Payments;
 using FxLink.Abstractions;
 using FxLink.Extensions;
-using FxLink.Outbox.EntityFrameworkCore.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RoutingSlip.Extensions;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Order.Databases;
+using Order.Dtos;
 using Order.Dtos.Batches;
 using Order.Dtos.MessageDefinitions;
 using Order.Dtos.Orders;
@@ -59,28 +61,23 @@ builder.Services.AddFxLink(opts =>
 
     opts.AddMessageDefinitionsFromAssemblies(typeof(Program).Assembly);
 
-    opts.UseOutbox(c =>
-    {
-        c.InMemoryOutbox();
-        c.DispatcherOptions(x =>
-        {
-            x.PollInterval = TimeSpan.FromSeconds(10);
-            x.RetentionPeriod = TimeSpan.FromDays(3);
-        });
-        c.MessageOutbox<IStockCreated>(cfg =>
-        {
-            cfg.EntityFrameworkOutbox(x => x
-                .AddDbContext<OrderDbContext>()
-            );
-        });
-    });
+    // opts.UseOutbox(c =>
+    // {
+    //     c.InMemoryOutbox();
+    //     c.DispatcherOptions(x =>
+    //     {
+    //         x.PollInterval = TimeSpan.FromSeconds(10);
+    //         x.RetentionPeriod = TimeSpan.FromDays(3);
+    //     });
+    //     c.MessageOutbox<IStockCreated>(cfg =>
+    //     {
+    //         cfg.EntityFrameworkOutbox(x => x
+    //             .AddDbContext<OrderDbContext>()
+    //         );
+    //     });
+    // });
 
-    opts.AddRabbitMq(config =>
-    {
-        config.Host("localhost", "fxlink");
-        config.PrefetchCount(1);
-        config.ConcurrentMessageLimit(1);
-    });
+    opts.AddRabbitMq(config => { config.Host("localhost", "fxlink"); });
 
     opts.AddRoutingSlip(cfg => cfg
         .AddActivity<ReserveInventoryActivity>()
@@ -193,13 +190,23 @@ app.MapPost("/batch/test", async (IPublisher publisher) =>
     .WithTags("Batch consumer")
     .WithOpenApi();
 
-app.MapPost("/outbox/test", async (IPublisher publisher) =>
+app.MapPost("/outbox/test", async (IPublisher publisher, OrderDbContext dbContext) =>
     {
         await publisher.PublishAsync<IStockCreated>(new { Name = "SomeName", Code = "SomeCode" },
             c => { c.Headers.Set("token", $"Current tick: {DateTime.UtcNow.Ticks}"); });
+        await dbContext.SaveChangesAsync();
         return "IStockCreated created";
     })
     .WithTags("Outbox test")
+    .WithOpenApi();
+
+app.MapPost("/payment/created", async (IPublisher publisher, [FromBody] PaymentCreatedTest @event) =>
+    {
+        // await publisher.PublishAsync<IPaymentCreated>(@event);
+        await publisher.PublishAsync<INoRefMessage>(@event);
+        return "Payment created";
+    })
+    .WithTags("Payment test")
     .WithOpenApi();
 
 app.Run();

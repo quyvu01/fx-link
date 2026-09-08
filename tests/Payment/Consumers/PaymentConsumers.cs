@@ -6,7 +6,8 @@ namespace Payment.Consumers;
 
 public sealed class PaymentConsumers(ILogger<PaymentConsumers> logger) :
     IConsumer<ChargePayment>,
-    IConsumer<PaymentRefundRequested>
+    IConsumer<PaymentRefundRequested>,
+    IConsumer<ISomeRefMessage>
 {
     // Cross-service request/reply: Order -> Payment. Amount <= 0 throws, which exercises the
     // default retry policy (see ConsumerDefinition<T>) and eventually the dead-letter queue -
@@ -31,6 +32,12 @@ public sealed class PaymentConsumers(ILogger<PaymentConsumers> logger) :
     public Task ConsumeAsync(IConsumeContext<PaymentRefundRequested> context, CancellationToken token = default)
     {
         logger.LogInformation("Refund requested: {@Message}", context.Message);
+        return Task.CompletedTask;
+    }
+
+    public Task ConsumeAsync(IConsumeContext<ISomeRefMessage> context, CancellationToken token = default)
+    {
+        Console.WriteLine($"Received some ref message: {context.Message.PaymentNumber}");
         return Task.CompletedTask;
     }
 }

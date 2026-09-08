@@ -39,9 +39,6 @@ namespace Order.Migrations
                     b.Property<TimeSpan?>("DelayTime")
                         .HasColumnType("interval");
 
-                    b.Property<DateTime?>("DispatchedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("LastError")
                         .HasColumnType("text");
 

@@ -99,8 +99,6 @@ internal class RabbitMqClientConnector<TMessage>(
 
     public override async Task ProcessMessageReceivedAsync(BasicDeliverEventArgs args, Type consumerType)
     {
-        var messageType = args.BasicProperties.Type;
-        if (typeof(TMessage).AssemblyQualifiedName != messageType) return;
         var bodyAsJson = Encoding.UTF8.GetString(args.Body.Span);
         var envelope = JsonSerializer.Deserialize<ConsumerContextEnvelope<TMessage>>(bodyAsJson,
             DistributedConfigurators.JsonSerializerOptions);

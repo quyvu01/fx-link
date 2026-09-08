@@ -13,8 +13,9 @@ internal sealed class OutboxDispatcherOptions : IOutboxDispatcherOptions
     public int MaxMessagesPerPartitionPerTick { get; set; } = 50;
     public int MaxPartitionsPerTick { get; set; } = 20;
 
-    // Cleanup (OutboxCleanupWorker): how long a Dispatched/DeadLettered row survives before it's
-    // eligible for deletion, and how often the cleanup loop checks.
+    // Cleanup (OutboxCleanupWorker): how long a DeadLettered row survives before it's eligible for
+    // deletion, and how often the cleanup loop checks. Dispatched rows never reach here — they're
+    // removed inline by MarkDispatchedAsync the moment they dispatch successfully.
     public TimeSpan RetentionPeriod { get; set; } = TimeSpan.FromDays(7);
     public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromHours(1);
 }
