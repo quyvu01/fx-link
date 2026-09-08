@@ -107,6 +107,7 @@ public class InMemoryOutboxStoreTests
 
         result.ShouldBeTrue();
         (await outbox.GetPendingByPartitionAsync(partitionKey, 10)).ShouldBeEmpty();
+        outbox.Contains(message.Id).ShouldBeFalse(); // removed entirely, not just excluded from pending
     }
 
     [Fact]
@@ -175,28 +176,28 @@ public class InMemoryOutboxStoreTests
     }
 
     [Fact]
-    public async Task DeleteDispatchedBeforeAsync_removes_only_terminal_messages_older_than_the_cutoff()
+    public async Task DeleteDispatchedBeforeAsync_removes_only_dead_lettered_messages_older_than_the_cutoff()
     {
         var (leases, outbox) = CreateStore();
         var partitionKey = Guid.NewGuid();
-        var oldDispatched = NewMessage(partitionKey);
-        var recentDispatched = NewMessage(partitionKey);
+        var oldDeadLettered = NewMessage(partitionKey);
+        var recentDeadLettered = NewMessage(partitionKey);
         var stillPending = NewMessage(partitionKey);
-        await outbox.EnqueueAsync(oldDispatched);
-        await outbox.EnqueueAsync(recentDispatched);
+        await outbox.EnqueueAsync(oldDeadLettered);
+        await outbox.EnqueueAsync(recentDeadLettered);
         await outbox.EnqueueAsync(stillPending);
 
         var version = await leases.TryAcquireAsync(partitionKey, "owner", TimeSpan.FromSeconds(30));
-        await outbox.MarkDispatchedAsync(oldDispatched.Id, version!.Value);
+        await outbox.MarkDeadLetteredAsync(oldDeadLettered.Id, version!.Value, "poison");
         await Task.Delay(50);
         var cutoff = DateTime.UtcNow;
         await Task.Delay(50);
-        await outbox.MarkDispatchedAsync(recentDispatched.Id, version.Value);
+        await outbox.MarkDeadLetteredAsync(recentDeadLettered.Id, version.Value, "poison");
 
         await outbox.DeleteDispatchedBeforeAsync(cutoff);
 
-        outbox.Contains(oldDispatched.Id).ShouldBeFalse();
-        outbox.Contains(recentDispatched.Id).ShouldBeTrue();
+        outbox.Contains(oldDeadLettered.Id).ShouldBeFalse();
+        outbox.Contains(recentDeadLettered.Id).ShouldBeTrue();
         outbox.Contains(stillPending.Id).ShouldBeTrue();
     }
 }

@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using FxLink.Abstractions;
 using FxLink.RabbitMq.Abstractions;
 using FxLink.RabbitMq.Entities;
+using FxLink.RabbitMq.Exceptions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RabbitMq.Registries;
 using FxLink.Wrappers;
@@ -19,6 +20,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
 
     private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = [];
+    private readonly ConcurrentDictionary<string, Type> _exchangeMapCollectorType = [];
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
     private readonly ILogger<RabbitMqClient> _logger = serviceProvider.GetRequiredService<ILogger<RabbitMqClient>>();
 
@@ -181,6 +183,16 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
         var messageKeys = _messageKeys.GetMessageKeys();
 
+        // Fail fast if two locally-consumed message types resolve to the same exchange name —
+        // RabbitMQ would fan out both types' messages to every queue bound to that exchange, so
+        // this must be caught here, before any channel/consumer is set up, not left to silently
+        // misroute at runtime (see _exchangeMapCollectorType below).
+        var duplicateExchangeGroup = messageKeys.Keys
+            .GroupBy(GetExchangeName)
+            .FirstOrDefault(g => g.Count() > 1);
+        if (duplicateExchangeGroup is not null)
+            throw new RabbitMqException.DuplicateExchangeName(duplicateExchangeGroup.Key, [.. duplicateExchangeGroup]);
+
         var tasks = messageKeys
             .Select(x => x.Value.Select(k => new
             {
@@ -231,12 +243,18 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         var consumer = new AsyncEventingBasicConsumer(channel);
                         consumer.ReceivedAsync += async (sender, ea) =>
                         {
-                            if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-                            var connectorType = _connectorTypeCache.GetOrAdd(messageType, static type =>
+                            // We will try to resolve exchange to check if we have the message or not...
+                            var connectorType = _exchangeMapCollectorType.GetValueOrDefault(ea.Exchange);
+                            if (connectorType is null)
                             {
-                                var msgType = Type.GetType(type);
-                                return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-                            });
+                                if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
+                                connectorType = _connectorTypeCache.GetOrAdd(messageType, static type =>
+                                {
+                                    var msgType = Type.GetType(type);
+                                    return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
+                                });
+                            }
+
                             if (connectorType is null) return;
                             var connector = (AbstractRabbitMqConnector)serviceProvider
                                 .GetRequiredService(connectorType);
@@ -247,14 +265,9 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                             }
                             catch (Exception ex)
                             {
-                                // RetryPipelineBehavior already owns retry/dead-letter handling and never
-                                // rethrows in the normal case — reaching here means that mechanism itself
-                                // failed (e.g. IPublisher missing, publish channel down). Ack anyway to
-                                // avoid an uncontrolled redelivery loop; the failure is only visible via
-                                // this log.
                                 _logger.LogCritical(ex,
                                     "Unhandled exception escaped the consumer pipeline for {MessageType}",
-                                    messageType);
+                                    connectorType);
                             }
 
                             await ackChannel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
@@ -286,8 +299,8 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     foreach (var messageType in messageTypes)
                     {
                         var exchangeName = GetExchangeName(messageType);
-                        // var exchangeName = messageType.GetExchangeName();
-                        // Declare main exchanges and queues
+                        _exchangeMapCollectorType.TryAdd(exchangeName, typeof(IClientConnector<>)
+                            .MakeGenericType(messageType));
                         await declareChannel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout,
                             durable: false, cancellationToken: cancellationToken);
                         await declareChannel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,

@@ -6,11 +6,13 @@ using Microsoft.Extensions.Logging;
 
 namespace FxLink.BackgroundServices;
 
-// Retention half of the Outbox pattern. Deletes Dispatched/DeadLettered rows older than
-// RetentionPeriod so stores don't grow forever. Unlike OutboxDispatcherWorker, this doesn't need
-// IPartitionLeaseStore coordination — DeleteDispatchedBeforeAsync only ever touches terminal rows,
-// so multiple instances running their own cleanup tick concurrently is naturally safe (deleting an
-// already-deleted row is a no-op, there's no ordering concern for rows nothing reads anymore).
+// Retention half of the Outbox pattern. Deletes DeadLettered rows older than RetentionPeriod so
+// stores don't grow forever — Dispatched rows never reach this worker at all, since
+// IOutboxStore.MarkDispatchedAsync removes them the moment they dispatch successfully. Unlike
+// OutboxDispatcherWorker, this doesn't need IPartitionLeaseStore coordination —
+// DeleteDispatchedBeforeAsync only ever touches terminal rows, so multiple instances running
+// their own cleanup tick concurrently is naturally safe (deleting an already-deleted row is a
+// no-op, there's no ordering concern for rows nothing reads anymore).
 //
 // Each tick opens its own scope and re-resolves IOutboxStore from it — same reasoning as
 // OutboxDispatcherWorker: a scope-aware backend can't be held across ticks by this Singleton service.

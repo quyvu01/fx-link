@@ -33,4 +33,8 @@
         <ProjectReference Include="..\FxLink\FxLink.csproj"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="FxLink.Outbox.EntityFrameworkCore.Tests"/>
+    </ItemGroup>
+
 </Project>

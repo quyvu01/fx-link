@@ -36,7 +36,7 @@ public class OutboxCleanupWorkerTests
     }
 
     [Fact]
-    public async Task Deletes_dispatched_and_dead_lettered_rows_once_they_exceed_the_retention_period()
+    public async Task Deletes_dead_lettered_rows_once_they_exceed_the_retention_period()
     {
         var leaseStore = new InMemoryPartitionLeaseStore();
         var outboxStore = new InMemoryOutboxStore(leaseStore);
@@ -50,6 +50,8 @@ public class OutboxCleanupWorkerTests
         await outboxStore.EnqueueAsync(deadLettered);
         await outboxStore.EnqueueAsync(stillPending);
 
+        // Dispatched rows are removed inline by MarkDispatchedAsync — the cleanup worker never
+        // even sees this one, it's just here to prove the worker doesn't touch stillPending either.
         var version1 = await leaseStore.TryAcquireAsync(dispatched.PartitionKey, "owner", TimeSpan.FromSeconds(30));
         await outboxStore.MarkDispatchedAsync(dispatched.Id, version1!.Value);
         var version2 = await leaseStore.TryAcquireAsync(deadLettered.PartitionKey, "owner", TimeSpan.FromSeconds(30));
@@ -69,17 +71,17 @@ public class OutboxCleanupWorkerTests
     }
 
     [Fact]
-    public async Task Leaves_recently_dispatched_rows_alone_until_the_retention_period_elapses()
+    public async Task Leaves_recently_dead_lettered_rows_alone_until_the_retention_period_elapses()
     {
         var leaseStore = new InMemoryPartitionLeaseStore();
         var outboxStore = new InMemoryOutboxStore(leaseStore);
         var registry = new OutboxRegistry();
         registry.RegisterDefault();
 
-        var dispatched = RowFor(Guid.NewGuid());
-        await outboxStore.EnqueueAsync(dispatched);
-        var version = await leaseStore.TryAcquireAsync(dispatched.PartitionKey, "owner", TimeSpan.FromSeconds(30));
-        await outboxStore.MarkDispatchedAsync(dispatched.Id, version!.Value);
+        var deadLettered = RowFor(Guid.NewGuid());
+        await outboxStore.EnqueueAsync(deadLettered);
+        var version = await leaseStore.TryAcquireAsync(deadLettered.PartitionKey, "owner", TimeSpan.FromSeconds(30));
+        await outboxStore.MarkDeadLetteredAsync(deadLettered.Id, version!.Value, "boom");
 
         var provider = BuildProvider(outboxStore);
         var longRetention = new OutboxDispatcherOptions
@@ -94,6 +96,6 @@ public class OutboxCleanupWorkerTests
         await Task.Delay(150);
         await worker.StopAsync(CancellationToken.None);
 
-        outboxStore.Contains(dispatched.Id).ShouldBeTrue();
+        outboxStore.Contains(deadLettered.Id).ShouldBeTrue();
     }
 }

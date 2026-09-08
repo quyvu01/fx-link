@@ -87,7 +87,6 @@ public class OutboxRowSenderTests
         where TMessage : class
     {
         public IOutboxStore GetOutboxStore() => store;
-        public IPartitionLeaseStore GetPartitionLeaseStore() => throw new NotSupportedException();
     }
 
     private static ServiceProvider BuildProvider<TMessage>(IClientConnector<TMessage> connector)
