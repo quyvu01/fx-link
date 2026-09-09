@@ -111,7 +111,7 @@ internal class RabbitMqClientConnector<TMessage>(
             _ => new ConsumerContextEnvelope<TMessage>
             {
                 Message = JsonSerializer.Deserialize<TMessage>(bodyAsJson,
-                    DistributedConfigurators.JsonSerializerOptions),
+                    messageDefinition.MessageConfigurator.RawJsonSerializerOptions),
                 Context = new ConsumerContextSerializable
                 {
                     MessageId = Id.New(),
