@@ -8,7 +8,7 @@ public sealed class RawJsonEventDefinition : MessageDefinition<IRawJsonEvent>
 {
     public override void Configure(IMessageConfigurator<IRawJsonEvent> options)
     {
-        options.UseRawJsonSerializer();
+        options.UseRawJsonSerializer(c => c.PropertyNameCaseInsensitive = true);
         options.Name("raw-json-message");
     }
 }

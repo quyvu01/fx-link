@@ -5,5 +5,5 @@ public interface IMessageConfigurator;
 public interface IMessageConfigurator<TMessage> : IMessageConfigurator where TMessage : class
 {
     void Name(string name);
-    void UseRawJsonSerializer();
+    void UseRawJsonSerializer(Action<RawJsonSerializerOptions> configure = null);
 }
