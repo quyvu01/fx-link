@@ -2,12 +2,7 @@ using FxLink.Contexts;
 
 namespace FxLink.Registries;
 
-internal abstract class MessageBatchOption
-{
-    internal abstract MessageBatchConfigurator GetMessageBatchConfigurator();
-}
-
-internal sealed class MessageBatchOption<TMessage> : MessageBatchOption, IMessageBatchOption<TMessage>
+internal sealed class MessageBatchOption<TMessage> : IMessageBatchOption, IMessageBatchOption<TMessage>
     where TMessage : class
 {
     private IGroupKeyProvider _groupByProvider;
@@ -50,6 +45,6 @@ internal sealed class MessageBatchOption<TMessage> : MessageBatchOption, IMessag
         return this;
     }
 
-    internal override MessageBatchConfigurator GetMessageBatchConfigurator() =>
+    public MessageBatchConfigurator GetMessageBatchConfigurator() =>
         new(_groupByProvider, _messageLimit, _concurrentLimit, _timeLimit, _timeLimitStart);
 }

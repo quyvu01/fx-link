@@ -85,7 +85,13 @@ internal class Configurator(IServiceCollection services) : IConfigurator
                 MessageKeys.AddMessageKey(wireMessageType, consumerType);
 
                 Services.AddKeyedSingleton(typeof(IBatchAccumulator<>).MakeGenericType(wireMessageType),
-                    consumerType, (sp, _) => BatchAccumulatorFactory.Create(consumerType, wireMessageType, sp));
+                    consumerType, (sp, _) =>
+                    {
+                        var batchAccumulatorFactoryService = (IBatchAccumulatorFactory)sp
+                            .GetRequiredService(typeof(BatchAccumulatorFactory<,>)
+                                .MakeGenericType(consumerType, wireMessageType));
+                        return batchAccumulatorFactoryService.CreateBatchAccumulator();
+                    });
 
                 var batchPipelineServiceType = typeof(IConsumerPipelineBehavior<>)
                     .MakeGenericType(typeof(IBatch<>).MakeGenericType(wireMessageType));

@@ -2,6 +2,11 @@ using FxLink.Contexts;
 
 namespace FxLink.Registries;
 
+internal interface IMessageBatchOption
+{
+    internal MessageBatchConfigurator GetMessageBatchConfigurator();
+}
+
 public interface IMessageBatchOption<out TMessage> : IOption where TMessage : class
 {
     public IMessageBatchOption<TMessage> SetMessageLimit(int limit);
