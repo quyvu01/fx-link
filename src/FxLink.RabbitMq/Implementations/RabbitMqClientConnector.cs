@@ -8,6 +8,7 @@ using FxLink.Entities;
 using FxLink.RabbitMq.Abstractions;
 using FxLink.RabbitMq.Entities;
 using FxLink.RabbitMq.Extensions;
+using FxLink.Statics;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
@@ -100,8 +101,28 @@ internal class RabbitMqClientConnector<TMessage>(
     public override async Task ProcessMessageReceivedAsync(BasicDeliverEventArgs args, Type consumerType)
     {
         var bodyAsJson = Encoding.UTF8.GetString(args.Body.Span);
-        var envelope = JsonSerializer.Deserialize<ConsumerContextEnvelope<TMessage>>(bodyAsJson,
-            DistributedConfigurators.JsonSerializerOptions);
+        var messageDefinition = serviceProvider
+            .GetService<IMessageDefinition<TMessage>>();
+
+        var envelope = messageDefinition.MessageConfigurator.IsRawJsonSerializer switch
+        {
+            false => JsonSerializer.Deserialize<ConsumerContextEnvelope<TMessage>>(bodyAsJson,
+                DistributedConfigurators.JsonSerializerOptions),
+            _ => new ConsumerContextEnvelope<TMessage>
+            {
+                Message = JsonSerializer.Deserialize<TMessage>(bodyAsJson,
+                    DistributedConfigurators.JsonSerializerOptions),
+                Context = new ConsumerContextSerializable
+                {
+                    MessageId = Id.New(),
+                    CorrelationId = Id.New(),
+                    Headers = new HeaderBag(),
+                    SentTime = DateTime.UtcNow,
+                    HostInfo = null,
+                    TimeToLive = null
+                }
+            }
+        };
 
         if (envelope is null) return;
 
