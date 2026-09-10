@@ -13,17 +13,11 @@ internal class ExecuteContext<TArgument> : AbstractContext, IExecuteContext<TArg
     public ExecuteContext(TArgument argument, IContext context) : base(context.Headers, context.CorrelationId)
         => Argument = argument;
 
-    public IExecuteResult Fault(Exception exception)
+    public IExecuteResult Fault(Exception exception = null)
     {
         var executionResult = new ExecuteResult(false);
-        executionResult.Fault(exception);
-        return executionResult;
-    }
-
-    public IExecuteResult Fault()
-    {
-        var executionResult = new ExecuteResult(false);
-        executionResult.Fault(new RoutingSlipException.ExecuteFaultedWithoutException(typeof(TArgument)));
+        var finalException = exception ?? new RoutingSlipException.ExecuteFaultedWithoutException(typeof(TArgument));
+        executionResult.Fault(finalException);
         return executionResult;
     }
 
@@ -41,17 +35,11 @@ internal sealed class ExecuteContext<TArgument, TLog> : AbstractContext, IExecut
     public ExecuteContext(TArgument argument, IContext context) : base(context.Headers, context.CorrelationId)
         => Argument = argument;
 
-    public IExecuteResult Fault(Exception exception)
+    public IExecuteResult<TLog> Fault(Exception exception = null)
     {
-        var executionResult = new ExecuteResult(false);
-        executionResult.Fault(exception);
-        return executionResult;
-    }
-
-    public IExecuteResult Fault()
-    {
-        var executionResult = new ExecuteResult(false);
-        executionResult.Fault(new RoutingSlipException.ExecuteFaultedWithoutException(typeof(TArgument)));
+        var executionResult = new ExecuteResult<TLog>(false, null);
+        var finalException = exception ?? new RoutingSlipException.ExecuteFaultedWithoutException(typeof(TArgument));
+        executionResult.Fault(finalException);
         return executionResult;
     }
 
