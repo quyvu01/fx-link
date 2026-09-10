@@ -101,10 +101,9 @@ internal class RabbitMqClientConnector<TMessage>(
     public override async Task ProcessMessageReceivedAsync(BasicDeliverEventArgs args, Type consumerType)
     {
         var bodyAsJson = Encoding.UTF8.GetString(args.Body.Span);
-        var messageDefinition = serviceProvider
-            .GetService<IMessageDefinition<TMessage>>();
-
-        var envelope = (messageDefinition?.MessageConfigurator?.IsRawJsonSerializer == true) switch
+        var messageDefinition = serviceProvider.GetService<IMessageDefinition<TMessage>>();
+        
+        var envelope = (messageDefinition is { MessageConfigurator.IsRawJsonSerializer: true }) switch
         {
             false => JsonSerializer.Deserialize<ConsumerContextEnvelope<TMessage>>(bodyAsJson,
                 DistributedConfigurators.JsonSerializerOptions),
