@@ -1,11 +1,11 @@
 using FxLink.Abstractions;
-using FxLink.Outbox.EntityFrameworkCore.Registries;
-using FxLink.Outbox.EntityFrameworkCore.Repositories;
-using FxLink.Outbox.EntityFrameworkCore.Wrappers;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Registries;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Repositories;
+using FxLink.Messaging.EntityFrameworkCore.Wrappers;
 using FxLink.Registries;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Extensions;
+namespace FxLink.Messaging.EntityFrameworkCore.Extensions;
 
 public static class DependencyExtensions
 {

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Registries;
+namespace FxLink.Messaging.EntityFrameworkCore.Outbox.Registries;
 
 public interface IOutboxEntityFrameworkConfigurator
 {

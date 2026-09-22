@@ -5,8 +5,8 @@
         <LangVersion>default</LangVersion>
         <Version>2.3.0</Version>
         <Authors>Quy Vu</Authors>
-        <PackageId>FxLink.Outbox.EntityFrameworkCore</PackageId>
-        <Description>A distributed messaging framework for .NET</Description>
+        <PackageId>FxLink.Messaging.EntityFrameworkCore</PackageId>
+        <Description>EF Core backend for FxLink's reliable-messaging patterns (Outbox, Inbox)</Description>
         <PackageTags>FxLink;distributed;open-source</PackageTags>
         <RepositoryUrl>https://github.com/quyvu01/fx-link</RepositoryUrl>
         <PackageIcon>FxLink.png</PackageIcon>
@@ -34,7 +34,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="FxLink.Outbox.EntityFrameworkCore.Tests"/>
+        <InternalsVisibleTo Include="FxLink.Messaging.EntityFrameworkCore.Tests"/>
     </ItemGroup>
 
 </Project>

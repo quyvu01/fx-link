@@ -82,7 +82,7 @@ namespace Order.Migrations
                     b.ToTable("OutboxMessage");
                 });
 
-            modelBuilder.Entity("FxLink.Outbox.EntityFrameworkCore.Entities.OutboxPartitionLease", b =>
+            modelBuilder.Entity("FxLink.Messaging.EntityFrameworkCore.Outbox.Entities.OutboxPartitionLease", b =>
                 {
                     b.Property<Guid>("PartitionKey")
                         .HasColumnType("uuid");

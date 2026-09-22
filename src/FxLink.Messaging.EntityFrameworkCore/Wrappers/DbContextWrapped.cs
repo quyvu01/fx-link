@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Wrappers;
+namespace FxLink.Messaging.EntityFrameworkCore.Wrappers;
 
 internal record DbContextWrapped(DbContext DbContext);

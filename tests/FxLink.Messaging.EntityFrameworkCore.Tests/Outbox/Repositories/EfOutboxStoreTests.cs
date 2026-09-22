@@ -1,12 +1,12 @@
 using FxLink.Entities;
-using FxLink.Outbox.EntityFrameworkCore.Entities;
-using FxLink.Outbox.EntityFrameworkCore.Repositories;
-using FxLink.Outbox.EntityFrameworkCore.Tests.TestSupport;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Entities;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Repositories;
+using FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Tests.Repositories;
+namespace FxLink.Messaging.EntityFrameworkCore.Tests.Outbox.Repositories;
 
 public class EfOutboxStoreTests
 {

@@ -3,7 +3,7 @@ namespace FxLink.Registries;
 // Tracks which IOutboxStore/IPartitionLeaseStore pairs were registered via UseOutbox, so
 // OutboxDispatcherWorker/OutboxCleanupWorker know what to resolve and act on — DI's IEnumerable<T>
 // resolution doesn't surface keyed registrations, so there's no other way to discover them at startup.
-// Public so external backend packages (e.g. FxLink.Outbox.EntityFrameworkCore) can register through
+// Public so external backend packages (e.g. FxLink.Messaging.EntityFrameworkCore) can register through
 // it via their own IOutboxConfigurator/IMessageOutboxConfigurator extension methods.
 public interface IOutboxRegistry
 {

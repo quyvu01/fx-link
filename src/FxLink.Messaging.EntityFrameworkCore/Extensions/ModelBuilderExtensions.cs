@@ -1,8 +1,8 @@
 using FxLink.Entities;
-using FxLink.Outbox.EntityFrameworkCore.Entities;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Extensions;
+namespace FxLink.Messaging.EntityFrameworkCore.Extensions;
 
 public static class ModelBuilderExtensions
 {

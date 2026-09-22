@@ -1,8 +1,8 @@
 using FxLink.Abstractions;
-using FxLink.Outbox.EntityFrameworkCore.Entities;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Repositories;
+namespace FxLink.Messaging.EntityFrameworkCore.Outbox.Repositories;
 
 // SQL-backed IPartitionLeaseStore. Atomicity comes from OutboxPartitionLease.Version being an EF
 // Core concurrency token (see ModelBuilderExtensions) — SaveChangesAsync throws
