@@ -76,6 +76,32 @@ namespace Order.Migrations
                     b.ToTable("OutboxMessage");
                 });
 
+            modelBuilder.Entity("FxLink.Messaging.EntityFrameworkCore.Inbox.Entities.InboxRecord", b =>
+                {
+                    b.Property<string>("ConsumerKey")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ClaimedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("ConsumerKey", "MessageId");
+
+                    b.ToTable("InboxRecord");
+                });
+
             modelBuilder.Entity("FxLink.Messaging.EntityFrameworkCore.Outbox.Entities.OutboxPartitionLease", b =>
                 {
                     b.Property<Guid>("PartitionKey")

@@ -8,7 +8,15 @@ internal sealed class InboxStoreResolver<TMessage>(IServiceProvider serviceProvi
 {
     public IInboxStore GetInboxStore()
     {
-        var inboxStore = serviceProvider.GetKeyedService<IInboxStore>(typeof(TMessage));
-        return inboxStore ?? serviceProvider.GetService<IInboxStore>();
+        // Check if TMessage is a batch of messages.
+        if (typeof(TMessage).IsGenericType && typeof(TMessage).GetGenericTypeDefinition() == typeof(IBatch<>))
+        {
+            var wireMessageType = typeof(TMessage).GetGenericArguments().First();
+            return serviceProvider.GetKeyedService<IInboxStore>(wireMessageType) ??
+                   serviceProvider.GetService<IInboxStore>();
+        }
+
+        return serviceProvider.GetKeyedService<IInboxStore>(typeof(TMessage)) ??
+               serviceProvider.GetService<IInboxStore>();
     }
 }
