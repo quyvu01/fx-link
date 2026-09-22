@@ -12,5 +12,6 @@ public interface IConfigurator
     void AddMessageDefinition<TMessageDefinition>() where TMessageDefinition : IMessageDefinition;
     void UseInMemory();
     void UseOutbox(Action<IOutboxConfigurator> option);
+    void UseInbox(Action<IInboxConfigurator> option);
     void ConfigureSupervisor(Action<ISupervisorOptions> options);
 }

@@ -17,6 +17,7 @@ internal class Configurator(IServiceCollection services) : IConfigurator
     public IMessageKeys MessageKeys { get; } = new MessageKeys();
     internal ISupervisorOptions SupervisorOptions { get; private set; } = new SupervisorOptions();
     internal IOutboxRegistry OutboxRegistry { get; } = new OutboxRegistry();
+    internal IInboxRegistry InboxRegistry { get; } = new InboxRegistry();
 
     public void AddConsumer<TConsumer>() where TConsumer : IConsumer => AddConsumer(typeof(TConsumer));
 
@@ -62,6 +63,26 @@ internal class Configurator(IServiceCollection services) : IConfigurator
         Services.AddSingleton<OutboxRowSender>();
         Services.AddHostedService<OutboxDispatcherWorker>();
         Services.AddHostedService<OutboxCleanupWorker>();
+    }
+
+    public void UseInbox(Action<IInboxConfigurator> option)
+    {
+        ArgumentNullException.ThrowIfNull(option);
+        var inboxConfig = new InboxConfigurator(Services, InboxRegistry);
+        option.Invoke(inboxConfig);
+
+        this.AddConsumerPipelineBehaviors(c => c
+            .Of(typeof(InboxPipelineBehavior<>))
+        );
+
+        // TryAdd: only takes effect if the callback above never called Options(...) — InboxCleanupWorker
+        // needs IInboxOptions unconditionally the same way OutboxDispatcherWorker/OutboxCleanupWorker
+        // need IOutboxDispatcherOptions, so it must resolve to sensible (already-valid) defaults even
+        // when the caller never touches it — see InboxOptions' own property initializers.
+        Services.TryAddSingleton<IInboxOptions, InboxOptions>();
+
+        Services.AddSingleton(InboxRegistry);
+        Services.AddHostedService<InboxCleanupWorker>();
     }
 
     public void ConfigureSupervisor(Action<ISupervisorOptions> options)

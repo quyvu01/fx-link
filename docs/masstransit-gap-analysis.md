@@ -1,7 +1,16 @@
 # FxLink vs. MassTransit — Feature Gap Analysis
 
-Date: 2026-08-24
+Date: 2026-08-24 (updated 2026-09-09)
 Scope: Full feature comparison against MassTransit. Not an implementation design — this is a prioritized inventory of what's missing.
+
+## Update — 2026-09-09
+
+Re-verified every row against current code (grep, not re-reasoned from the original pass):
+
+- **Outbox pattern (#3) is now DONE** — write-path pipeline behavior, dispatch worker with lease/fencing, cleanup job, EF Core backend (`FxLink.Outbox.EntityFrameworkCore`), test coverage (InMemory + SQLite). Moved to "What FxLink Already Has."
+- **Concurrency/prefetch limits (#2) was already present**, the original pass's grep missed it — `IRabbitMqConfiguration.PrefetchCount`/`ConcurrentMessageLimit`, `IConsumerDispatchDefinition`, configured via `RabbitMqConfigurator.PrefetchCount(...)`/`ConcurrentMessageLimit(...)`. Moved to "What FxLink Already Has," not a real gap.
+- **New gap identified, not in the original pass: Inbox pattern** (dedup/idempotency on the consume side) — brainstormed this session (chosen direction: dedup-only v1, chained-with-Outbox as a later extension), not yet implemented. It's the natural other half of the now-completed Outbox, reuses most of its InMemory/EfCore/cleanup-worker pattern, and directly closes a duplicate-delivery risk found in `OutboxDispatcherWorker` this session. Added as a new row.
+- Rows #1, #4-#12 re-checked by direct grep and remain accurate as originally assessed (no code touched those areas this session).
 
 ## Understanding Summary
 
@@ -25,14 +34,17 @@ Scope: Full feature comparison against MassTransit. Not an implementation design
 | Faults | `Fault<T>` | `Fault.cs`, `RequestTimeoutExpired.cs` |
 | Consumer definitions | `ConsumerDefinition<T>` | `IConsumerDefinition<T>` |
 | Process supervision | — (no direct MT equivalent) | `ServerSupervisor` with OneForOne/OneForAll/RestForOne strategies — arguably **more sophisticated** than MassTransit here |
+| Concurrency / prefetch limits per consumer | `UseConcurrencyLimit`, `PrefetchCount` | `IRabbitMqConfiguration.PrefetchCount`/`ConcurrentMessageLimit`, `IConsumerDispatchDefinition` — present all along, the original pass's grep missed it |
+| Outbox pattern | In-memory + EF Core outbox | `IOutboxStore`/`IPartitionLeaseStore`, `OutboxPublisherPipelineBehavior`, `OutboxDispatcherWorker`/`OutboxCleanupWorker`, `FxLink.Outbox.EntityFrameworkCore` — **built this session** |
 
 ## Gap Table (priority order)
 
 | # | Feature | MassTransit has | FxLink has | Priority | Why |
 |---|---|---|---|---|---|
 | 1 | **Job Consumers** | `IJobConsumer<T>`, job saga state machine, `ConcurrentJobLimit`, job retry/status tracking, `IJobService` submit/cancel/query | Nothing | **High** | Confirmed gap — no way to run long-lived, cancellable, concurrency-bounded background jobs with progress/status tracking. This was your stated suspicion. |
-| 2 | **Concurrency / prefetch limits per consumer** | `UseConcurrencyLimit`, `PrefetchCount` on receive endpoint | Not found in `ConsumerConfigurator` or `AddRabbitMq` | **High** | Without this, a slow/expensive consumer can't be throttled independently of broker prefetch defaults — real production risk. |
-| 3 | **Outbox pattern** | In-memory outbox + EF Core outbox (`AddEntityFrameworkOutbox`) for exactly-transactional publish | Not found | **High** | Without an outbox, publish-after-DB-write isn't atomic — a classic dual-write bug source in exactly the EF Core-backed services FxLink targets (`FlowX.EntityFrameworkCore`, `FxLink.StateMachine.EntityFrameworkCore`). |
+| ~~2~~ | ~~Concurrency / prefetch limits per consumer~~ | — | — | — | **RESOLVED (was already present)** — `IRabbitMqConfiguration.PrefetchCount`/`ConcurrentMessageLimit`, `IConsumerDispatchDefinition`. Moved to "What FxLink Already Has." |
+| ~~3~~ | ~~Outbox pattern~~ | — | — | — | **RESOLVED 2026-09** — built this session (write-path pipeline behavior, dispatch worker with lease/fencing, cleanup job, EF Core backend + tests). Moved to "What FxLink Already Has." |
+| 3.5 | **Inbox pattern** (dedup/idempotency on consume) | `InboxState` (EF Core outbox package) | Nothing | **High** | New gap identified 2026-09-09. Natural other half of the now-completed Outbox — reuses most of its pattern (store/InMemory/EfCore/cleanup worker). Directly closes a duplicate-delivery risk found in `OutboxDispatcherWorker` this session (a message can be resent if `MarkDispatchedAsync` fails for a non-fencing reason after the send already succeeded). |
 | 4 | **Multi-transport support** | RabbitMq, Azure Service Bus, Amazon SQS, Kafka (rider), ActiveMQ, gRPC | RabbitMq only | **High** (per your stated roadmap) | You confirmed multi-transport is planned; today `IMessageBrokerConnector` has exactly one implementation, so this is architecture debt, not just a missing feature. |
 | 5 | **Test harness** | `ITestHarness` / `InMemoryTestHarness` with `Consumed`, `Published`, `Sent` assertion helpers | `InMemory` transport exists but no assertion/harness API | **Medium-High** | Testability of consumers today likely means hand-rolled fakes; a harness is what makes consumer unit tests fast to write and keeps them from rotting. |
 | 6 | **Observability (OpenTelemetry / diagnostics)** | Built-in `ActivitySource`, metrics, `MassTransit.Diagnostics` | No `ActivitySource`/diagnostics found | **Medium-High** | No distributed tracing across publish→consume hops or broker health metrics out of the box — hard to debug in production without it. |
@@ -63,4 +75,4 @@ Scope: Full feature comparison against MassTransit. Not an implementation design
 
 ## Suggested Next Step
 
-Given the confirmed priority-1 status of **Job Consumers**, the natural next brainstorming session is a design pass for that feature specifically (job saga shape, concurrency/slot limiting, persistence, cancellation) — happy to start that whenever you're ready.
+Outbox (#3) is done. Two High-priority items remain open: **Inbox pattern** (#3.5 — small, reuses the Outbox pattern almost directly, closes a known duplicate-delivery risk) and **Job Consumers** (#1 — large, new subsystem). Inbox is the cheaper, more immediately valuable next step given how much of its plumbing already exists; Job Consumers remains the bigger standalone design effort whenever there's appetite for it.

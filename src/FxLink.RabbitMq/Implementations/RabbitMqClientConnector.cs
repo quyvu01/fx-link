@@ -102,8 +102,8 @@ internal class RabbitMqClientConnector<TMessage>(
     {
         var bodyAsJson = Encoding.UTF8.GetString(args.Body.Span);
         var messageDefinition = serviceProvider.GetService<IMessageDefinition<TMessage>>();
-        
-        var envelope = (messageDefinition is { MessageConfigurator.IsRawJsonSerializer: true }) switch
+
+        var envelope = (messageDefinition is { MessageConfigurator.IsRawJsonSerializer : true }) switch
         {
             false => JsonSerializer.Deserialize<ConsumerContextEnvelope<TMessage>>(bodyAsJson,
                 DistributedConfigurators.JsonSerializerOptions),
