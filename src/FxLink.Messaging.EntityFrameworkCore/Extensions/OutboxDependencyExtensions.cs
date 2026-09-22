@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Messaging.EntityFrameworkCore.Extensions;
 
-public static class DependencyExtensions
+public static class OutboxDependencyExtensions
 {
     public static void EntityFrameworkOutbox(this IOutboxConfigurator configurator,
         Action<IOutboxEntityFrameworkConfigurator> options)
