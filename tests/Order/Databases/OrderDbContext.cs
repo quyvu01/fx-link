@@ -1,4 +1,4 @@
-using FxLink.Outbox.EntityFrameworkCore.Extensions;
+using FxLink.Messaging.EntityFrameworkCore.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Order.Databases;

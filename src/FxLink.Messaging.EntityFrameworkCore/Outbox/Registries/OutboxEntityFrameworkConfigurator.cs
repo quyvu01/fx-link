@@ -1,9 +1,9 @@
-using FxLink.Outbox.EntityFrameworkCore.Exceptions;
-using FxLink.Outbox.EntityFrameworkCore.Wrappers;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Exceptions;
+using FxLink.Messaging.EntityFrameworkCore.Wrappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Registries;
+namespace FxLink.Messaging.EntityFrameworkCore.Outbox.Registries;
 
 // registrationKey null = the default/unkeyed outbox (IOutboxConfigurator.EntityFrameworkOutbox);
 // non-null = a per-TMessage outbox (IMessageOutboxConfigurator.EntityFrameworkOutbox), keyed by

@@ -1,10 +1,10 @@
 using System.Linq.Expressions;
 using FxLink.Abstractions;
 using FxLink.Entities;
-using FxLink.Outbox.EntityFrameworkCore.Entities;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Repositories;
+namespace FxLink.Messaging.EntityFrameworkCore.Outbox.Repositories;
 
 internal sealed class EfOutboxStore(DbContext dbContext) : IOutboxStore
 {

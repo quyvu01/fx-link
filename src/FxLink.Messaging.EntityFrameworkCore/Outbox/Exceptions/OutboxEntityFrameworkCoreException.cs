@@ -1,10 +1,10 @@
 using FxLink.Exceptions;
-using FxLink.Outbox.EntityFrameworkCore.Registries;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Registries;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Exceptions;
+namespace FxLink.Messaging.EntityFrameworkCore.Outbox.Exceptions;
 
 /// <summary>
-/// Groups the exceptions thrown by FxLink.Outbox.EntityFrameworkCore (DbContext registration).
+/// Groups the exceptions thrown by the Outbox EF Core backend (DbContext registration).
 /// </summary>
 public static class OutboxEntityFrameworkCoreException
 {

@@ -1,7 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Tests.TestSupport;
+namespace FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
 
 // SQLite in-memory (not the EF Core InMemory provider) — a real relational engine that enforces
 // concurrency tokens, which is exactly what the fencing tests below depend on. A single connection

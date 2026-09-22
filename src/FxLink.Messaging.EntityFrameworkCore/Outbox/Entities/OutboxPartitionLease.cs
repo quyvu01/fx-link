@@ -1,4 +1,4 @@
-namespace FxLink.Outbox.EntityFrameworkCore.Entities;
+namespace FxLink.Messaging.EntityFrameworkCore.Outbox.Entities;
 
 // SQL-backed counterpart to InMemoryPartitionLeaseStore's in-process lease record. Version is the
 // EF Core concurrency token (see ModelBuilderExtensions.AddOutboxPartitionLeaseEntity) — the

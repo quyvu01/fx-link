@@ -1,11 +1,11 @@
-using FxLink.Outbox.EntityFrameworkCore.Exceptions;
-using FxLink.Outbox.EntityFrameworkCore.Registries;
-using FxLink.Outbox.EntityFrameworkCore.Tests.TestSupport;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Exceptions;
+using FxLink.Messaging.EntityFrameworkCore.Outbox.Registries;
+using FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
-namespace FxLink.Outbox.EntityFrameworkCore.Tests.Registries;
+namespace FxLink.Messaging.EntityFrameworkCore.Tests.Outbox.Registries;
 
 public class OutboxEntityFrameworkConfiguratorTests
 {
