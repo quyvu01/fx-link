@@ -1,4 +1,4 @@
-using FxLink.Messaging.EntityFrameworkCore.Outbox.Exceptions;
+using FxLink.Messaging.EntityFrameworkCore.Exceptions;
 using FxLink.Messaging.EntityFrameworkCore.Outbox.Registries;
 using FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +14,7 @@ public class OutboxEntityFrameworkConfiguratorTests
     {
         var configurator = new OutboxEntityFrameworkConfigurator(new ServiceCollection(), registrationKey: null);
 
-        Should.Throw<OutboxEntityFrameworkCoreException.DbContextNotConfigured>(configurator.ValidateItSelf);
+        Should.Throw<MessagingEntityFrameworkCoreException.DbContextNotConfigured>(configurator.ValidateItSelf);
     }
 
     [Fact]
@@ -45,6 +45,6 @@ public class OutboxEntityFrameworkConfiguratorTests
         configurator.AddDbContext<TestOutboxDbContext>();
         configurator.DbContextFactory(() => (TestOutboxDbContext)null!);
 
-        Should.Throw<OutboxEntityFrameworkCoreException.DbContextAlreadyConfigured>(configurator.ValidateItSelf);
+        Should.Throw<MessagingEntityFrameworkCoreException.DbContextAlreadyConfigured>(configurator.ValidateItSelf);
     }
 }

@@ -24,4 +24,12 @@ internal static class SqliteDbContextFactory
         if (ensureCreated) context.Database.EnsureCreated();
         return context;
     }
+
+    internal static TestInboxDbContext CreateInboxContext(SqliteConnection connection, bool ensureCreated = false)
+    {
+        var options = new DbContextOptionsBuilder<TestInboxDbContext>().UseSqlite(connection).Options;
+        var context = new TestInboxDbContext(options);
+        if (ensureCreated) context.Database.EnsureCreated();
+        return context;
+    }
 }

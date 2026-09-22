@@ -1,4 +1,3 @@
-using FxLink.Messaging.EntityFrameworkCore.Outbox.Exceptions;
 using FxLink.Messaging.EntityFrameworkCore.Wrappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,47 +10,15 @@ namespace FxLink.Messaging.EntityFrameworkCore.Outbox.Registries;
 internal sealed class OutboxEntityFrameworkConfigurator(IServiceCollection services, object registrationKey)
     : IOutboxEntityFrameworkConfigurator
 {
-    private Type _dbContextType;
-    private int _dbContextConfigurationCallCount;
+    private readonly DbContextRegistrar _registrar = new(services, registrationKey);
 
-    public void AddDbContext<TDbContext>() where TDbContext : DbContext
-    {
-        _dbContextType = typeof(TDbContext);
-        _dbContextConfigurationCallCount++;
-        RegisterWrapped(sp => new DbContextWrapped(sp.GetRequiredService<TDbContext>()));
-    }
+    public void AddDbContext<TDbContext>() where TDbContext : DbContext => _registrar.AddDbContext<TDbContext>();
 
-    public void DbContextFactory<TDbContext>(Func<TDbContext> dbContextFactory) where TDbContext : DbContext
-    {
-        _dbContextType = typeof(TDbContext);
-        _dbContextConfigurationCallCount++;
-        RegisterWrapped(_ => new DbContextWrapped(dbContextFactory.Invoke()));
-    }
+    public void DbContextFactory<TDbContext>(Func<TDbContext> dbContextFactory) where TDbContext : DbContext =>
+        _registrar.DbContextFactory(dbContextFactory);
 
     public void DbContextFactory<TDbContext>(Func<IServiceProvider, TDbContext> dbContextFactory)
-        where TDbContext : DbContext
-    {
-        _dbContextType = typeof(TDbContext);
-        _dbContextConfigurationCallCount++;
-        RegisterWrapped(sp => new DbContextWrapped(dbContextFactory.Invoke(sp)));
-    }
+        where TDbContext : DbContext => _registrar.DbContextFactory(dbContextFactory);
 
-    private void RegisterWrapped(Func<IServiceProvider, DbContextWrapped> factory)
-    {
-        if (registrationKey is null)
-        {
-            services.AddScoped(factory);
-            return;
-        }
-
-        services.AddKeyedScoped(registrationKey, (sp, _) => factory(sp));
-    }
-
-    internal void ValidateItSelf()
-    {
-        if (_dbContextConfigurationCallCount > 1)
-            throw new OutboxEntityFrameworkCoreException.DbContextAlreadyConfigured(_dbContextType);
-        if (_dbContextConfigurationCallCount == 0)
-            throw new OutboxEntityFrameworkCoreException.DbContextNotConfigured();
-    }
+    internal void ValidateItSelf() => _registrar.ValidateItSelf();
 }

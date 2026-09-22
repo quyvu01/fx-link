@@ -1,4 +1,5 @@
 using FxLink.Entities;
+using FxLink.Messaging.EntityFrameworkCore.Inbox.Entities;
 using FxLink.Messaging.EntityFrameworkCore.Outbox.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +24,15 @@ public static class ModelBuilderExtensions
                 builder.HasKey(l => l.PartitionKey);
                 builder.Property(l => l.PartitionKey).ValueGeneratedNever();
                 builder.Property(l => l.Version).IsConcurrencyToken();
+            });
+        }
+
+        public void AddInboxRecordEntity()
+        {
+            modelBuilder.Entity<InboxRecord>(builder =>
+            {
+                builder.HasKey(r => new { r.ConsumerKey, r.MessageId });
+                builder.Property(r => r.Version).IsConcurrencyToken();
             });
         }
     }
