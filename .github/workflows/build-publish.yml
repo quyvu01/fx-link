@@ -48,7 +48,7 @@ jobs:
     name: Build and Publish NuGets
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') && success()
+    if: github.ref == 'refs/heads/master' && success()
     needs:
       - calc-version
     steps:
@@ -83,7 +83,7 @@ jobs:
         working-directory: artifacts
         run: |
           for file in *.nupkg; do
-            if [[ "$file" =~ ^(FxLink|FxLink\.(Nats|RabbitMq))\.[0-9] ]]; then
+            if [[ "$file" =~ ^(FxLink|FxLink\.(RabbitMq|RoutingSlip|StateMachine\.EntityFrameworkCore|StateMachine|Messaging\.EntityFrameworkCore))\.[0-9] ]]; then
               echo "Pushing $file"
               dotnet nuget push "$file" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate --no-symbols
             else
