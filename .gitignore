@@ -373,3 +373,6 @@ FodyWeavers.xsd
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Claude Code local project config/tooling — not committed.
+/.claude/
