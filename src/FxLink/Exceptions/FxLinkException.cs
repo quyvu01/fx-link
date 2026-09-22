@@ -50,4 +50,16 @@ public static class FxLinkException
     public sealed class BatchConsumerMissingBatchOptions(Type messageType, Type consumerType) :
         DistributedException(
             $"{consumerType.Name} consumes IBatch<{messageType.Name}> but never configured batching. Call UseBatching<{messageType.Name}>(...) in its ConsumerDefinition.Configure().");
+
+    /// <summary>An IInboxOptions TimeSpan property was configured with a zero or negative value.</summary>
+    public sealed class InboxOptionsMustBePositive(string propertyName, TimeSpan value) :
+        DistributedException(
+            $"IInboxOptions.{propertyName} must be greater than TimeSpan.Zero, but was {value}.");
+
+    /// <summary>ClaimRenewInterval was configured >= ClaimDuration, so a claim would always go stale
+    /// before InboxPipelineBehavior's renewal loop ever gets a chance to extend it.</summary>
+    public sealed class InboxClaimRenewIntervalTooLong(TimeSpan claimRenewInterval, TimeSpan claimDuration) :
+        DistributedException(
+            $"IInboxOptions.ClaimRenewInterval ({claimRenewInterval}) must be less than ClaimDuration ({claimDuration}), " +
+            "or a claim will always expire before the first renewal fires. Set ClaimRenewInterval to a fraction of ClaimDuration (e.g. 1/3 to 1/2).");
 }

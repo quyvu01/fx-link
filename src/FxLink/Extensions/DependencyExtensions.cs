@@ -44,6 +44,11 @@ public static class DependencyExtensions
         // (e.g. an EF Core-backed one — InMemory doesn't care, it has no scoping concerns at all).
         services.AddScoped(typeof(IOutboxStoreResolver<>), typeof(OutboxStoreResolver<>));
 
+        // Scoped for the same reason as IOutboxStoreResolver above — InMemoryInboxStore doesn't care
+        // (it's a process-wide Singleton with no scoping concerns), but a future scope-aware
+        // IInboxStore backend (e.g. EF Core, sharing the consumer's own scoped DbContext) would.
+        services.AddScoped(typeof(IInboxStoreResolver<>), typeof(InboxStoreResolver<>));
+
         services.AddSingleton(typeof(BatchAccumulatorFactory<,>));
 
         services.AddSingleton(typeof(IConsumerConfiguratorResolver<>), typeof(ConsumerConfiguratorResolver<>));
