@@ -376,3 +376,5 @@ FodyWeavers.xsd
 
 # Claude Code local project config/tooling — not committed.
 /.claude/
+/.mcp.json
+/.ignore
