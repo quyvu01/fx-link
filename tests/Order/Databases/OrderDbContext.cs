@@ -8,6 +8,7 @@ public sealed class OrderDbContext(DbContextOptions<OrderDbContext> options) : D
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddInboxRecordEntity();
         base.OnModelCreating(modelBuilder);
     }
 }

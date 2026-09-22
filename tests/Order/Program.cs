@@ -3,6 +3,7 @@ using Contracts.Messages;
 using Contracts.Payments;
 using FxLink.Abstractions;
 using FxLink.Extensions;
+using FxLink.Messaging.EntityFrameworkCore.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RoutingSlip.Extensions;
 using Microsoft.AspNetCore.Mvc;
@@ -76,6 +77,20 @@ builder.Services.AddFxLink(opts =>
     //         );
     //     });
     // });
+    
+    opts.UseInbox(c =>
+    {
+        c.EntityFrameworkInbox(cfg =>
+        {
+            cfg.AddDbContext<OrderDbContext>();
+        });
+        c.Options(k =>
+        {
+            k.ClaimDuration = TimeSpan.FromSeconds(10);
+            k.ClaimRenewInterval = TimeSpan.FromSeconds(2);
+        });
+        c.MessageInbox<IInventoryCreated>(cfg => cfg.InMemoryInbox());
+    });
 
     opts.AddRabbitMq(config => { config.Host("localhost", "fxlink"); });
 
