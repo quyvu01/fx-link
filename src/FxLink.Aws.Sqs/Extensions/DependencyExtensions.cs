@@ -22,7 +22,8 @@ public static class DependencyExtensions
                 credential.AccessKeyIdValue,
                 credential.SecretAccessKeyValue,
                 config.AwsRegionValue,
-                credential.ServiceUrlValue));
+                credential.ServiceUrlValue,
+                config.MaxReceiveCountValue));
             services.AddSingleton<ISqsConnection, SqsConnection>();
             services.AddSingleton<SqsClient>();
             services.AddSingleton<IMessageBrokerConnector>(sp => sp.GetRequiredService<SqsClient>());
@@ -32,5 +33,15 @@ public static class DependencyExtensions
             // SqsClientConnector<TMessage>.SendAsync's NotSupportedException guard.
             services.AddHostedService<SqsSupervisorWorker>();
         }
+
+        /// <summary>
+        /// Opts into delaying messages via SQS's native SendMessageRequest.DelaySeconds (capped
+        /// at 15 minutes) — registers it as the IDelayMessageProvider. Only needed if you actually
+        /// send messages with a delay; call a different transport/provider's own
+        /// "Use...DelayScheduler()" to back delays with something else (EventBridge Scheduler,
+        /// Quartz, Hangfire, Redis, ...) instead.
+        /// </summary>
+        public void UseSqsDelayScheduler() =>
+            configurator.Services.AddSingleton<IDelayMessageProvider, SqsDelayMessageProvider>();
     }
 }

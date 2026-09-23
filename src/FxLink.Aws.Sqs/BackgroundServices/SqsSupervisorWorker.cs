@@ -24,7 +24,7 @@ internal sealed class SqsSupervisorWorker(
 
         try
         {
-            // Register the single RabbitMQ server
+            // Register the single Aws.Sqs server
             _supervisor.RegisterServer("Aws.Sqs", connector);
 
             // Start the supervisor

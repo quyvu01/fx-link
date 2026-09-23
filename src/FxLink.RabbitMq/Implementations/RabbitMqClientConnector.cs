@@ -154,8 +154,8 @@ internal class RabbitMqClientConnector<TMessage>(
             });
         if (serviceType is null) return Task.CompletedTask;
         var jsonBody = Encoding.UTF8.GetString(args.Body.Span);
-        var wireResultDispatcher = serviceProvider.GetRequiredService(serviceType) as WireResultDispatcher;
-        wireResultDispatcher?.SetResult(jsonBody, args.CancellationToken);
+        var wireResultDispatcher = (IWireResultDispatcher)serviceProvider.GetRequiredService(serviceType);
+        wireResultDispatcher.SetResult(jsonBody, args.CancellationToken);
         return Task.CompletedTask;
     }
 

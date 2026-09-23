@@ -3,20 +3,14 @@ using FxLink.Abstractions;
 using FxLink.Configurators;
 using FxLink.Contexts;
 using FxLink.Entities;
-using FxLink.RabbitMq.Abstractions;
 using FxLink.Wrappers;
 
-namespace FxLink.RabbitMq.Implementations;
-
-internal abstract class WireResultDispatcher
-{
-    public abstract void SetResult(string json, CancellationToken token = default);
-}
+namespace FxLink.Implementations;
 
 internal class WireResultDispatcher<TResponse>(IInMemoryResponseSetter inMemoryResponseSetter)
-    : WireResultDispatcher, IWireResultDispatcher<TResponse> where TResponse : class
+    : IWireResultDispatcher<TResponse> where TResponse : class
 {
-    public override void SetResult(string json, CancellationToken token = default)
+    public void SetResult(string json, CancellationToken token = default)
     {
         var envelope = JsonSerializer.Deserialize<ConsumerContextEnvelope<Result<TResponse>>>(json,
             DistributedConfigurators.JsonSerializerOptions);

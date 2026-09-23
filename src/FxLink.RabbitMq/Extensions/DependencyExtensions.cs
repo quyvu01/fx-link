@@ -22,8 +22,12 @@ public static class DependencyExtensions
             services.AddSingleton<IMessageBrokerConnector>(sp => sp.GetRequiredService<RabbitMqClient>());
             services.AddSingleton<IRabbitMqClient>(sp => sp.GetRequiredService<RabbitMqClient>());
             services.AddSingleton(typeof(IClientConnector<>), typeof(RabbitMqClientConnector<>));
-            services.AddSingleton(typeof(IRequester<>), typeof(RabbitMqClientConnector<>));
-            services.AddSingleton(typeof(IWireResultDispatcher<>), typeof(WireResultDispatcher<>));
+            // IRequester<> is registered generically by AddFxLink itself (Requester<> wraps
+            // whatever IClientConnector<> a transport provides) — RabbitMqClientConnector<> never
+            // implemented IRequester<>, so a registration here would have been a no-op override
+            // shadowed by AddFxLink's own later registration anyway. IWireResultDispatcher<>'s
+            // implementation moved to core (FxLink.Implementations.WireResultDispatcher<>) and is
+            // now registered by AddFxLink too, since its logic never depended on RabbitMq at all.
             services.AddHostedService<RabbitMqSupervisorWorker>();
         }
 

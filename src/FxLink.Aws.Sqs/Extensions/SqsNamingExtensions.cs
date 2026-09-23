@@ -27,6 +27,13 @@ internal static class SqsNamingExtensions
         }
     }
 
+    extension(string queueName)
+    {
+        // Per-queue DLQ — a hyphen, not a dot, since queueName is already sanitized and a plain
+        // "." here would just get stripped right back out by the next Sanitize() call anyway.
+        internal string DeadLetterQueueName() => $"{queueName}-deadletter";
+    }
+
     // Also run over user-supplied custom names (IMessageConfigurator.Name(...),
     // ReceivedEndpoint(...)) — a name that's valid on another transport, or that simply contains
     // dots, would otherwise fail CreateTopic/CreateQueue outright instead of just being renamed.
