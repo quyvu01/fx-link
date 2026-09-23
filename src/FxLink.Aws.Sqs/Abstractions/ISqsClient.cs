@@ -10,6 +10,21 @@ internal interface ISqsClient
     // StartAsync has run, or for a type that was never registered for this transport.
     string GetTopicArn(Type messageType);
 
-    Task PublishAsync(string topicArn, string messageBody, string messageTypeName,
+    // replyToQueueUrl is set for the request leg of a request/response call — carried as a wire
+    // attribute so the responding side knows where to send its reply back to (see
+    // SqsClientConnector<TMessage>.ProcessMessageReceivedAsync's ReplyTo handling).
+    Task PublishAsync(string topicArn, string messageBody, string messageTypeName, string replyToQueueUrl = null,
         CancellationToken token = default);
+
+    // SNS PublishRequest has no per-message delay — only SQS's own SendMessageRequest.DelaySeconds
+    // does. A delayed publish has to bypass the topic and go directly to every queue that would
+    // otherwise have received it via that topic's subscription — this is what a delay provider
+    // needs to reconstruct that fan-out by hand. Same registration-required caveat as GetTopicArn.
+    IReadOnlyList<string> GetQueueUrlsForMessageType(Type messageType);
+
+    // The per-instance reply queue a request should set as its "ReplyTo" wire attribute — mirrors
+    // IRabbitMqClient.ReplyQueueName, except it's a full queue URL (SQS has no "route by name via
+    // the default exchange" equivalent, so the responder needs the actual address to send to) and
+    // is unique per process instance (see SqsClient.StartAsync), not shared like a consumer queue.
+    string ReplyQueueUrl { get; }
 }

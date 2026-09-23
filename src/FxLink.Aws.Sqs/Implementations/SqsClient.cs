@@ -15,7 +15,8 @@ namespace FxLink.Aws.Sqs.Implementations;
 internal sealed class SqsClient(
     ISqsConnection sqsConnection,
     IMessageKeys messageKeys,
-    IServiceProvider serviceProvider)
+    IServiceProvider serviceProvider,
+    ISqsConfiguration sqsConfiguration)
     : IMessageBrokerConnector, ISqsClient
 {
     private readonly ILogger<SqsClient> _logger = serviceProvider.GetRequiredService<ILogger<SqsClient>>();
@@ -26,10 +27,21 @@ internal sealed class SqsClient(
     private readonly Dictionary<Type, string> _topicArnsByMessageType = new();
     private readonly Dictionary<Type, string> _queueUrlsByConsumerType = new();
 
+    // Every queue subscribed to a given message type's topic — the fan-out set a delayed publish
+    // (see SqsDelayMessageProvider) has to reconstruct by hand, since it can't go through SNS.
+    private readonly Dictionary<Type, List<string>> _queueUrlsByMessageType = new();
+
     // messageTypeName (AssemblyQualifiedName, from the "MessageType" attribute) -> the closed
     // IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's
     // _connectorTypeCache.
     private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = new();
+
+    // Unique per process instance (see StartAsync) — unlike a consumer queue, nothing else should
+    // ever read from or know about this one, so it's created fresh on every start and deleted in
+    // StopAsync rather than being a stable, well-known name.
+    private string _replyQueueUrl;
+    public string ReplyQueueUrl => _replyQueueUrl ?? throw new InvalidOperationException(
+        "The reply queue isn't ready yet — StartAsync must run before a request can be sent.");
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -59,16 +71,34 @@ internal sealed class SqsClient(
             _queueUrlsByConsumerType[consumerType] = queueUrl;
 
             var queueArn = await GetQueueArnAsync(queueUrl, cancellationToken);
-            var topicArns = group.Select(messageType => _topicArnsByMessageType[messageType]).ToArray();
+            var messageTypes = group.ToArray();
+            var topicArns = messageTypes.Select(messageType => _topicArnsByMessageType[messageType]).ToArray();
+
+            foreach (var messageType in messageTypes)
+            {
+                if (!_queueUrlsByMessageType.TryGetValue(messageType, out var queueUrls))
+                    _queueUrlsByMessageType[messageType] = queueUrls = [];
+                queueUrls.Add(queueUrl);
+            }
 
             await AllowTopicsToPublishToQueueAsync(queueUrl, queueArn, topicArns, cancellationToken);
             foreach (var topicArn in topicArns)
                 await SubscribeQueueToTopicAsync(topicArn, queueArn, cancellationToken);
 
+            await ConfigureDeadLetterQueueAsync(queueName, queueUrl, cancellationToken);
+
             // Fire-and-forget, same shape as RabbitMqClient's MonitorRecycleAsync loops — runs
             // until cancellationToken (the token StartAsync itself was given) is cancelled.
             _ = PollLoopAsync(queueUrl, consumerType, cancellationToken);
         }
+
+        // Per-instance reply queue for request/response — unique name so replies can never be
+        // misdelivered to a different instance's poller (see ISqsClient.ReplyQueueUrl).
+        var replyQueueName = SqsNamingExtensions.Sanitize($"reply-{Guid.NewGuid():N}");
+        var replyQueue = await sqsConnection.Sqs.CreateQueueAsync(
+            new CreateQueueRequest { QueueName = replyQueueName }, cancellationToken);
+        _replyQueueUrl = replyQueue.QueueUrl;
+        _ = ReplyPollLoopAsync(_replyQueueUrl, cancellationToken);
 
         // Run until StopAsync/host shutdown cancels this token — same contract as
         // RabbitMqClient.StartAsync (see IMessageBrokerConnector.StartAsync's doc comment).
@@ -155,6 +185,29 @@ internal sealed class SqsClient(
             "RawMessageDelivery", "true", token);
     }
 
+    // Creates a per-queue dead-letter queue and points the main queue's RedrivePolicy at it —
+    // native SQS mechanism, unlike RabbitMq's hand-rolled DLX+queue-bind dance. Purely a
+    // broker-level safety net (see ISqsConfigurator.MaxReceiveCount's doc comment); it does NOT
+    // need an SNS-style access policy, since SQS moves messages queue-to-queue internally rather
+    // than through a publish.
+    private async Task ConfigureDeadLetterQueueAsync(string queueName, string queueUrl, CancellationToken token)
+    {
+        var deadLetterQueueName = queueName.DeadLetterQueueName();
+        var deadLetterQueue = await sqsConnection.Sqs.CreateQueueAsync(
+            new CreateQueueRequest { QueueName = deadLetterQueueName }, token);
+        var deadLetterQueueArn = await GetQueueArnAsync(deadLetterQueue.QueueUrl, token);
+
+        var redrivePolicy = new
+        {
+            deadLetterTargetArn = deadLetterQueueArn,
+            maxReceiveCount = sqsConfiguration.MaxReceiveCount
+        };
+
+        await sqsConnection.Sqs.SetQueueAttributesAsync(queueUrl,
+            new Dictionary<string, string> { [QueueAttributeName.RedrivePolicy] = JsonSerializer.Serialize(redrivePolicy) },
+            token);
+    }
+
     // SQS has no push-based consume like AMQP's BasicConsumeAsync — this long-polls the queue
     // in a loop instead. One loop per consumer type/queue, all started from StartAsync.
     private async Task PollLoopAsync(string queueUrl, Type consumerType, CancellationToken token)
@@ -238,6 +291,84 @@ internal sealed class SqsClient(
         }
     }
 
+    // Same long-poll shape as PollLoopAsync, but for this instance's own reply queue — every
+    // message on it is a response to one of THIS instance's own outstanding requests, dispatched
+    // via ProcessResponseMessageAsync instead of ProcessMessageReceivedAsync (no consumerType,
+    // no IConsumerConnector<TMessage> — it completes an in-process await instead).
+    private async Task ReplyPollLoopAsync(string queueUrl, CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            ReceiveMessageResponse response;
+            try
+            {
+                response = await sqsConnection.Sqs.ReceiveMessageAsync(new ReceiveMessageRequest
+                {
+                    QueueUrl = queueUrl,
+                    MaxNumberOfMessages = 10,
+                    WaitTimeSeconds = 20,
+                    MessageAttributeNames = ["All"]
+                }, token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "ReceiveMessage failed for reply queue {QueueUrl}; retrying", queueUrl);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+
+                continue;
+            }
+
+            if (response.Messages.Count == 0) continue;
+
+            await Task.WhenAll(response.Messages.Select(message => ProcessAndDeleteResponseAsync(queueUrl, message, token)));
+        }
+    }
+
+    private async Task ProcessAndDeleteResponseAsync(string queueUrl, Message message, CancellationToken token)
+    {
+        try
+        {
+            if (message.MessageAttributes.TryGetValue("MessageType", out var attribute) &&
+                attribute.StringValue is { Length: > 0 } messageTypeName)
+            {
+                var connectorType = _connectorTypeCache.GetOrAdd(messageTypeName, static type =>
+                {
+                    var msgType = Type.GetType(type);
+                    return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
+                });
+
+                if (connectorType is not null)
+                {
+                    var connector = (AbstractSqsConnector)serviceProvider.GetRequiredService(connectorType);
+                    await connector.ProcessResponseMessageAsync(message, token);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Mirrors ProcessAndDeleteAsync's reasoning: whoever was waiting on this response has
+            // its own timeout (Requester<TRequest>'s own CancelAfter), so there's nothing useful
+            // to retry here — just make the failure visible and move on.
+            _logger.LogCritical(ex, "Unhandled exception processing a response message {MessageId}",
+                message.MessageId);
+        }
+        finally
+        {
+            await sqsConnection.Sqs.DeleteMessageAsync(queueUrl, message.ReceiptHandle, CancellationToken.None);
+        }
+    }
+
     public string GetTopicArn(Type messageType)
     {
         if (_topicArnsByMessageType.TryGetValue(messageType, out var topicArn)) return topicArn;
@@ -246,26 +377,46 @@ internal sealed class SqsClient(
             "(and the message type must be registered on this transport) before it can be published.");
     }
 
+    public IReadOnlyList<string> GetQueueUrlsForMessageType(Type messageType) =>
+        _queueUrlsByMessageType.GetValueOrDefault(messageType, []);
+
     public Task PublishAsync(string topicArn, string messageBody, string messageTypeName,
-        CancellationToken token = default) => sqsConnection.Sns.PublishAsync(new PublishRequest
+        string replyToQueueUrl = null, CancellationToken token = default)
     {
-        TopicArn = topicArn,
-        Message = messageBody,
-        MessageAttributes = new Dictionary<string, Amazon.SimpleNotificationService.Model.MessageAttributeValue>
+        var attributes = new Dictionary<string, Amazon.SimpleNotificationService.Model.MessageAttributeValue>
         {
             // Read back on receive to resolve which IClientConnector<TMessage>/IConsumerConnector<TMessage>
             // to dispatch into — survives SNS->SQS delivery because RawMessageDelivery is enabled
             // on every subscription (see SubscribeQueueToTopicAsync).
             ["MessageType"] = new() { DataType = "String", StringValue = messageTypeName }
-        }
-    }, token);
+        };
+        if (replyToQueueUrl is { Length: > 0 })
+            attributes["ReplyTo"] = new Amazon.SimpleNotificationService.Model.MessageAttributeValue
+                { DataType = "String", StringValue = replyToQueueUrl };
 
-    public Task StopAsync(CancellationToken cancellationToken = default)
+        return sqsConnection.Sns.PublishAsync(new PublishRequest
+        {
+            TopicArn = topicArn,
+            Message = messageBody,
+            MessageAttributes = attributes
+        }, token);
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        // Nothing to actively tear down yet: the SNS/SQS clients are plain HTTP clients owned
-        // (and disposed) by the ISqsConnection singleton, not a stateful connection SqsClient
-        // itself holds the way RabbitMqClient.StopAsync closes an actual AMQP connection. Once
-        // poll loops exist, this is where they'll be signalled to stop and awaited.
-        return Task.CompletedTask;
+        // The regular per-consumer queues are stable, well-known names meant to outlive this
+        // instance (other instances of the same consumer type still read from them) — only the
+        // reply queue is unique to this instance and has no reason to persist after it exits.
+        if (_replyQueueUrl is null) return;
+        try
+        {
+            // CancellationToken.None deliberately — a shutdown-cancelled token must not abort the
+            // delete itself, or the queue leaks in the AWS account for good.
+            await sqsConnection.Sqs.DeleteQueueAsync(_replyQueueUrl, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete reply queue {QueueUrl} on shutdown", _replyQueueUrl);
+        }
     }
 }

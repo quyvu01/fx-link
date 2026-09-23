@@ -8,4 +8,5 @@ internal interface ISqsConfiguration
     string AwsSecretAccessKey { get; }
     RegionEndpoint AwsRegion { get; }
     string ServiceUrl { get; }
+    int MaxReceiveCount { get; }
 }

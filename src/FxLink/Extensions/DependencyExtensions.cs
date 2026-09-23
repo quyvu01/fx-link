@@ -36,6 +36,10 @@ public static class DependencyExtensions
         services.AddScoped<IPublisher, Publisher>();
         services.AddSingleton(typeof(IRequester<>), typeof(Requester<>));
 
+        // Transport-agnostic: every transport's reply-queue receive path resolves this generically
+        // to deserialize a wire-format response body and complete the matching Requester<> await.
+        services.AddSingleton(typeof(IWireResultDispatcher<>), typeof(WireResultDispatcher<>));
+
         // Scoped, not Singleton: this resolver's captured IServiceProvider must be the ambient
         // per-message scope, not the root container — EnqueueAsync needs to land on the exact same
         // scoped DbContext the consumer's own business write uses (that's the whole point of the
