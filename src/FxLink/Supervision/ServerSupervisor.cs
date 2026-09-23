@@ -64,6 +64,7 @@ public class ServerSupervisor(ISupervisorOptions options, ILogger<ServerSupervis
             foreach (var state in _servers.Values)
             {
                 StartServer(state);
+                logger?.LogInformation("Started supervisor for {ServerId}", state.ServerId);
             }
         }
         finally

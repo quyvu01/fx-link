@@ -1,7 +1,9 @@
 using System.Reflection;
+using Amazon;
 using Contracts.Messages;
 using Contracts.Payments;
 using FxLink.Abstractions;
+using FxLink.Aws.Sqs.Extensions;
 using FxLink.Extensions;
 using FxLink.Messaging.EntityFrameworkCore.Extensions;
 using FxLink.RabbitMq.Extensions;
@@ -78,21 +80,31 @@ builder.Services.AddFxLink(opts =>
     //     });
     // });
     
-    opts.UseInbox(c =>
-    {
-        c.EntityFrameworkInbox(cfg =>
-        {
-            cfg.AddDbContext<OrderDbContext>();
-        });
-        c.Options(k =>
-        {
-            k.ClaimDuration = TimeSpan.FromSeconds(10);
-            k.ClaimRenewInterval = TimeSpan.FromSeconds(2);
-        });
-        c.MessageInbox<IInventoryCreated>(cfg => cfg.InMemoryInbox());
-    });
+    // opts.UseInbox(c =>
+    // {
+    //     c.EntityFrameworkInbox(cfg =>
+    //     {
+    //         cfg.AddDbContext<OrderDbContext>();
+    //     });
+    //     c.Options(k =>
+    //     {
+    //         k.ClaimDuration = TimeSpan.FromSeconds(10);
+    //         k.ClaimRenewInterval = TimeSpan.FromSeconds(2);
+    //     });
+    //     c.MessageInbox<IInventoryCreated>(cfg => cfg.InMemoryInbox());
+    // });
 
-    opts.AddRabbitMq(config => { config.Host("localhost", "fxlink"); });
+    // opts.AddRabbitMq(config => { config.Host("localhost", "fxlink"); });
+    
+    opts.AddSqs(c =>
+    {
+        c.Region(RegionEndpoint.USEast1, credential =>
+        {
+            credential.ServiceUrl("http://localhost:4566"); // LocalStack endpoint
+            credential.AccessKeyId("test");
+            credential.SecretAccessKey("test");
+        });
+    });
 
     opts.AddRoutingSlip(cfg => cfg
         .AddActivity<ReserveInventoryActivity>()
