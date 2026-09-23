@@ -10,13 +10,13 @@ namespace FxLink.RabbitMq.Extensions;
 
 public static class DependencyExtensions
 {
-    extension(IConfigurator distributedConfigurator)
+    extension(IConfigurator configurator)
     {
         public void AddRabbitMq(Action<IRabbitMqConfigurator> options)
         {
             var config = new RabbitMqConfigurator();
             options.Invoke(config);
-            var services = distributedConfigurator.Services;
+            var services = configurator.Services;
             services.AddSingleton(config.ToConfiguration());
             services.AddSingleton<RabbitMqClient>();
             services.AddSingleton<IMessageBrokerConnector>(sp => sp.GetRequiredService<RabbitMqClient>());
@@ -34,6 +34,6 @@ public static class DependencyExtensions
         /// something else (Quartz, Hangfire, Redis, ...) instead.
         /// </summary>
         public void UseRabbitMqDelayScheduler() =>
-            distributedConfigurator.Services.AddSingleton<IDelayMessageProvider, RabbitMqScheduleExchangeProvider>();
+            configurator.Services.AddSingleton<IDelayMessageProvider, RabbitMqScheduleExchangeProvider>();
     }
 }

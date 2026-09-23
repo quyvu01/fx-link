@@ -20,6 +20,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\src\FxLink.Aws.Sqs\FxLink.Aws.Sqs.csproj" />
         <ProjectReference Include="..\..\src\FxLink.Messaging.EntityFrameworkCore\FxLink.Messaging.EntityFrameworkCore.csproj"/>
         <ProjectReference Include="..\..\src\FxLink.RabbitMq\FxLink.RabbitMq.csproj"/>
         <ProjectReference Include="..\..\src\FxLink.RoutingSlip\FxLink.RoutingSlip.csproj"/>
