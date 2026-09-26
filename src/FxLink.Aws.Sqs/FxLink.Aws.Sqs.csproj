@@ -1,16 +1,34 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
-        <TargetFrameworks>net10.0;net8.0;net9.0</TargetFrameworks>
+        <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
         <LangVersion>default</LangVersion>
+        <Version>1.0.2</Version>
+        <Authors>Quy Vu</Authors>
+        <PackageId>FxLink.Aws.Sqs</PackageId>
+        <Description>A distributed messaging framework for .NET</Description>
+        <PackageTags>FxLink;distributed;open-source</PackageTags>
+        <RepositoryUrl>https://github.com/quyvu01/fx-link</RepositoryUrl>
+        <PackageIcon>FxLink.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="AWSSDK.SimpleNotificationService" Version="[3.7.0, )" />
+        <None Include="..\..\FxLink.png">
+            <Pack>True</Pack>
+            <PackagePath/>
+            <Link>FxLink.png</Link>
+        </None>
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="\"/>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="AWSSDK.SimpleNotificationService" Version="[3.7.0, )"/>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="[8.0.0, )"/>
         <PackageReference Include="AWSSDK.SQS" Version="[3.7.0, )"/>
     </ItemGroup>
     <ItemGroup>
-      <ProjectReference Include="..\FxLink\FxLink.csproj" />
+        <ProjectReference Include="..\FxLink\FxLink.csproj"/>
     </ItemGroup>
 </Project>
