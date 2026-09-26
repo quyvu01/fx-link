@@ -1,10 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
-        <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
+        <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
         <LangVersion>default</LangVersion>
+        <Version>1.0.2</Version>
+        <Authors>Quy Vu</Authors>
+        <PackageId>FxLink.Nats</PackageId>
+        <Description>A distributed messaging framework for .NET</Description>
+        <PackageTags>FxLink;distributed;open-source</PackageTags>
+        <RepositoryUrl>https://github.com/quyvu01/fx-link</RepositoryUrl>
+        <PackageIcon>FxLink.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     </PropertyGroup>
+    <ItemGroup>
+        <None Include="..\..\FxLink.png">
+            <Pack>True</Pack>
+            <PackagePath/>
+            <Link>FxLink.png</Link>
+        </None>
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="\"/>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="[8.0.0, )"/>
         <PackageReference Include="NATS.Net" Version="[2.5.5, )"/>
