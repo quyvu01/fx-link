@@ -12,6 +12,7 @@
   <Folder Name="/FxLink.Tests/">
     <Project Path="tests/Contracts/Contracts.csproj" />
     <Project Path="tests/FxLink.Messaging.EntityFrameworkCore.Tests/FxLink.Messaging.EntityFrameworkCore.Tests.csproj" />
+    <Project Path="tests/FxLink.Nats.Tests/FxLink.Nats.Tests.csproj" />
     <Project Path="tests/FxLink.Tests/FxLink.Tests.csproj" />
     <Project Path="tests/Order/Order.csproj" />
     <Project Path="tests/Payment/Payment.csproj" />
@@ -20,6 +21,7 @@
   <Folder Name="/FxLink.Transports/">
     <Project Path="src/FxLink.Aws.Sqs/FxLink.Aws.Sqs.csproj" />
     <Project Path="src/FxLink.RabbitMq/FxLink.RabbitMq.csproj" />
+    <Project Path="src\FxLink.Nats\FxLink.Nats.csproj" />
   </Folder>
   <Folder Name="/FxLink/">
     <Project Path="src\FxLink\FxLink.csproj" />
