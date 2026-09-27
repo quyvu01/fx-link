@@ -19,7 +19,10 @@ internal static class ServiceBusConstants
     public const string MessageTypeProperty = "MessageType";
 
     // Set on a retry so only the subscription that failed receives it — see ServiceBusTopology.TargetRule.
-    public const string TargetProperty = "x-target";
+    // No hyphen: SQL filter identifiers must be letters/digits/'_'/'$' — real Azure accepts a hyphenated
+    // name via [bracket] quoting, but Artemis-backed environments (e.g. the floci-az emulator) reject it
+    // outright, so a plain identifier is what's actually portable.
+    public const string TargetProperty = "TargetSubscription";
 
     // Context header carrying the requester's session id, next to the core ReplyToKey (the queue name).
     public const string ReplyToSessionKey = "x-reply-to-session";
