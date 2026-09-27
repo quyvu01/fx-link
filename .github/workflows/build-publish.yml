@@ -99,6 +99,8 @@ jobs:
         working-directory: artifacts
         run: |
           for file in *.nupkg; do
+            # FxLink.Azure.ServiceBus is deliberately excluded: unverified against a real broker/emulator yet
+            # (see docs/azure-service-bus-transport-design.md) — add it back once that's done.
             if [[ "$file" =~ ^(FxLink|FxLink\.(RabbitMq|Aws\.Sqs|Nats|RoutingSlip|StateMachine\.EntityFrameworkCore|StateMachine|Messaging\.EntityFrameworkCore))\.[0-9] ]]; then
               echo "Pushing $file"
               dotnet nuget push "$file" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate --no-symbols

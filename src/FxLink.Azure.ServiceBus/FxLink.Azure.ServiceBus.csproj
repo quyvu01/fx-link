@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
+        <LangVersion>default</LangVersion>
+        <Version>1.0.2</Version>
+        <Authors>Quy Vu</Authors>
+        <PackageId>FxLink.Azure.ServiceBus</PackageId>
+        <Description>Azure Service Bus transport for FxLink</Description>
+        <PackageTags>FxLink;distributed;open-source;azure;servicebus</PackageTags>
+        <RepositoryUrl>https://github.com/quyvu01/fx-link</RepositoryUrl>
+        <PackageIcon>FxLink.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    </PropertyGroup>
+    <ItemGroup>
+        <None Include="..\..\FxLink.png">
+            <Pack>True</Pack>
+            <PackagePath/>
+            <Link>FxLink.png</Link>
+        </None>
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="\"/>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Azure.Identity" Version="[1.13.0, )"/>
+        <PackageReference Include="Azure.Messaging.ServiceBus" Version="[7.18.0, )"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="[8.0.0, )"/>
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\FxLink\FxLink.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="FxLink.Azure.ServiceBus.Tests"/>
+    </ItemGroup>
+</Project>

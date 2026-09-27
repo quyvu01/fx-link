@@ -19,7 +19,7 @@
 FxLink lets services talk to each other through typed messages without coupling your business code to a
 specific broker. You write consumers and publish messages; FxLink handles serialization, routing,
 retries, dead-lettering and delivery guarantees, and a small transport package binds it all to
-RabbitMQ, Amazon SNS/SQS or NATS JetStream (or runs everything in-process for tests).
+RabbitMQ, Amazon SNS/SQS, Azure Service Bus or NATS JetStream (or runs everything in-process for tests).
 
 ## Features
 
@@ -38,22 +38,23 @@ RabbitMQ, Amazon SNS/SQS or NATS JetStream (or runs everything in-process for te
 
 ## Packages
 
-| Package | What it is |
-|---|---|
-| `FxLink` | Core: messages, consumers, publisher, requester, pipeline, retry, batching, Outbox/Inbox abstractions, in-memory transport and stores. |
-| `FxLink.RabbitMq` | RabbitMQ transport. |
-| `FxLink.Aws.Sqs` | Amazon SNS + SQS transport. |
-| `FxLink.Nats` | NATS JetStream transport. |
-| `FxLink.Messaging.EntityFrameworkCore` | EF Core stores for the Outbox and the Inbox. |
-| `FxLink.StateMachine` | State machines / sagas. |
-| `FxLink.StateMachine.EntityFrameworkCore` | EF Core persistence for state machine instances. |
-| `FxLink.RoutingSlip` | Routing slips with compensation. |
+| Package                                   | What it is                                                                                                                             |
+|-------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `FxLink`                                  | Core: messages, consumers, publisher, requester, pipeline, retry, batching, Outbox/Inbox abstractions, in-memory transport and stores. |
+| `FxLink.RabbitMq`                         | RabbitMQ transport.                                                                                                                    |
+| `FxLink.Aws.Sqs`                          | Amazon SNS + SQS transport.                                                                                                            |
+| `FxLink.Azure.ServiceBus`                 | Azure Service Bus transport (topics + subscriptions).                                                                                  |
+| `FxLink.Nats`                             | NATS JetStream transport.                                                                                                              |
+| `FxLink.Messaging.EntityFrameworkCore`    | EF Core stores for the Outbox and the Inbox.                                                                                           |
+| `FxLink.StateMachine`                     | State machines / sagas.                                                                                                                |
+| `FxLink.StateMachine.EntityFrameworkCore` | EF Core persistence for state machine instances.                                                                                       |
+| `FxLink.RoutingSlip`                      | Routing slips with compensation.                                                                                                       |
 
 You need the core package, exactly one transport, and whichever of the rest you use.
 
 ```bash
 dotnet add package FxLink
-dotnet add package FxLink.RabbitMq          # or FxLink.Aws.Sqs / FxLink.Nats
+dotnet add package FxLink.RabbitMq          # or FxLink.Aws.Sqs / FxLink.Azure.ServiceBus / FxLink.Nats
 dotnet add package FxLink.Messaging.EntityFrameworkCore   # optional: Outbox / Inbox
 ```
 
@@ -202,13 +203,13 @@ opts.ConfigureSupervisor(s =>
 
 ## Transports
 
-| | RabbitMQ | Amazon SNS/SQS | NATS JetStream |
-|---|---|---|---|
-| Fan-out | fanout exchange per message type, queue per consumer | SNS topic per message type, SQS queue per consumer | one stream, subject per message type, durable consumer per consumer type |
-| Request/response | exclusive reply queue per instance | unique reply queue per instance | unique `_INBOX` subject per instance (Core NATS) |
-| Retry backoff | TTL + dead-letter queue | not yet implemented | server-side message scheduling |
-| Dead-letter | dead-letter exchange + queue | native redrive policy as a safety net | dead-letter subject retained by a per-consumer durable |
-| Delayed publish | delayed-message-exchange plugin | `DelaySeconds`, up to 15 minutes | server-side message scheduling (NATS ≥ 2.12) |
+| | RabbitMQ | Amazon SNS/SQS | Azure Service Bus | NATS JetStream |
+|---|---|---|---|---|
+| Fan-out | fanout exchange per message type, queue per consumer | SNS topic per message type, SQS queue per consumer | topic per message type, subscription per consumer | one stream, subject per message type, durable consumer per consumer type |
+| Request/response | exclusive reply queue per instance | unique reply queue per instance | one shared session-enabled queue, a session per instance | unique `_INBOX` subject per instance (Core NATS) |
+| Retry backoff | TTL + dead-letter queue | not yet implemented | scheduled message, targeted at the failing subscription | server-side message scheduling |
+| Dead-letter | dead-letter exchange + queue | native redrive policy as a safety net | native subscription dead-letter queue, with a reason | dead-letter subject retained by a per-consumer durable |
+| Delayed publish | delayed-message-exchange plugin | `DelaySeconds`, up to 15 minutes | scheduled messages, no upper limit | server-side message scheduling (NATS ≥ 2.12) |
 
 All transports honor custom message names (`MessageDefinition`), custom consumer endpoint names
 (`options.ReceivedEndpoint("...")` in a consumer definition) and the same consumer pipeline.
@@ -252,6 +253,36 @@ opts.UseSqsDelayScheduler();      // optional: delayed publish (max 15 minutes)
 
 Note: SQS retry backoff and app-level dead-lettering are not implemented yet — a consumer that throws
 fails the delivery instead of being retried by FxLink.
+
+### Azure Service Bus
+
+> **Status: unverified against a real broker.** Builds and its unit tests (configuration, naming, the emulator
+> `Config.json` export) pass, but publish/consume, targeted retry, dead-letter, delay and request/response have
+> not been exercised against Azure Service Bus or its emulator — unlike the other three transports, which were.
+> Treat it as a design in code form until that verification happens.
+
+One topic per message type and one subscription per consumer type. Each subscription has a mandatory SQL rule
+(`[x-target] IS NULL OR [x-target] = '<subscription>'`) so a retry reaches only the consumer that failed, while
+ordinary messages still fan out to everyone. Dead-lettered messages stay in the subscription's native
+dead-letter queue with the exception as the reason.
+
+```csharp
+opts.AddServiceBus(bus =>
+{
+    bus.Namespace("my-namespace.servicebus.windows.net");   // Entra ID, DefaultAzureCredential
+    // bus.ConnectionString("Endpoint=sb://...");             // or a connection string
+    bus.MaxDeliveryCount(5);
+    bus.LockDuration(TimeSpan.FromSeconds(30));
+    bus.MaxConcurrentCalls(8);
+    // bus.AutoProvision(false);   // when topics/subscriptions are created outside the app
+});
+opts.UseServiceBusDelayScheduler();   // optional: delayed publish
+```
+
+Request/response uses a single shared reply queue with sessions enabled; every instance accepts only its own
+session, so it needs no per-instance entities and only Send/Listen rights. With `AutoProvision(false)` (and for
+the Service Bus emulator, which can't create entities at run time), inject `IServiceBusTopologyExporter` and call
+`ToEmulatorConfigJson()` to get the exact topology your consumers expect.
 
 ### NATS JetStream
 
