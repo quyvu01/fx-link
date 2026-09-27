@@ -59,12 +59,14 @@ public class ServiceBusNamingTests
     [Fact]
     public void Target_rule_matches_untargeted_messages_and_the_named_subscription()
     {
-        ServiceBusTopology.TargetRule("orders").ShouldBe("[x-target] IS NULL OR [x-target] = 'orders'");
+        ServiceBusTopology.TargetRule("orders")
+            .ShouldBe("TargetSubscription IS NULL OR TargetSubscription = 'orders'");
     }
 
     [Fact]
     public void Target_rule_escapes_single_quotes()
     {
-        ServiceBusTopology.TargetRule("o'brien").ShouldBe("[x-target] IS NULL OR [x-target] = 'o''brien'");
+        ServiceBusTopology.TargetRule("o'brien")
+            .ShouldBe("TargetSubscription IS NULL OR TargetSubscription = 'o''brien'");
     }
 }

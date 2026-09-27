@@ -11,10 +11,10 @@ internal sealed record TopicModel(string Name, Type MessageType, IReadOnlyList<S
 // AutoProvision and the emulator Config.json export read it, so they can't drift apart.
 internal sealed record ServiceBusTopology(IReadOnlyList<TopicModel> Topics, string ReplyQueueName)
 {
-    // Replaces the default match-all rule: ordinary messages (no x-target) reach every subscription, a
-    // retry (x-target = subscription name) reaches only the subscription that failed.
+    // Replaces the default match-all rule: ordinary messages (no TargetSubscription) reach every
+    // subscription, a retry (TargetSubscription = subscription name) reaches only the one that failed.
     internal static string TargetRule(string subscriptionName) =>
-        $"[{ServiceBusConstants.TargetProperty}] IS NULL OR [{ServiceBusConstants.TargetProperty}] = " +
+        $"{ServiceBusConstants.TargetProperty} IS NULL OR {ServiceBusConstants.TargetProperty} = " +
         $"'{subscriptionName.Replace("'", "''")}'";
 
     internal static string ToIso(TimeSpan value) => XmlConvert.ToString(value);
