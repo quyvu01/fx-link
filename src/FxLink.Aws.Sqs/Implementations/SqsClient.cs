@@ -45,6 +45,14 @@ internal sealed class SqsClient(
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
+        // These three persist on this instance across restarts (the supervisor re-invokes
+        // StartAsync on the same singleton) — without clearing them first, a restart would
+        // append the same queue URL onto _queueUrlsByMessageType's lists again, duplicating the
+        // delayed-publish fan-out set (see GetQueueUrlsForMessageType).
+        _topicArnsByMessageType.Clear();
+        _queueUrlsByConsumerType.Clear();
+        _queueUrlsByMessageType.Clear();
+
         var messageKeyMap = messageKeys.GetMessageKeys(); // messageType -> consumerTypes[]
 
         // One topic per message type — declared before any queue subscribes to it below.
@@ -61,48 +69,72 @@ internal sealed class SqsClient(
             .SelectMany(kv => kv.Value.Select(consumerType => (consumerType, messageType: kv.Key)))
             .GroupBy(x => x.consumerType, x => x.messageType);
 
-        foreach (var group in messageTypesByConsumerType)
+        // Loops started here must die with this StartAsync call, not just with the host: unlike
+        // RabbitMqClient (where StopAsync closing the shared connection cascades into closing every
+        // channel), StopAsync here only deletes the reply queue — it never touches the shared
+        // ISqsConnection.Sqs client the poll loops below read from. Without this, a StartAsync call
+        // that throws partway through (e.g. the second consumer's CreateQueueAsync fails) would
+        // leave the first consumer's PollLoopAsync running forever on the never-cancelled
+        // cancellationToken, and the supervisor's restart would start a second poller for the same
+        // queue alongside it.
+        using var loopsCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var loops = new List<Task>();
+
+        try
         {
-            var consumerType = group.Key;
-            var queueName = ResolveQueueName(consumerType);
-            var queue = await sqsConnection.Sqs.CreateQueueAsync(new CreateQueueRequest { QueueName = queueName },
-                cancellationToken);
-            var queueUrl = queue.QueueUrl;
-            _queueUrlsByConsumerType[consumerType] = queueUrl;
-
-            var queueArn = await GetQueueArnAsync(queueUrl, cancellationToken);
-            var messageTypes = group.ToArray();
-            var topicArns = messageTypes.Select(messageType => _topicArnsByMessageType[messageType]).ToArray();
-
-            foreach (var messageType in messageTypes)
+            foreach (var group in messageTypesByConsumerType)
             {
-                if (!_queueUrlsByMessageType.TryGetValue(messageType, out var queueUrls))
-                    _queueUrlsByMessageType[messageType] = queueUrls = [];
-                queueUrls.Add(queueUrl);
+                var consumerType = group.Key;
+                var queueName = ResolveQueueName(consumerType);
+                var queue = await sqsConnection.Sqs.CreateQueueAsync(
+                    new CreateQueueRequest { QueueName = queueName }, cancellationToken);
+                var queueUrl = queue.QueueUrl;
+                _queueUrlsByConsumerType[consumerType] = queueUrl;
+
+                var queueArn = await GetQueueArnAsync(queueUrl, cancellationToken);
+                var messageTypes = group.ToArray();
+                var topicArns = messageTypes.Select(messageType => _topicArnsByMessageType[messageType]).ToArray();
+
+                foreach (var messageType in messageTypes)
+                {
+                    if (!_queueUrlsByMessageType.TryGetValue(messageType, out var queueUrls))
+                        _queueUrlsByMessageType[messageType] = queueUrls = [];
+                    queueUrls.Add(queueUrl);
+                }
+
+                await AllowTopicsToPublishToQueueAsync(queueUrl, queueArn, topicArns, cancellationToken);
+                foreach (var topicArn in topicArns)
+                    await SubscribeQueueToTopicAsync(topicArn, queueArn, cancellationToken);
+
+                await ConfigureDeadLetterQueueAsync(queueName, queueUrl, cancellationToken);
+
+                loops.Add(PollLoopAsync(queueUrl, consumerType, loopsCts.Token));
             }
 
-            await AllowTopicsToPublishToQueueAsync(queueUrl, queueArn, topicArns, cancellationToken);
-            foreach (var topicArn in topicArns)
-                await SubscribeQueueToTopicAsync(topicArn, queueArn, cancellationToken);
+            // Per-instance reply queue for request/response — unique name so replies can never be
+            // misdelivered to a different instance's poller (see ISqsClient.ReplyQueueUrl).
+            var replyQueueName = SqsNamingExtensions.Sanitize($"reply-{Guid.NewGuid():N}");
+            var replyQueue = await sqsConnection.Sqs.CreateQueueAsync(
+                new CreateQueueRequest { QueueName = replyQueueName }, cancellationToken);
+            _replyQueueUrl = replyQueue.QueueUrl;
+            loops.Add(ReplyPollLoopAsync(_replyQueueUrl, loopsCts.Token));
 
-            await ConfigureDeadLetterQueueAsync(queueName, queueUrl, cancellationToken);
-
-            // Fire-and-forget, same shape as RabbitMqClient's MonitorRecycleAsync loops — runs
-            // until cancellationToken (the token StartAsync itself was given) is cancelled.
-            _ = PollLoopAsync(queueUrl, consumerType, cancellationToken);
+            // Run until StopAsync/host shutdown cancels this token — same contract as
+            // RabbitMqClient.StartAsync (see IMessageBrokerConnector.StartAsync's doc comment).
+            await Task.Delay(Timeout.Infinite, cancellationToken);
         }
-
-        // Per-instance reply queue for request/response — unique name so replies can never be
-        // misdelivered to a different instance's poller (see ISqsClient.ReplyQueueUrl).
-        var replyQueueName = SqsNamingExtensions.Sanitize($"reply-{Guid.NewGuid():N}");
-        var replyQueue = await sqsConnection.Sqs.CreateQueueAsync(
-            new CreateQueueRequest { QueueName = replyQueueName }, cancellationToken);
-        _replyQueueUrl = replyQueue.QueueUrl;
-        _ = ReplyPollLoopAsync(_replyQueueUrl, cancellationToken);
-
-        // Run until StopAsync/host shutdown cancels this token — same contract as
-        // RabbitMqClient.StartAsync (see IMessageBrokerConnector.StartAsync's doc comment).
-        await Task.Delay(Timeout.Infinite, cancellationToken);
+        finally
+        {
+            await loopsCts.CancelAsync();
+            try
+            {
+                await Task.WhenAll(loops);
+            }
+            catch
+            {
+                // Loops only ever end by cancellation; nothing left to report.
+            }
+        }
     }
 
     // A message type can override its SNS topic name via IMessageDefinition<TMessage>'s

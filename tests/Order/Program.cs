@@ -4,8 +4,10 @@ using Contracts.Messages;
 using Contracts.Payments;
 using FxLink.Abstractions;
 using FxLink.Aws.Sqs.Extensions;
+using FxLink.Azure.ServiceBus.Extensions;
 using FxLink.Extensions;
 using FxLink.Messaging.EntityFrameworkCore.Extensions;
+using FxLink.Nats.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RoutingSlip.Extensions;
 using Microsoft.AspNetCore.Mvc;
@@ -96,15 +98,30 @@ builder.Services.AddFxLink(opts =>
 
     // opts.AddRabbitMq(config => { config.Host("localhost", "fxlink"); });
     
-    opts.AddSqs(c =>
+    // opts.AddSqs(c =>
+    // {
+    //     c.Region(RegionEndpoint.USEast1, credential =>
+    //     {
+    //         credential.ServiceUrl("http://localhost:4566"); // LocalStack endpoint
+    //         credential.AccessKeyId("test");
+    //         credential.SecretAccessKey("test");
+    //     });
+    // });
+    
+    // opts.AddNats(c =>
+    // {
+    //     c.Server("nats://localhost:4222");
+    // });
+    
+    opts.AddServiceBus(c =>
     {
-        c.Region(RegionEndpoint.USEast1, credential =>
-        {
-            credential.ServiceUrl("http://localhost:4566"); // LocalStack endpoint
-            credential.AccessKeyId("test");
-            credential.SecretAccessKey("test");
-        });
+        // Well-known dev-emulator connection string (Azure's own emulator, or floci-az in
+        // non-mocked mode) — same convention as SQS's LocalStack endpoint above. Swap for a real
+        // namespace with c.Namespace("x.servicebus.windows.net") (Entra ID) to run against Azure.
+        c.ConnectionString("Endpoint=sb://localhost:5673;SharedAccessKeyName=RootManageSharedAccessKey;" +
+                            "SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;");
     });
+    opts.UseServiceBusDelayScheduler();
 
     opts.AddRoutingSlip(cfg => cfg
         .AddActivity<ReserveInventoryActivity>()
@@ -204,6 +221,25 @@ app.MapPost("/calendar/created", async (IPublisher publisher, Guid id, string na
         return "Calendar created";
     })
     .WithTags("Calendar")
+    .WithOpenApi();
+
+app.MapPost("/orders/place-delayed", async (IPublisher publisher, ILogger<Program> logger, int delaySeconds = 15) =>
+    {
+        var orderId = Guid.NewGuid();
+        // DelayTime alone isn't enough — the transport only takes the delayed-delivery path
+        // (Service Bus ScheduledEnqueueTime / NATS message scheduling / SQS DelaySeconds) when
+        // DeliveryKindKey is also set to Delay; that's what UseServiceBusDelayScheduler() above
+        // registers a handler for.
+        await publisher.PublishAsync(new OrderPlaced { OrderId = orderId, OrderTime = DateTime.UtcNow }, c =>
+        {
+            c.DelayTime = TimeSpan.FromSeconds(delaySeconds);
+        });
+        logger.LogInformation("[API/Publisher] Order placed with a {DelaySeconds}s delay: {@OrderId}",
+            delaySeconds, orderId);
+        return $"Order placed, delayed by {delaySeconds}s";
+    })
+    .WithTags("Plain pub/sub")
+    .WithSummary("Delayed publish — exercises UseServiceBusDelayScheduler() (ScheduledEnqueueTime, no upper bound)")
     .WithOpenApi();
 
 app.MapPost("/batch/test", async (IPublisher publisher) =>
