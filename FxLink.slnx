@@ -15,6 +15,7 @@
     <Project Path="tests/FxLink.Azure.ServiceBus.Tests/FxLink.Azure.ServiceBus.Tests.csproj" />
     <Project Path="tests/FxLink.Nats.Tests/FxLink.Nats.Tests.csproj" />
     <Project Path="tests/FxLink.Tests/FxLink.Tests.csproj" />
+    <Project Path="tests/FxLink.IntegrationTests/FxLink.IntegrationTests.csproj" />
     <Project Path="tests/Order/Order.csproj" />
     <Project Path="tests/Payment/Payment.csproj" />
     <Project Path="tests/StateMachine/StateMachine.csproj" />

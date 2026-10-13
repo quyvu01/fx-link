@@ -10,7 +10,7 @@ public sealed class OrderResultConsumer(ILogger<OrderResultConsumer> logger) : I
     public async Task ConsumeAsync(IConsumeContext<OrderResult> context, CancellationToken token = default)
     {
         logger.LogInformation("Order result request: {@OrderRequest}", context.Message);
-        await Task.Delay(TimeSpan.FromSeconds(2), token);
+        // await Task.Delay(TimeSpan.FromSeconds(2), token);
         await context.ResponseAsync(new OrderResultResponse { OrderId = context.Message.OrderId, IsSucceed = true },
             token);
     }

@@ -12,6 +12,10 @@ public class ServerSupervisor(ISupervisorOptions options, ILogger<ServerSupervis
     : IServerSupervisor
 {
     private readonly ConcurrentDictionary<string, SupervisedServerState> _servers = new();
+
+    // ConcurrentDictionary enumeration order isn't registration order — RestForOne needs the real
+    // order to know which servers come "after" a failed one, so it's tracked here instead.
+    private readonly List<string> _registrationOrder = [];
     private readonly ISupervisorOptions _options = options ?? new SupervisorOptions();
     private readonly SemaphoreSlim _supervisorLock = new(1, 1);
     private CancellationTokenSource _supervisorCts;
@@ -38,6 +42,8 @@ public class ServerSupervisor(ISupervisorOptions options, ILogger<ServerSupervis
 
         if (!_servers.TryAdd(serverId, state))
             throw new InvalidOperationException($"Server with ID '{serverId}' is already registered.");
+
+        lock (_registrationOrder) _registrationOrder.Add(serverId);
 
         logger?.LogDebug("Registered server {ServerId} for supervision", serverId);
     }
@@ -122,7 +128,15 @@ public class ServerSupervisor(ISupervisorOptions options, ILogger<ServerSupervis
     {
         if (_supervisorCts?.IsCancellationRequested == true) return;
 
-        state.Cts = CancellationTokenSource.CreateLinkedTokenSource(_supervisorCts?.Token ?? CancellationToken.None);
+        // Captured locally and referenced only via this local below — not state.Cts. A restart
+        // (OneForAll/RestForOne) calls StartServer again for the same state while the previous
+        // run is still unwinding from cancellation, replacing state.Cts with a fresh, non-cancelled
+        // source; if the closure below read state.Cts instead, the cancellation check would see
+        // that new source and treat an ordinary cancelled shutdown as a real failure — which the
+        // default directive for OperationCanceledException marks Stopped, permanently, even though
+        // the server is actually running fine under its new run.
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_supervisorCts?.Token ?? CancellationToken.None);
+        state.Cts = cts;
 
         state.RunningTask = Task.Run(async () =>
         {
@@ -130,9 +144,9 @@ public class ServerSupervisor(ISupervisorOptions options, ILogger<ServerSupervis
             {
                 logger?.LogDebug("Starting server {ServerId}", state.ServerId);
                 UpdateHealth(state, ServerHealth.Healthy);
-                await state.Server.StartAsync(state.Cts.Token);
+                await state.Server.StartAsync(cts.Token);
             }
-            catch (OperationCanceledException) when (state.Cts.IsCancellationRequested)
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
                 logger?.LogDebug("Server {ServerId} was cancelled", state.ServerId);
             }
@@ -308,7 +322,9 @@ public class ServerSupervisor(ISupervisorOptions options, ILogger<ServerSupervis
 
     private async Task RestartServersFromAsync(string failedServerId)
     {
-        var serverList = _servers.Values.ToList();
+        List<string> order;
+        lock (_registrationOrder) order = [.._registrationOrder];
+        var serverList = order.Select(id => _servers[id]).ToList();
         var failedIndex = serverList.FindIndex(s => s.ServerId == failedServerId);
 
         if (failedIndex < 0) return;

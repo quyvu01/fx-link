@@ -16,6 +16,9 @@
         </PackageReference>
         <PackageReference Include="Shouldly" Version="4.2.1"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.29"/>
+        <!-- Microsoft.EntityFrameworkCore.Sqlite 8.0.29 pulls a vulnerable SQLitePCLRaw.lib.e_sqlite3
+             (GHSA-2m69-gcr7-jv3q); pinned up directly. -->
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="[2.1.13, )"/>
     </ItemGroup>
 
     <ItemGroup>

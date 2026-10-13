@@ -2,7 +2,7 @@
 
 name: Build FxLink and Publish
 env:
-  VERSION: 1.0.2
+  VERSION: 1.0.3
 
 on:
   push:
@@ -33,12 +33,42 @@ jobs:
         run: dotnet restore
       - name: Build
         run: dotnet build --no-restore
-  
+
+  test:
+    name: 'run transport and unit tests'
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Test
+        # Every unit/naming test project in the solution, including the per-transport ones — a
+        # transport test failing here must block calc-version/publish below, not just get reported
+        # after the fact (see docs/lessons-from-fxmap.md item 9). FxLink.IntegrationTests is
+        # deliberately NOT included: it exercises real local brokers (RabbitMQ/NATS/SQS containers)
+        # that don't exist on this runner yet, and is a local-only suite for now — see
+        # tests/FxLink.IntegrationTests/README.md.
+        run: |
+          dotnet test tests/FxLink.Tests/FxLink.Tests.csproj --no-restore -c Release
+          dotnet test tests/FxLink.Nats.Tests/FxLink.Nats.Tests.csproj --no-restore -c Release
+          dotnet test tests/FxLink.Azure.ServiceBus.Tests/FxLink.Azure.ServiceBus.Tests.csproj --no-restore -c Release
+          dotnet test tests/FxLink.Messaging.EntityFrameworkCore.Tests/FxLink.Messaging.EntityFrameworkCore.Tests.csproj --no-restore -c Release
+
   calc-version:
     name: Calculate Version
     runs-on: ubuntu-latest
     needs:
       - build
+      - test
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:

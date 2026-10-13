@@ -3,7 +3,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
         <LangVersion>default</LangVersion>
-        <Version>1.0.2</Version>
+        <Version>1.0.3</Version>
         <Authors>Quy Vu</Authors>
         <PackageId>FxLink.StateMachine.EntityFrameworkCore</PackageId>
         <Description>A distributed messaging framework for .NET</Description>
@@ -27,6 +27,10 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="[8.0.0, )"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="[8.0.0, )"/>
+        <!-- Microsoft.EntityFrameworkCore 8.0.0's own floor pulls in a vulnerable transitive version
+             (GHSA-qj66-m88j-hmgj); pinned up directly so a consumer restoring at the lowest allowed
+             version doesn't get it. -->
+        <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="[8.0.1, )"/>
     </ItemGroup>
 
     <ItemGroup>
