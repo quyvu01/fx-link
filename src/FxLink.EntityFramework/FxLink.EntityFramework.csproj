@@ -5,8 +5,8 @@
         <LangVersion>default</LangVersion>
         <Version>1.0.4</Version>
         <Authors>Quy Vu</Authors>
-        <PackageId>FxLink.Messaging.EntityFrameworkCore</PackageId>
-        <Description>EF Core backend for FxLink's reliable-messaging patterns (Outbox, Inbox)</Description>
+        <PackageId>FxLink.EntityFramework</PackageId>
+        <Description>EF Core backend for FxLink's reliable-messaging patterns (Outbox, Inbox) and state machine persistence</Description>
         <PackageTags>FxLink;distributed;open-source</PackageTags>
         <RepositoryUrl>https://github.com/quyvu01/fx-link</RepositoryUrl>
         <PackageIcon>FxLink.png</PackageIcon>

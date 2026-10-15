@@ -21,7 +21,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\FxLink.RabbitMq\FxLink.RabbitMq.csproj" />
-        <ProjectReference Include="..\..\src\FxLink.StateMachine.EntityFrameworkCore\FxLink.StateMachine.EntityFrameworkCore.csproj"/>
+        <ProjectReference Include="..\..\src\FxLink.EntityFramework\FxLink.EntityFramework.csproj"/>
         <ProjectReference Include="..\..\src\FxLink\FxLink.csproj"/>
     </ItemGroup>
 
