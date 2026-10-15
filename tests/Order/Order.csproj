@@ -25,7 +25,6 @@
         <ProjectReference Include="..\..\src\FxLink.Messaging.EntityFrameworkCore\FxLink.Messaging.EntityFrameworkCore.csproj"/>
         <ProjectReference Include="..\..\src\FxLink.Nats\FxLink.Nats.csproj" />
         <ProjectReference Include="..\..\src\FxLink.RabbitMq\FxLink.RabbitMq.csproj"/>
-        <ProjectReference Include="..\..\src\FxLink.RoutingSlip\FxLink.RoutingSlip.csproj"/>
         <ProjectReference Include="..\..\src\FxLink\FxLink.csproj"/>
         <ProjectReference Include="..\Contracts\Contracts.csproj"/>
     </ItemGroup>
