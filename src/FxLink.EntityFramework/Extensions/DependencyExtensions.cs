@@ -1,8 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
-using FxLink.StateMachine.Abstractions;
+using FxLink.Abstractions;
 using FxLink.EntityFramework.Registries;
 using FxLink.EntityFramework.Repositories;
-using FxLink.StateMachine.Registries;
+using FxLink.Registries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.EntityFramework.Extensions;

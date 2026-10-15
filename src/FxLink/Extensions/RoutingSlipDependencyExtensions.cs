@@ -1,0 +1,29 @@
+using System.Diagnostics.CodeAnalysis;
+using FxLink.Extensions;
+using FxLink.Registries;
+using FxLink.Abstractions;
+using FxLink.Implementations;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FxLink.Extensions;
+
+public static class RoutingSlipDependencyExtensions
+{
+    public static void AddRoutingSlip(this IConfigurator configurator,
+        [NotNull] Action<IRoutingSlipConfigurator> options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var services = configurator.Services;
+        var routingSlipConfigurator = new RoutingSlipConfigurator(services);
+        options.Invoke(routingSlipConfigurator);
+        routingSlipConfigurator.Build();
+        var messageKeys = configurator.MessageKeys();
+        routingSlipConfigurator.MessageKeys
+            .ForEach(mk => mk.Value
+                .ForEach(v => messageKeys.AddMessageKey(mk.Key, v)));
+        services.AddScoped<IRoutingSlipExecutor, RoutingSlipExecutor>();
+        services.AddScoped(typeof(IRoutingSlipPublisher<>), typeof(RoutingSlipPublisher<>));
+        services.AddScoped(typeof(IExecuteActivityProxy<>), typeof(ExecuteActivityProxy<>));
+        services.AddScoped(typeof(IExecuteActivityProxy<,>), typeof(ExecuteActivityProxy<,>));
+    }
+}

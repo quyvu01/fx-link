@@ -1,0 +1,11 @@
+using System.Linq.Expressions;
+using FxLink.Contexts;
+using FxLink.Abstractions;
+
+namespace FxLink.Registries;
+
+public interface IEventCorrelationByConfigurator<TInstance, TMessage> : IEventConfigurator<TInstance, TMessage>
+    where TInstance : IStateMachineInstance where TMessage : class
+{
+    IEventConfigurator<TInstance, TMessage> SelectId(Expression<Func<IConsumeContext<TMessage>, Guid>> selector);
+}
