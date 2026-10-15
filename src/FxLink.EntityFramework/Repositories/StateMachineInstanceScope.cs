@@ -1,4 +1,4 @@
-using FxLink.StateMachine.Abstractions;
+using FxLink.Abstractions;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace FxLink.EntityFramework.Repositories;

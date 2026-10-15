@@ -1,7 +1,6 @@
 using FxLink.Abstractions;
 using FxLink.Contexts;
-using FxLink.RoutingSlip.Abstractions;
-using FxLink.RoutingSlip.Extensions;
+using FxLink.Extensions;
 using Order.TestRoutingSlip.Arguments;
 using Order.TestRoutingSlip.Contracts;
 

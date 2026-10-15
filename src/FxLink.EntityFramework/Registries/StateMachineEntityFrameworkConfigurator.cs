@@ -1,11 +1,11 @@
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Extensions;
-using FxLink.StateMachine.Abstractions;
+using FxLink.Abstractions;
 using FxLink.EntityFramework.Exceptions;
 using FxLink.EntityFramework.Wrappers;
-using FxLink.StateMachine.Implementations.StateMachines;
-using FxLink.StateMachine.Registries;
+using FxLink.Implementations.StateMachines;
+using FxLink.Registries;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

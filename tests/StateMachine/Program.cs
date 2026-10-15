@@ -5,7 +5,6 @@ using FxLink.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.EntityFramework.Extensions;
 using FxLink.EntityFramework.Registries;
-using FxLink.StateMachine.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Serilog;

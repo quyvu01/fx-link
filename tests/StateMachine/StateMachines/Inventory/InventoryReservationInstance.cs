@@ -1,4 +1,4 @@
-using FxLink.StateMachine.Abstractions;
+using FxLink.Abstractions;
 
 namespace StateMachine.StateMachines.Inventory;
 

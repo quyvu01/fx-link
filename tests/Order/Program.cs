@@ -9,7 +9,6 @@ using FxLink.Extensions;
 using FxLink.EntityFramework.Extensions;
 using FxLink.Nats.Extensions;
 using FxLink.RabbitMq.Extensions;
-using FxLink.RoutingSlip.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;

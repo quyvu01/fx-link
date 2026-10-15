@@ -1,0 +1,16 @@
+using FxLink.Abstractions;
+using FxLink.Contexts;
+using FxLink.Registries;
+
+namespace FxLink.Abstractions;
+
+public interface IStateMachine : IConsumer
+{
+    IState Initial { get; }
+    IState Completed { get; }
+    IState[] States { get; }
+    IReadOnlyDictionary<IActivity, IActivityConfigurator> InternalActivityConfigurators { get; }
+
+    Task RaiseEventAsync<TMessage>(IConsumeContext<TMessage> context, CancellationToken token = default)
+        where TMessage : class;
+}

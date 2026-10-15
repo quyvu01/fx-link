@@ -1,0 +1,15 @@
+using FxLink.Faults;
+using FxLink.Abstractions;
+
+namespace FxLink.Registries;
+
+internal class RequestConfigurator<TInstance, TRequest, TResponse> :
+    IRequestConfigurator<TInstance, TRequest, TResponse>
+    where TInstance : IStateMachineInstance where TRequest : class where TResponse : class
+{
+    public TimeSpan Timeout { get; set; }
+    public TimeSpan? TimeToLive { get; set; }
+    public Action<IEventConfigurator<TInstance, TResponse>> Completed { get; set; }
+    public Action<IEventConfigurator<TInstance, Fault<TRequest>>> Failed { get; set; }
+    public Action<IEventConfigurator<TInstance, RequestTimeoutExpired<TRequest>>> TimeoutExpired { get; set; }
+}
