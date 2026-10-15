@@ -45,15 +45,14 @@ RabbitMQ, Amazon SNS/SQS, Azure Service Bus or NATS JetStream (or runs everythin
 | `FxLink.Aws.Sqs`                          | Amazon SNS + SQS transport.                                                                                                            |
 | `FxLink.Azure.ServiceBus`                 | Azure Service Bus transport (topics + subscriptions).                                                                                  |
 | `FxLink.Nats`                             | NATS JetStream transport.                                                                                                              |
-| `FxLink.Messaging.EntityFrameworkCore`    | EF Core stores for the Outbox and the Inbox.                                                                                           |
-| `FxLink.StateMachine.EntityFrameworkCore` | EF Core persistence for state machine instances.                                                                                       |
+| `FxLink.EntityFramework`                  | EF Core stores for the Outbox/Inbox and persistence for state machine instances.                                                       |
 
 You need the core package, exactly one transport, and whichever of the rest you use.
 
 ```bash
 dotnet add package FxLink
 dotnet add package FxLink.RabbitMq          # or FxLink.Aws.Sqs / FxLink.Azure.ServiceBus / FxLink.Nats
-dotnet add package FxLink.Messaging.EntityFrameworkCore   # optional: Outbox / Inbox
+dotnet add package FxLink.EntityFramework   # optional: Outbox / Inbox / state machine persistence
 ```
 
 ## Quick start

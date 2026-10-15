@@ -22,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\FxLink.Messaging.EntityFrameworkCore\FxLink.Messaging.EntityFrameworkCore.csproj"/>
+        <ProjectReference Include="..\..\src\FxLink.EntityFramework\FxLink.EntityFramework.csproj"/>
     </ItemGroup>
 
 </Project>

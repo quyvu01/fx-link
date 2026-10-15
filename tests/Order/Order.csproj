@@ -22,7 +22,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\FxLink.Aws.Sqs\FxLink.Aws.Sqs.csproj" />
         <ProjectReference Include="..\..\src\FxLink.Azure.ServiceBus\FxLink.Azure.ServiceBus.csproj" />
-        <ProjectReference Include="..\..\src\FxLink.Messaging.EntityFrameworkCore\FxLink.Messaging.EntityFrameworkCore.csproj"/>
+        <ProjectReference Include="..\..\src\FxLink.EntityFramework\FxLink.EntityFramework.csproj"/>
         <ProjectReference Include="..\..\src\FxLink.Nats\FxLink.Nats.csproj" />
         <ProjectReference Include="..\..\src\FxLink.RabbitMq\FxLink.RabbitMq.csproj"/>
         <ProjectReference Include="..\..\src\FxLink\FxLink.csproj"/>

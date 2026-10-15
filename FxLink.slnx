@@ -1,9 +1,6 @@
 <Solution>
-  <Folder Name="/FxLink.Messaging/">
-    <Project Path="src/FxLink.Messaging.EntityFrameworkCore/FxLink.Messaging.EntityFrameworkCore.csproj" />
-  </Folder>
-  <Folder Name="/FxLink.StateMachine/">
-    <Project Path="src/FxLink.StateMachine.EntityFrameworkCore/FxLink.StateMachine.EntityFrameworkCore.csproj" />
+  <Folder Name="/FxLink.EntityFramework/">
+    <Project Path="src/FxLink.EntityFramework/FxLink.EntityFramework.csproj" />
   </Folder>
   <Folder Name="/FxLink.Tests/">
     <Project Path="tests/Contracts/Contracts.csproj" />

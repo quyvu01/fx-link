@@ -132,8 +132,10 @@ jobs:
             # FxLink.Azure.ServiceBus is deliberately excluded: unverified against a real broker/emulator yet
             # (see docs/azure-service-bus-transport-design.md) — add it back once that's done.
             # FxLink.RoutingSlip and FxLink.StateMachine no longer exist: both merged into FxLink
-            # core — see that version's commit for why.
-            if [[ "$file" =~ ^(FxLink|FxLink\.(RabbitMq|Aws\.Sqs|Nats|StateMachine\.EntityFrameworkCore|Messaging\.EntityFrameworkCore))\.[0-9] ]]; then
+            # core — see that version's commit for why. FxLink.StateMachine.EntityFrameworkCore and
+            # FxLink.Messaging.EntityFrameworkCore no longer exist either: both merged into the
+            # single FxLink.EntityFramework package.
+            if [[ "$file" =~ ^(FxLink|FxLink\.(RabbitMq|Aws\.Sqs|Nats|EntityFramework))\.[0-9] ]]; then
               echo "Pushing $file"
               dotnet nuget push "$file" -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate --no-symbols
             else
