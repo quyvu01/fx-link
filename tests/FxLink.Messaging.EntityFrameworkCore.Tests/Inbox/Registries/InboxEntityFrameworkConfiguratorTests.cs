@@ -1,11 +1,11 @@
-using FxLink.Messaging.EntityFrameworkCore.Exceptions;
-using FxLink.Messaging.EntityFrameworkCore.Inbox.Registries;
-using FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
+using FxLink.EntityFramework.Exceptions;
+using FxLink.EntityFramework.Inbox.Registries;
+using FxLink.EntityFramework.Tests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
-namespace FxLink.Messaging.EntityFrameworkCore.Tests.Inbox.Registries;
+namespace FxLink.EntityFramework.Tests.Inbox.Registries;
 
 public class InboxEntityFrameworkConfiguratorTests
 {
@@ -14,7 +14,7 @@ public class InboxEntityFrameworkConfiguratorTests
     {
         var configurator = new InboxEntityFrameworkConfigurator(new ServiceCollection(), registrationKey: null);
 
-        Should.Throw<MessagingEntityFrameworkCoreException.DbContextNotConfigured>(configurator.ValidateItSelf);
+        Should.Throw<EntityFrameworkException.DbContextNotConfigured>(configurator.ValidateItSelf);
     }
 
     [Fact]
@@ -45,6 +45,6 @@ public class InboxEntityFrameworkConfiguratorTests
         configurator.AddDbContext<TestInboxDbContext>();
         configurator.DbContextFactory(() => (TestInboxDbContext)null!);
 
-        Should.Throw<MessagingEntityFrameworkCoreException.DbContextAlreadyConfigured>(configurator.ValidateItSelf);
+        Should.Throw<EntityFrameworkException.DbContextAlreadyConfigured>(configurator.ValidateItSelf);
     }
 }

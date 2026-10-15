@@ -1,0 +1,65 @@
+using FxLink.Exceptions;
+using FxLink.StateMachine.Abstractions;
+using FxLink.EntityFramework.Registries;
+
+namespace FxLink.EntityFramework.Exceptions;
+
+/// <summary>
+/// Groups the exceptions thrown by FxLink.EntityFramework: shared DbContext-registration
+/// boilerplate (state machine persistence, Outbox, Inbox all hit the same two), plus the state
+/// machine side's own concurrency/version configuration.
+/// </summary>
+public static class EntityFrameworkException
+{
+    /// <summary>AddDbContext/DbContextFactory was called more than once for the same setup.</summary>
+    public sealed class DbContextAlreadyConfigured(Type dbContextType) :
+        DistributedException(
+            $"Add {dbContextType.Name} is invoked multiple times. Call AddDbContext or DbContextFactory only once.");
+
+    /// <summary>Neither AddDbContext nor DbContextFactory was called during setup.</summary>
+    public sealed class DbContextNotConfigured()
+        : DistributedException("DbContext must be added by calling AddDbContext or DbContextFactory.");
+
+    /// <summary>
+    /// ConcurrencyMode.Pessimistic was selected without a SqlDialect. EF Core has no cross-provider
+    /// row-locking API, so the correct advisory-lock SQL depends on knowing the target database.
+    /// </summary>
+    public sealed class PessimisticModeDialectNotConfigured()
+        : DistributedException(
+            $"{nameof(ConcurrencyMode)}.{nameof(ConcurrencyMode.Pessimistic)} requires a {nameof(SqlDialect)}. " +
+            $"Call UseConcurrencyMode(cfg => cfg.{nameof(IConcurrencyModeConfigurator.Pessimistic)}(dialect)).");
+
+    /// <summary>
+    /// ConcurrencyMode.Pessimistic requires the correlation id up front so the advisory lock can be
+    /// acquired before the instance is read. This means the event must resolve the correlation id
+    /// eagerly, via CorrelationId(...) (or CorrelationBy(...) combined with SelectId(...)).
+    /// </summary>
+    public sealed class PessimisticModeCorrelationIdUnresolved()
+        : DistributedException(
+            $"{nameof(ConcurrencyMode)}.{nameof(ConcurrencyMode.Pessimistic)} requires the correlation id to be resolvable before reading the instance. " +
+            "Configure the event with CorrelationId(...) (or CorrelationBy(...) combined with SelectId(...)) so the lock key is known ahead of the query.");
+
+    /// <summary>
+    /// ConcurrencyMode.Optimistic (the default) requires TInstance to implement IVersion so a real
+    /// concurrency-token column can be mapped. Without it, EF Core has nothing to compare against on
+    /// UPDATE and a concurrent write would silently overwrite another instance's changes instead of
+    /// throwing — the same failure mode ConcurrentInstanceSaveConflict exists to catch.
+    /// </summary>
+    public sealed class OptimisticModeVersionNotImplemented(Type instanceType)
+        : DistributedException(
+            $"{instanceType.Name} must implement {nameof(IVersion)} to use {nameof(ConcurrencyMode)}.{nameof(ConcurrencyMode.Optimistic)} " +
+            $"(the default) — otherwise there is no column for EF Core to detect a concurrent write against. " +
+            $"Either implement {nameof(IVersion)} on {instanceType.Name} and call " +
+            $"modelBuilder.AddStateMachineInstanceVersion<{instanceType.Name}>() in your DbContext's OnModelCreating, " +
+            $"or switch to {nameof(ConcurrencyMode)}.{nameof(ConcurrencyMode.Pessimistic)}.");
+
+    /// <summary>
+    /// SaveInstanceAsync failed with a DbUpdateException: either an optimistic-concurrency mismatch
+    /// (DbUpdateConcurrencyException, e.g. a stale RowVersion) or a duplicate-key violation from two
+    /// concurrent CreateInstanceAsync calls racing for the same correlation id.
+    /// </summary>
+    public sealed class ConcurrentInstanceSaveConflict(Exception inner)
+        : DistributedException(
+            "Saving the state machine instance failed because of a concurrent write (optimistic concurrency mismatch or a duplicate instance creation).",
+            inner);
+}

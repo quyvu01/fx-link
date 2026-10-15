@@ -1,7 +1,7 @@
-using FxLink.Messaging.EntityFrameworkCore.Extensions;
+using FxLink.EntityFramework.Extensions;
 using Microsoft.EntityFrameworkCore;
 
-namespace FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
+namespace FxLink.EntityFramework.Tests.TestSupport;
 
 internal sealed class TestOutboxDbContext(DbContextOptions<TestOutboxDbContext> options) : DbContext(options)
 {

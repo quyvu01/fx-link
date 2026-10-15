@@ -1,10 +1,10 @@
-using FxLink.Messaging.EntityFrameworkCore.Outbox.Entities;
-using FxLink.Messaging.EntityFrameworkCore.Outbox.Repositories;
-using FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
+using FxLink.EntityFramework.Outbox.Entities;
+using FxLink.EntityFramework.Outbox.Repositories;
+using FxLink.EntityFramework.Tests.TestSupport;
 using Shouldly;
 using Xunit;
 
-namespace FxLink.Messaging.EntityFrameworkCore.Tests.Outbox.Repositories;
+namespace FxLink.EntityFramework.Tests.Outbox.Repositories;
 
 public class EfPartitionLeaseStoreTests
 {

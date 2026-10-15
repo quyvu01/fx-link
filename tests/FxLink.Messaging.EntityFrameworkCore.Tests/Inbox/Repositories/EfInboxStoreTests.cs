@@ -1,11 +1,11 @@
-using FxLink.Messaging.EntityFrameworkCore.Inbox.Entities;
-using FxLink.Messaging.EntityFrameworkCore.Inbox.Repositories;
-using FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
+using FxLink.EntityFramework.Inbox.Entities;
+using FxLink.EntityFramework.Inbox.Repositories;
+using FxLink.EntityFramework.Tests.TestSupport;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 
-namespace FxLink.Messaging.EntityFrameworkCore.Tests.Inbox.Repositories;
+namespace FxLink.EntityFramework.Tests.Inbox.Repositories;
 
 public class EfInboxStoreTests
 {

@@ -6,7 +6,7 @@ using FxLink.Abstractions;
 using FxLink.Aws.Sqs.Extensions;
 using FxLink.Azure.ServiceBus.Extensions;
 using FxLink.Extensions;
-using FxLink.Messaging.EntityFrameworkCore.Extensions;
+using FxLink.EntityFramework.Extensions;
 using FxLink.Nats.Extensions;
 using FxLink.RabbitMq.Extensions;
 using FxLink.RoutingSlip.Extensions;
