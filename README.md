@@ -40,15 +40,13 @@ RabbitMQ, Amazon SNS/SQS, Azure Service Bus or NATS JetStream (or runs everythin
 
 | Package                                   | What it is                                                                                                                             |
 |-------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| `FxLink`                                  | Core: messages, consumers, publisher, requester, pipeline, retry, batching, Outbox/Inbox abstractions, in-memory transport and stores. |
+| `FxLink`                                  | Core: messages, consumers, publisher, requester, pipeline, retry, batching, Outbox/Inbox abstractions, in-memory transport and stores, state machines/sagas, routing slips. |
 | `FxLink.RabbitMq`                         | RabbitMQ transport.                                                                                                                    |
 | `FxLink.Aws.Sqs`                          | Amazon SNS + SQS transport.                                                                                                            |
 | `FxLink.Azure.ServiceBus`                 | Azure Service Bus transport (topics + subscriptions).                                                                                  |
 | `FxLink.Nats`                             | NATS JetStream transport.                                                                                                              |
 | `FxLink.Messaging.EntityFrameworkCore`    | EF Core stores for the Outbox and the Inbox.                                                                                           |
-| `FxLink.StateMachine`                     | State machines / sagas.                                                                                                                |
 | `FxLink.StateMachine.EntityFrameworkCore` | EF Core persistence for state machine instances.                                                                                       |
-| `FxLink.RoutingSlip`                      | Routing slips with compensation.                                                                                                       |
 
 You need the core package, exactly one transport, and whichever of the rest you use.
 
@@ -355,7 +353,7 @@ Add a migration after mapping the entities — the tables are ordinary EF Core t
 
 ## State machines
 
-`FxLink.StateMachine` models long-running business processes as state machines driven by messages.
+FxLink models long-running business processes as state machines driven by messages.
 Instances are persisted (EF Core), correlated to events by an id or a predicate, and can schedule
 messages, send requests and publish events as they transition.
 
@@ -404,7 +402,7 @@ is exercised in [`tests/StateMachine`](tests/StateMachine).
 
 ## Routing slips
 
-`FxLink.RoutingSlip` executes a sequence of activities and, if one fails, compensates the ones that already
+FxLink's routing slips execute a sequence of activities and, if one fails, compensate the ones that already
 completed in reverse order.
 
 ```csharp

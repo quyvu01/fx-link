@@ -2,12 +2,8 @@
   <Folder Name="/FxLink.Messaging/">
     <Project Path="src/FxLink.Messaging.EntityFrameworkCore/FxLink.Messaging.EntityFrameworkCore.csproj" />
   </Folder>
-  <Folder Name="/FxLink.RoutingSlip/">
-    <Project Path="src/FxLink.RoutingSlip/FxLink.RoutingSlip.csproj" />
-  </Folder>
   <Folder Name="/FxLink.StateMachine/">
     <Project Path="src/FxLink.StateMachine.EntityFrameworkCore/FxLink.StateMachine.EntityFrameworkCore.csproj" />
-    <Project Path="src/FxLink.StateMachine/FxLink.StateMachine.csproj" />
   </Folder>
   <Folder Name="/FxLink.Tests/">
     <Project Path="tests/Contracts/Contracts.csproj" />

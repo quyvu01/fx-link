@@ -3,7 +3,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
         <LangVersion>default</LangVersion>
-        <Version>1.0.3</Version>
+        <Version>1.0.4</Version>
         <Authors>Quy Vu</Authors>
         <PackageId>FxLink</PackageId>
         <Description>A distributed messaging framework for .NET</Description>
@@ -25,9 +25,10 @@
         <InternalsVisibleTo Include="FxLink.Aws.Sqs"/>
         <InternalsVisibleTo Include="FxLink.Nats"/>
         <InternalsVisibleTo Include="FxLink.Azure.ServiceBus"/>
-        <InternalsVisibleTo Include="FxLink.StateMachine"/>
-        <InternalsVisibleTo Include="FxLink.RoutingSlip"/>
         <InternalsVisibleTo Include="FxLink.Tests"/>
+        <!-- FxLink.StateMachine and FxLink.RoutingSlip no longer exist as separate assemblies —
+             their code now lives directly in this project (src/FxLink/StateMachine,
+             src/FxLink/RoutingSlip), so internals are already visible without a grant. -->
     </ItemGroup>
 
     <ItemGroup>
