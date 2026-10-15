@@ -1,4 +1,4 @@
-using FxLink.StateMachine.EntityFrameworkCore.Extensions;
+using FxLink.EntityFramework.Extensions;
 using Microsoft.EntityFrameworkCore;
 using StateMachine.StateMachines.Inventory;
 

@@ -319,7 +319,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 {
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.AddOutboxMessageEntity();   // FxLink.Messaging.EntityFrameworkCore.Extensions
+        modelBuilder.AddOutboxMessageEntity();   // FxLink.EntityFramework.Extensions
         modelBuilder.AddInboxRecordEntity();
     }
 }
