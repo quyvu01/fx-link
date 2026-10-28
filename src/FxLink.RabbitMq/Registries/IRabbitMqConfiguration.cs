@@ -13,4 +13,5 @@ internal interface IRabbitMqConfiguration
     int PublishChannelPoolSize { get; }
     ushort PrefetchCount { get; }
     ushort ConcurrentMessageLimit { get; }
+    bool Durable { get; }
 }
