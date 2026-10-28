@@ -18,7 +18,9 @@ public static class InboxDependencyExtensions
         options.Invoke(efConfigurator);
         efConfigurator.ValidateItSelf();
 
-        services.AddScoped<IInboxStore>(sp => new EfInboxStore(sp.GetRequiredService<DbContextWrapped>().DbContext));
+        services.AddScoped<IInboxStore>(sp => new EfInboxStore(sp.GetRequiredService<DbContextWrapped>().DbContext,
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            static renewalServices => renewalServices.GetRequiredService<DbContextWrapped>().DbContext));
         configurator.Registry.RegisterDefault();
     }
 
@@ -33,7 +35,9 @@ public static class InboxDependencyExtensions
         efConfigurator.ValidateItSelf();
 
         services.AddKeyedScoped<IInboxStore>(messageType,
-            (sp, key) => new EfInboxStore(sp.GetRequiredKeyedService<DbContextWrapped>(key).DbContext));
+            (sp, key) => new EfInboxStore(sp.GetRequiredKeyedService<DbContextWrapped>(key).DbContext,
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                renewalServices => renewalServices.GetRequiredKeyedService<DbContextWrapped>(key).DbContext));
         configurator.Registry.RegisterKeyed(messageType);
     }
 }
