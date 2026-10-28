@@ -309,17 +309,44 @@ internal sealed class SqsClient(
         catch (Exception ex)
         {
             // RetryPipelineBehavior already owns retry/dead-letter handling and never rethrows in
-            // the normal case — reaching here means that mechanism itself failed. Delete anyway to
-            // avoid an uncontrolled redelivery loop; the failure is only visible via this log.
+            // the normal case — reaching here means that mechanism itself failed.
             _logger.LogCritical(ex, "Unhandled exception escaped the consumer pipeline for message {MessageId}",
                 message.MessageId);
+
+            // With RequeueOnFailure configured, leave it on the queue so it's redelivered once the
+            // dependency recovers; RedrivePolicy's MaxReceiveCount bounds the loop. Otherwise delete it
+            // below to avoid an uncontrolled redelivery loop; the failure is then only visible via this log.
+            if (sqsConfiguration.RequeueOnFailureDelay is { } requeueDelay)
+            {
+                await RequeueAfterDelayAsync(queueUrl, message, requeueDelay);
+                return;
+            }
         }
-        finally
+
+        // Deliberately CancellationToken.None: a message that was already successfully
+        // processed must still be deleted even if the caller's token just got cancelled —
+        // losing the delete here would mean reprocessing it from scratch on restart.
+        await sqsConnection.Sqs.DeleteMessageAsync(queueUrl, message.ReceiptHandle, CancellationToken.None);
+    }
+
+    // Sets the message's visibility timeout to the delay instead of deleting it, so SQS makes it
+    // visible again on its own. If that call fails too, the message still reappears once its current
+    // visibility timeout expires, so it isn't lost either way.
+    private async Task RequeueAfterDelayAsync(string queueUrl, Message message, TimeSpan delay)
+    {
+        try
         {
-            // Deliberately CancellationToken.None: a message that was already successfully
-            // processed must still be deleted even if the caller's token just got cancelled —
-            // losing the delete here would mean reprocessing it from scratch on restart.
-            await sqsConnection.Sqs.DeleteMessageAsync(queueUrl, message.ReceiptHandle, CancellationToken.None);
+            await sqsConnection.Sqs.ChangeMessageVisibilityAsync(new ChangeMessageVisibilityRequest
+            {
+                QueueUrl = queueUrl,
+                ReceiptHandle = message.ReceiptHandle,
+                VisibilityTimeout = (int)Math.Ceiling(delay.TotalSeconds)
+            }, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to change visibility of message {MessageId}; it is redelivered " +
+                                   "when its current visibility timeout expires", message.MessageId);
         }
     }
 

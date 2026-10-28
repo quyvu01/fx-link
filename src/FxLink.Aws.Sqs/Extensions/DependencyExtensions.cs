@@ -23,7 +23,8 @@ public static class DependencyExtensions
                 credential.SecretAccessKeyValue,
                 config.AwsRegionValue,
                 credential.ServiceUrlValue,
-                config.MaxReceiveCountValue));
+                config.MaxReceiveCountValue,
+                config.RequeueOnFailureDelayValue));
             services.AddSingleton<ISqsConnection, SqsConnection>();
             services.AddSingleton<SqsClient>();
             services.AddSingleton<IMessageBrokerConnector>(sp => sp.GetRequiredService<SqsClient>());

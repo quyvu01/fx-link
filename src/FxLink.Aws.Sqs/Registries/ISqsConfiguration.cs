@@ -9,4 +9,5 @@ internal interface ISqsConfiguration
     RegionEndpoint AwsRegion { get; }
     string ServiceUrl { get; }
     int MaxReceiveCount { get; }
+    TimeSpan? RequeueOnFailureDelay { get; }
 }

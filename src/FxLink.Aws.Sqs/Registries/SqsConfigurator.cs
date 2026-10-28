@@ -7,6 +7,7 @@ internal sealed class SqsConfigurator : ISqsConfigurator
     internal RegionEndpoint AwsRegionValue { get; private set; }
     internal ISqsCredential Credential { get; } = new SqsCredential();
     internal int MaxReceiveCountValue { get; private set; } = 5;
+    internal TimeSpan? RequeueOnFailureDelayValue { get; private set; }
 
     public void Region(RegionEndpoint region, Action<ISqsCredential> configure = null)
     {
@@ -19,5 +20,12 @@ internal sealed class SqsConfigurator : ISqsConfigurator
         ArgumentOutOfRangeException.ThrowIfLessThan(maxReceiveCount, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxReceiveCount, 1000); // SQS RedrivePolicy's own limit
         MaxReceiveCountValue = maxReceiveCount;
+    }
+
+    public void RequeueOnFailure(TimeSpan delay)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(delay, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(delay, TimeSpan.FromHours(12)); // SQS visibility timeout limit
+        RequeueOnFailureDelayValue = delay;
     }
 }

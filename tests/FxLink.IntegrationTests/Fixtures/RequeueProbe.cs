@@ -5,7 +5,7 @@ using FxLink.Delegates;
 
 namespace FxLink.IntegrationTests.Fixtures;
 
-// Used by RabbitMqRequeueOnFailureTests only. Static state is keyed by Id, so concurrent tests
+// Used by the *RequeueOnFailureTests only. Static state is keyed by Id, so concurrent tests
 // (each publishing its own Ids) can't see each other's attempts.
 public sealed class RequeueProbe
 {

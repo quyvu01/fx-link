@@ -51,4 +51,14 @@ public interface INatsConfigurator
     /// consumer is interested in its holding subject. Defaults to 7 days.
     /// </summary>
     void MaxAge(TimeSpan maxAge);
+
+    /// <summary>
+    /// Controls what happens to a message when an exception escapes the consumer pipeline — i.e. the
+    /// retry/dead-letter mechanism itself failed (republish failed, Inbox store unreachable, ...), not a
+    /// consumer exception, which <c>RetryPipelineBehavior</c> already handles. By default such a message
+    /// is acked and only logged, so it is lost. When configured, it is instead negatively acknowledged
+    /// so JetStream redelivers it after <paramref name="delay"/>, once the dependency recovers. Each
+    /// redelivery counts towards <see cref="MaxDeliver"/>, after which JetStream stops redelivering it.
+    /// </summary>
+    void RequeueOnFailure(TimeSpan delay);
 }

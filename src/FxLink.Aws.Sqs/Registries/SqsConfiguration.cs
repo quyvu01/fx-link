@@ -7,7 +7,8 @@ internal sealed class SqsConfiguration(
     string awsSecretAccessKey,
     RegionEndpoint awsRegion,
     string serviceUrl,
-    int maxReceiveCount)
+    int maxReceiveCount,
+    TimeSpan? requeueOnFailureDelay)
     : ISqsConfiguration
 {
     public string AwsAccessKeyId { get; } = awsAccessKeyId;
@@ -15,4 +16,5 @@ internal sealed class SqsConfiguration(
     public RegionEndpoint AwsRegion { get; } = awsRegion;
     public string ServiceUrl { get; } = serviceUrl;
     public int MaxReceiveCount { get; } = maxReceiveCount;
+    public TimeSpan? RequeueOnFailureDelay { get; } = requeueOnFailureDelay;
 }
