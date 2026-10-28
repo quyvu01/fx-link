@@ -106,21 +106,6 @@ public class EfInboxStoreTests
         SaveChangesInterceptor interceptor) => new(new DbContextOptionsBuilder<TestInboxDbContext>()
         .UseSqlite(connection).AddInterceptors(interceptor).Options);
 
-    // Runs a callback once, right before the first SaveChanges hits the database.
-    private sealed class RunBeforeSaveInterceptor(Func<Task> beforeSave) : SaveChangesInterceptor
-    {
-        private bool _ran;
-
-        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
-            InterceptionResult<int> result, CancellationToken cancellationToken = default)
-        {
-            if (_ran) return result;
-            _ran = true;
-            await beforeSave();
-            return result;
-        }
-    }
-
     [Fact]
     public async Task TryClaimAsync_steals_and_bumps_the_version_once_the_claim_has_expired()
     {

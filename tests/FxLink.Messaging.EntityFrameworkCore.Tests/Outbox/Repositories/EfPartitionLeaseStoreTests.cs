@@ -1,6 +1,9 @@
 using FxLink.EntityFramework.Outbox.Entities;
 using FxLink.EntityFramework.Outbox.Repositories;
 using FxLink.EntityFramework.Tests.TestSupport;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 using Xunit;
 
@@ -35,6 +38,51 @@ public class EfPartitionLeaseStoreTests
 
         version.ShouldBeNull();
     }
+
+    [Fact]
+    public async Task TryAcquireAsync_returns_null_and_leaves_nothing_tracked_when_another_instance_inserts_first()
+    {
+        await using var connection = SqliteDbContextFactory.OpenConnection();
+        var partitionKey = Guid.NewGuid();
+        await using (SqliteDbContextFactory.CreateContext(connection, ensureCreated: true))
+        {
+        }
+
+        // Just before this context's INSERT goes out, another instance wins the race for the same partition.
+        var racing = new RunBeforeSaveInterceptor(async () =>
+        {
+            await using var winner = SqliteDbContextFactory.CreateContext(connection);
+            await new EfPartitionLeaseStore(winner).TryAcquireAsync(partitionKey, "owner-b", TimeSpan.FromMinutes(1));
+        });
+        await using var context = CreateContext(connection, racing);
+
+        var version = await new EfPartitionLeaseStore(context)
+            .TryAcquireAsync(partitionKey, "owner-a", TimeSpan.FromMinutes(1));
+
+        version.ShouldBeNull();
+        context.ChangeTracker.Entries<OutboxPartitionLease>().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task TryAcquireAsync_rethrows_a_database_failure_that_is_not_a_duplicate_key()
+    {
+        await using var connection = SqliteDbContextFactory.OpenConnection();
+        await using (SqliteDbContextFactory.CreateContext(connection, ensureCreated: true))
+        {
+        }
+
+        var failing = new RunBeforeSaveInterceptor(() => throw new DbUpdateException("database unavailable"));
+        await using var context = CreateContext(connection, failing);
+
+        var exception = await Should.ThrowAsync<DbUpdateException>(() => new EfPartitionLeaseStore(context)
+            .TryAcquireAsync(Guid.NewGuid(), "owner-a", TimeSpan.FromMinutes(1)));
+
+        exception.Message.ShouldBe("database unavailable");
+    }
+
+    private static TestOutboxDbContext CreateContext(SqliteConnection connection,
+        SaveChangesInterceptor interceptor) => new(new DbContextOptionsBuilder<TestOutboxDbContext>()
+        .UseSqlite(connection).AddInterceptors(interceptor).Options);
 
     [Fact]
     public async Task TryAcquireAsync_succeeds_and_bumps_the_version_once_the_lease_has_expired()

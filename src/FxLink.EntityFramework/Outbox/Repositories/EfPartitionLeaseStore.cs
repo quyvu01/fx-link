@@ -34,8 +34,19 @@ internal sealed class EfPartitionLeaseStore(DbContext dbContext) : IPartitionLea
             }
             catch (DbUpdateException)
             {
-                // Another instance inserted the same PartitionKey concurrently (PK violation) — theirs, not ours.
-                return null;
+                // Same reasoning as EfInboxStore.TryClaimAsync: DbUpdateException covers every SaveChanges
+                // failure, not just another instance inserting the same PartitionKey first. Treating a
+                // timeout or dropped connection as "theirs" would hide it — the partition would just be
+                // skipped every tick with nothing logged. Drop the failed insert from the tracker and
+                // only return null when the row really exists; otherwise let OutboxDispatcherWorker's
+                // tick-level handler log it.
+                dbContext.Entry(lease).State = EntityState.Detached;
+
+                var heldElsewhere = await _outboxPartitionLeases.AsNoTracking()
+                    .AnyAsync(l => l.PartitionKey == partitionKey, token);
+                if (heldElsewhere) return null;
+
+                throw;
             }
         }
 
