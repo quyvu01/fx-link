@@ -38,8 +38,20 @@ internal sealed class EfInboxStore(DbContext dbContext) : IInboxStore
             }
             catch (DbUpdateException)
             {
-                // Another instance inserted the same (ConsumerKey, MessageId) concurrently — theirs, not ours.
-                return null;
+                // DbUpdateException is how EF reports EVERY SaveChanges failure — a duplicate key from
+                // another instance inserting the same (ConsumerKey, MessageId) concurrently, but also a
+                // timeout, a dropped connection or a deadlock. Only the first means "theirs, not ours";
+                // returning null for the rest would make the pipeline skip the message and the
+                // transport ack it, losing it silently. So drop the failed insert from the tracker
+                // (otherwise the next SaveChanges on this context would try to insert it again) and
+                // confirm the row really exists before treating it as owned elsewhere.
+                dbContext.Entry(record).State = EntityState.Detached;
+
+                var ownedElsewhere = await _inboxRecords.AsNoTracking()
+                    .AnyAsync(r => r.ConsumerKey == consumerKey && r.MessageId == messageId, token);
+                if (ownedElsewhere) return null;
+
+                throw;
             }
         }
 

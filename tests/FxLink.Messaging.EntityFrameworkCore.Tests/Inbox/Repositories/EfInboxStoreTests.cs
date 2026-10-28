@@ -1,7 +1,9 @@
 using FxLink.EntityFramework.Inbox.Entities;
 using FxLink.EntityFramework.Inbox.Repositories;
 using FxLink.EntityFramework.Tests.TestSupport;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 using Xunit;
 
@@ -57,6 +59,66 @@ public class EfInboxStoreTests
             .TryClaimAsync(ConsumerKey, messageId, TimeSpan.FromMinutes(1));
 
         version.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task TryClaimAsync_returns_null_and_leaves_nothing_tracked_when_another_instance_inserts_first()
+    {
+        await using var connection = SqliteDbContextFactory.OpenConnection();
+        var messageId = Guid.NewGuid();
+        await using (SqliteDbContextFactory.CreateInboxContext(connection, ensureCreated: true))
+        {
+        }
+
+        // Just before this context's INSERT goes out, another instance wins the race for the same key.
+        var racing = new RunBeforeSaveInterceptor(async () =>
+        {
+            await using var winner = SqliteDbContextFactory.CreateInboxContext(connection);
+            await new EfInboxStore(winner).TryClaimAsync(ConsumerKey, messageId, TimeSpan.FromMinutes(1));
+        });
+        await using var context = CreateInboxContext(connection, racing);
+
+        var version = await new EfInboxStore(context)
+            .TryClaimAsync(ConsumerKey, messageId, TimeSpan.FromMinutes(1));
+
+        version.ShouldBeNull();
+        context.ChangeTracker.Entries<InboxRecord>().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task TryClaimAsync_rethrows_a_database_failure_that_is_not_a_duplicate_key()
+    {
+        await using var connection = SqliteDbContextFactory.OpenConnection();
+        await using (SqliteDbContextFactory.CreateInboxContext(connection, ensureCreated: true))
+        {
+        }
+
+        var failing = new RunBeforeSaveInterceptor(() => throw new DbUpdateException("database unavailable"));
+        await using var context = CreateInboxContext(connection, failing);
+
+        var exception = await Should.ThrowAsync<DbUpdateException>(() => new EfInboxStore(context)
+            .TryClaimAsync(ConsumerKey, Guid.NewGuid(), TimeSpan.FromMinutes(1)));
+
+        exception.Message.ShouldBe("database unavailable");
+    }
+
+    private static TestInboxDbContext CreateInboxContext(SqliteConnection connection,
+        SaveChangesInterceptor interceptor) => new(new DbContextOptionsBuilder<TestInboxDbContext>()
+        .UseSqlite(connection).AddInterceptors(interceptor).Options);
+
+    // Runs a callback once, right before the first SaveChanges hits the database.
+    private sealed class RunBeforeSaveInterceptor(Func<Task> beforeSave) : SaveChangesInterceptor
+    {
+        private bool _ran;
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
+            InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (_ran) return result;
+            _ran = true;
+            await beforeSave();
+            return result;
+        }
     }
 
     [Fact]
