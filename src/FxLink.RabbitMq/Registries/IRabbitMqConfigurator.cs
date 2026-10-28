@@ -45,6 +45,16 @@ public interface IRabbitMqConfigurator
     /// </summary>
     void RequeueOnFailure(TimeSpan delay);
 
+    /// <summary>
+    /// Waits for the broker to confirm every publish before the publish call returns, so a message the
+    /// broker never accepted surfaces as an exception instead of being silently lost — which matters most
+    /// for the Outbox, which deletes a row as soon as its publish returns. A broker nack throws a
+    /// <c>PublishException</c>; a message returned as unroutable (no queue bound yet) is only logged, as
+    /// before. Defaults to <c>true</c> (as in MassTransit); turning it off trades that guarantee for
+    /// one less broker round-trip per publish.
+    /// </summary>
+    void PublisherConfirms(bool enabled);
+
     void PrefetchCount(ushort count);
     void ConcurrentMessageLimit(ushort limitCount);
 }

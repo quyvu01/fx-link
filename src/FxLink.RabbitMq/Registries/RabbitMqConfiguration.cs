@@ -14,6 +14,7 @@ internal sealed class RabbitMqConfiguration(
     ushort concurrentMessageLimit,
     bool durable,
     TimeSpan? requeueOnFailureDelay,
+    bool publisherConfirms,
     Action<ConnectionFactory> configureConnection)
     : IRabbitMqConfiguration
 {
@@ -28,5 +29,6 @@ internal sealed class RabbitMqConfiguration(
     public ushort ConcurrentMessageLimit { get; } = concurrentMessageLimit;
     public bool Durable { get; } = durable;
     public TimeSpan? RequeueOnFailureDelay { get; } = requeueOnFailureDelay;
+    public bool PublisherConfirms { get; } = publisherConfirms;
     public Action<ConnectionFactory> ConfigureConnection { get; } = configureConnection;
 }

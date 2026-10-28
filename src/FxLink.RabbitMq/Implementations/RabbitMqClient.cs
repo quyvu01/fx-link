@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
 
 namespace FxLink.RabbitMq.Implementations;
 
@@ -38,8 +39,18 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             if (_rabbitMqConfiguration.Durable && message.ExchangeName.Length > 0)
                 message.Props.DeliveryMode = DeliveryModes.Persistent;
 
+            // With PublisherConfirms on, this only returns once the broker has acked the message (and
+            // throws PublishException if it nacked it), not merely once it's written to the socket.
             await channel.BasicPublishAsync(message.ExchangeName, message.RoutingKey, mandatory: message.Mandatory,
                 basicProperties: message.Props, message.MessageBody, token);
+        }
+        catch (PublishException ex) when (ex.IsReturn)
+        {
+            // Mandatory publishes are returned when no queue is bound yet (e.g. nobody consumes this message
+            // type) — the same outcome as without confirms, where BasicReturnAsync only logs it. Not a
+            // failure of the publish itself, so don't turn it into one.
+            _logger.LogWarning("Message returned as unroutable. Exchange={Exchange} RoutingKey={RoutingKey}",
+                message.ExchangeName, message.RoutingKey);
         }
         finally
         {
@@ -68,7 +79,14 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
     private async Task<IChannel> CreatePublishChannelAsync(CancellationToken cancellationToken = default)
     {
-        var channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        var confirms = _rabbitMqConfiguration.PublisherConfirms;
+        var channel = await _connection.CreateChannelAsync(
+            new CreateChannelOptions(publisherConfirmationsEnabled: confirms,
+                publisherConfirmationTrackingEnabled: confirms), cancellationToken);
+        // With confirm tracking, a returned message already surfaces as PublishException.IsReturn in
+        // PublishMessageAsync, which logs it there.
+        if (confirms) return channel;
+
         channel.BasicReturnAsync += (_, ea) =>
         {
             _logger.LogWarning(
