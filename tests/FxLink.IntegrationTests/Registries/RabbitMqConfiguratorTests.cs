@@ -84,4 +84,15 @@ public class RabbitMqConfiguratorTests
     [Fact]
     public void ConfigureConnection_is_null_when_not_configured() =>
         Build(c => c.Host("rabbit.internal", "/")).ConfigureConnection.ShouldBeNull();
+
+    [Fact]
+    public void PublisherConfirms_is_on_by_default_and_can_be_turned_off()
+    {
+        Build(c => c.Host("rabbit.internal", "/")).PublisherConfirms.ShouldBeTrue();
+        Build(c =>
+        {
+            c.Host("rabbit.internal", "/");
+            c.PublisherConfirms(false);
+        }).PublisherConfirms.ShouldBeFalse();
+    }
 }

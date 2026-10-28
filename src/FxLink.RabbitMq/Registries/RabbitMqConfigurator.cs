@@ -14,6 +14,7 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
     private ushort _concurrentMessageLimitValue = RabbitMqConstants.DefaultConcurrentMessageLimit;
     private bool _durableValue;
     private TimeSpan? _requeueOnFailureDelayValue;
+    private bool _publisherConfirmsValue = true;
     private Action<ConnectionFactory> _configureConnectionValue;
 
     public void Host(string host, string virtualHost, int? port = null, Action<RabbitMqCredential> configure = null)
@@ -46,6 +47,8 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
         _requeueOnFailureDelayValue = delay;
     }
 
+    public void PublisherConfirms(bool enabled) => _publisherConfirmsValue = enabled;
+
     public void PrefetchCount(ushort prefetchCount)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(prefetchCount, 0);
@@ -71,6 +74,6 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
 
         return new RabbitMqConfiguration(_hostValue, _virtualHostValue, port, Credential.UserNameValue,
             Credential.PasswordValue, sslOption, _poolSizeValue, _prefetchCountValue, _concurrentMessageLimitValue,
-            _durableValue, _requeueOnFailureDelayValue, _configureConnectionValue);
+            _durableValue, _requeueOnFailureDelayValue, _publisherConfirmsValue, _configureConnectionValue);
     }
 }
