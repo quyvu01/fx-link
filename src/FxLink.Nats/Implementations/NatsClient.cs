@@ -27,16 +27,12 @@ internal sealed class NatsClient(
 
     private readonly ILogger<NatsClient> _logger = serviceProvider.GetService<ILogger<NatsClient>>();
     private readonly MessageTypeResolver _messageTypeResolver = serviceProvider.GetRequiredService<MessageTypeResolver>();
+    private readonly IInMemoryResponseSetter _responseSetter = serviceProvider.GetRequiredService<IInMemoryResponseSetter>();
 
     // subject -> the message type published on it. Consumed messages are resolved by the subject they
     // were delivered on first — it's fixed by the topology, not by whoever published — and only fall
     // back to the (untrusted) MessageType header through the MessageTypeResolver allow-list.
     private readonly ConcurrentDictionary<string, Type> _messageTypesBySubject = new();
-
-    // Reply path only: messageTypeName (AssemblyQualifiedName, from the "MessageType" header) -> the
-    // closed IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's
-    // _connectorTypeCache.
-    private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = new();
 
     // One subject per message type inside the single shared stream (the fan-out point, mirrors
     // RabbitMq's fanout exchange); one durable pull consumer per consumer type reads the subjects
@@ -354,11 +350,9 @@ internal sealed class NatsClient(
             values.ToString() is not { Length: > 0 } messageTypeName)
             return null;
 
-        var connectorType = _connectorTypeCache.GetOrAdd(messageTypeName, static type =>
-        {
-            var msgType = Type.GetType(type);
-            return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-        });
+        // Only a Result<TResponse> some request in this process is waiting on — never Type.GetType.
+        var resultType = _responseSetter.ResolveResultType(messageTypeName);
+        var connectorType = resultType is null ? null : typeof(IClientConnector<>).MakeGenericType(resultType);
         return connectorType is null ? null : (AbstractNatsConnector)serviceProvider.GetRequiredService(connectorType);
     }
 

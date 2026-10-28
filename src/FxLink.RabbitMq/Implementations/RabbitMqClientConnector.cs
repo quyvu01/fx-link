@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using FxLink.Abstractions;
@@ -136,23 +135,16 @@ internal class RabbitMqClientConnector<TMessage>(
         await serverConnector.ConsumeAsync(consumerContext, consumerType, args.CancellationToken);
     }
 
-    private static readonly ConcurrentDictionary<string, Type> MessageResponseProcessors = new();
+    // RabbitMqClient only picks this connector for a Result<TResponse> some request in this process waits on
+    // (IInMemoryResponseSetter.ResolveResultType), so TMessage itself is the response's wire type.
+    private static readonly Type ResponseDispatcherType =
+        typeof(TMessage).IsGenericType && typeof(TMessage).GetGenericTypeDefinition() == typeof(Result<>)
+            ? typeof(IWireResultDispatcher<>).MakeGenericType(typeof(TMessage).GetGenericArguments()[0])
+            : null;
 
     public override Task ProcessResponseMessageAsync(BasicDeliverEventArgs args)
     {
-        var messageTypeAsString = args.BasicProperties.Type;
-
-        if (string.IsNullOrEmpty(messageTypeAsString)) return Task.CompletedTask;
-        var serviceType = MessageResponseProcessors
-            .GetOrAdd(messageTypeAsString, static msg =>
-            {
-                var messageType = Type.GetType(msg);
-                if (messageType is null || !messageType.IsGenericType ||
-                    messageType.GetGenericTypeDefinition() != typeof(Result<>)) return null;
-                var responseType = messageType.GetGenericArguments()[0];
-                return typeof(IWireResultDispatcher<>).MakeGenericType(responseType);
-            });
-        if (serviceType is null) return Task.CompletedTask;
+        if (ResponseDispatcherType is not { } serviceType) return Task.CompletedTask;
         var jsonBody = Encoding.UTF8.GetString(args.Body.Span);
         var wireResultDispatcher = (IWireResultDispatcher)serviceProvider.GetRequiredService(serviceType);
         wireResultDispatcher.SetResult(jsonBody, args.CancellationToken);
