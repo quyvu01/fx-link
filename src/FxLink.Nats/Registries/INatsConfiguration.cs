@@ -17,4 +17,5 @@ internal interface INatsConfiguration
     TimeSpan AckWait { get; }
     int MaxAckPending { get; }
     TimeSpan MaxAge { get; }
+    TimeSpan? RequeueOnFailureDelay { get; }
 }

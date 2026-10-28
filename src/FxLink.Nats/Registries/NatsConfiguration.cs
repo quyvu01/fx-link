@@ -15,7 +15,8 @@ internal sealed class NatsConfiguration(
     int maxDeliver,
     TimeSpan ackWait,
     int maxAckPending,
-    TimeSpan maxAge)
+    TimeSpan maxAge,
+    TimeSpan? requeueOnFailureDelay)
     : INatsConfiguration
 {
     public string Url { get; } = url;
@@ -31,4 +32,5 @@ internal sealed class NatsConfiguration(
     public TimeSpan AckWait { get; } = ackWait;
     public int MaxAckPending { get; } = maxAckPending;
     public TimeSpan MaxAge { get; } = maxAge;
+    public TimeSpan? RequeueOnFailureDelay { get; } = requeueOnFailureDelay;
 }
