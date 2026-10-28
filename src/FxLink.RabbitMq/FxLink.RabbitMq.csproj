@@ -31,4 +31,7 @@
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="[8.0.0, )"/>
         <PackageReference Include="RabbitMQ.Client" Version="[7.0.0, )"/>
     </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="FxLink.IntegrationTests"/>
+    </ItemGroup>
 </Project>

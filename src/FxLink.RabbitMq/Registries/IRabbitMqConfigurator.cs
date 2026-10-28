@@ -1,10 +1,23 @@
 using FxLink.RabbitMq.Implementations;
+using RabbitMQ.Client;
 
 namespace FxLink.RabbitMq.Registries;
 
 public interface IRabbitMqConfigurator
 {
-    void Host(string host, string virtualHost, int port = 5672, Action<RabbitMqCredential> configure = null);
+    /// <summary>
+    /// Broker to connect to. <paramref name="port"/> defaults to 5672, or 5671 when TLS is enabled via
+    /// <see cref="RabbitMqCredential.Ssl"/>.
+    /// </summary>
+    void Host(string host, string virtualHost, int? port = null, Action<RabbitMqCredential> configure = null);
+
+    /// <summary>
+    /// Adjusts the underlying <see cref="ConnectionFactory"/> right before the connection is opened, after
+    /// FxLink has applied its own settings (host, port, virtual host, credentials, TLS) — for anything
+    /// FxLink doesn't expose directly, such as client certificates, <c>AuthMechanisms</c> or a
+    /// <c>CredentialsProvider</c>. Calling it more than once applies each callback in order.
+    /// </summary>
+    void ConfigureConnection(Action<ConnectionFactory> configure);
 
     /// <summary>
     /// Sets the size of the bounded publishing channel pool used by <see cref="RabbitMqClient"/>.
