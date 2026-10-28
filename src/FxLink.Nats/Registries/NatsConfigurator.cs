@@ -13,6 +13,7 @@ internal sealed class NatsConfigurator : INatsConfigurator
     private TimeSpan _ackWaitValue = NatsConstants.DefaultAckWait;
     private int _maxAckPendingValue = NatsConstants.DefaultMaxAckPending;
     private TimeSpan _maxAgeValue = NatsConstants.DefaultMaxAge;
+    private TimeSpan? _requeueOnFailureDelayValue;
 
     public void Server(string url, Action<NatsCredential> configure = null)
     {
@@ -63,12 +64,19 @@ internal sealed class NatsConfigurator : INatsConfigurator
         _maxAgeValue = maxAge;
     }
 
+    public void RequeueOnFailure(TimeSpan delay)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(delay, TimeSpan.Zero);
+        _requeueOnFailureDelayValue = delay;
+    }
+
     internal INatsConfiguration ToConfiguration()
     {
         if (_urlValue is null)
             throw new InvalidOperationException("NATS server must be configured by calling Server(...).");
         return new NatsConfiguration(_urlValue, Credential.UserNameValue, Credential.PasswordValue,
             Credential.TokenValue, Credential.CredsFileValue, Credential.TlsOptionValue, _streamNameValue,
-            _subjectPrefixValue, _autoProvisionValue, _maxDeliverValue, _ackWaitValue, _maxAckPendingValue, _maxAgeValue);
+            _subjectPrefixValue, _autoProvisionValue, _maxDeliverValue, _ackWaitValue, _maxAckPendingValue, _maxAgeValue,
+            _requeueOnFailureDelayValue);
     }
 }

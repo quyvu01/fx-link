@@ -366,23 +366,38 @@ internal sealed class NatsClient(
         catch (Exception ex)
         {
             // RetryPipelineBehavior already owns retry/dead-letter handling and never rethrows in
-            // the normal case — reaching here means that mechanism itself failed. Ack anyway to
-            // avoid an uncontrolled redelivery loop; the failure is only visible via this log.
+            // the normal case — reaching here means that mechanism itself failed.
             _logger?.LogCritical(ex, "Unhandled exception escaped the consumer pipeline for subject {Subject}",
                 message.Subject);
+
+            // With RequeueOnFailure configured, nak it so JetStream redelivers it after the delay once the
+            // dependency recovers; MaxDeliver bounds the loop. Otherwise ack it below to avoid an
+            // uncontrolled redelivery loop; the failure is then only visible via this log.
+            if (natsConfiguration.RequeueOnFailureDelay is { } requeueDelay)
+            {
+                try
+                {
+                    await message.NakAsync(delay: requeueDelay, cancellationToken: CancellationToken.None);
+                }
+                catch (Exception nakEx)
+                {
+                    // Unacked, so JetStream still redelivers it once AckWait expires.
+                    _logger?.LogWarning(nakEx, "Failed to nak message on subject {Subject}", message.Subject);
+                }
+
+                return;
+            }
         }
-        finally
+
+        // CancellationToken.None deliberately: a message that was already handled must still be
+        // acked even if the caller's token was just cancelled, or it's redelivered on restart.
+        try
         {
-            // CancellationToken.None deliberately: a message that was already handled must still be
-            // acked even if the caller's token was just cancelled, or it's redelivered on restart.
-            try
-            {
-                await message.AckAsync(cancellationToken: CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Failed to ack message on subject {Subject}", message.Subject);
-            }
+            await message.AckAsync(cancellationToken: CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to ack message on subject {Subject}", message.Subject);
         }
     }
 
