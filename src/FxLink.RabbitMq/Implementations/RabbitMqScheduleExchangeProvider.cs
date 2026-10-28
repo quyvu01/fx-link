@@ -7,6 +7,8 @@ using FxLink.Entities;
 using FxLink.RabbitMq.Abstractions;
 using FxLink.RabbitMq.Entities;
 using FxLink.RabbitMq.Extensions;
+using FxLink.RabbitMq.Registries;
+using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
 
 namespace FxLink.RabbitMq.Implementations;
