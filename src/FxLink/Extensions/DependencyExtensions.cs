@@ -24,6 +24,7 @@ public static class DependencyExtensions
         options.Invoke(configurator);
 
         services.AddSingleton(configurator.MessageKeys);
+        services.AddSingleton<MessageTypeResolver>();
         services.AddScoped(typeof(IConsumerConnector<>), typeof(ConsumerConnector<>));
         services.AddTransient(typeof(PublisherPipelineBehaviorOrchestrator<>));
         services.AddTransient(typeof(ConsumerPipelineBehaviorOrchestrator<>));

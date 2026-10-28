@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using FxLink.Abstractions;
+using FxLink.Implementations;
 using FxLink.RabbitMq.Abstractions;
 using FxLink.RabbitMq.Entities;
 using FxLink.RabbitMq.Exceptions;
@@ -24,6 +25,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     private readonly ConcurrentDictionary<string, Type> _exchangeMapCollectorType = [];
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
     private readonly ILogger<RabbitMqClient> _logger = serviceProvider.GetRequiredService<ILogger<RabbitMqClient>>();
+    private readonly MessageTypeResolver _messageTypeResolver = serviceProvider.GetRequiredService<MessageTypeResolver>();
 
     private IConnection _connection;
 
@@ -272,8 +274,8 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                             // We will try to resolve exchange to check if we have the message or not...
                             var connectorType = _exchangeMapCollectorType.GetValueOrDefault(ea.Exchange);
-                            if (connectorType is null && ea.BasicProperties.Type is { Length: > 0 } messageType)
-                                connectorType = ResolveConnectorType(messageType);
+                            if (connectorType is null && _messageTypeResolver.Resolve(ea.BasicProperties.Type) is { } messageType)
+                                connectorType = typeof(IClientConnector<>).MakeGenericType(messageType);
 
                             // Every path below must ack or nack: an early return would leave the delivery
                             // unacked for the channel's whole lifetime, permanently holding one prefetch
@@ -331,8 +333,10 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     foreach (var messageType in messageTypes)
                     {
                         var exchangeName = GetExchangeName(messageType);
-                        _exchangeMapCollectorType.TryAdd(exchangeName, typeof(IClientConnector<>)
-                            .MakeGenericType(messageType));
+                        var connectorType = typeof(IClientConnector<>).MakeGenericType(messageType);
+                        _exchangeMapCollectorType.TryAdd(exchangeName, connectorType);
+                        // Delayed deliveries arrive via the delay exchange, which binds straight to this queue.
+                        _exchangeMapCollectorType.TryAdd(exchangeName.GetDelayExchangeName(), connectorType);
                         await declareChannel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout,
                             durable: _rabbitMqConfiguration.Durable, cancellationToken: cancellationToken);
                         await declareChannel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,

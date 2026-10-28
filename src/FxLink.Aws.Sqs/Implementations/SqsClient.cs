@@ -4,6 +4,7 @@ using Amazon.SimpleNotificationService.Model;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using FxLink.Abstractions;
+using FxLink.Implementations;
 using FxLink.Aws.Sqs.Abstractions;
 using FxLink.Aws.Sqs.Extensions;
 using FxLink.Aws.Sqs.Registries;
@@ -20,6 +21,7 @@ internal sealed class SqsClient(
     : IMessageBrokerConnector, ISqsClient
 {
     private readonly ILogger<SqsClient> _logger = serviceProvider.GetRequiredService<ILogger<SqsClient>>();
+    private readonly MessageTypeResolver _messageTypeResolver = serviceProvider.GetRequiredService<MessageTypeResolver>();
 
     // Populated by StartAsync, read by PublishAsync/the poll loop below — one SNS topic per
     // message type is the fan-out point (mirrors RabbitMq's fanout exchange), one SQS queue per
@@ -31,8 +33,8 @@ internal sealed class SqsClient(
     // (see SqsDelayMessageProvider) has to reconstruct by hand, since it can't go through SNS.
     private readonly Dictionary<Type, List<string>> _queueUrlsByMessageType = new();
 
-    // messageTypeName (AssemblyQualifiedName, from the "MessageType" attribute) -> the closed
-    // IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's
+    // Reply path only: messageTypeName (AssemblyQualifiedName, from the "MessageType" attribute) -> the
+    // closed IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's
     // _connectorTypeCache.
     private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = new();
 
@@ -108,7 +110,7 @@ internal sealed class SqsClient(
 
                 await ConfigureDeadLetterQueueAsync(queueName, queueUrl, cancellationToken);
 
-                loops.Add(PollLoopAsync(queueUrl, consumerType, loopsCts.Token));
+                loops.Add(PollLoopAsync(queueUrl, consumerType, messageTypes, loopsCts.Token));
             }
 
             // Per-instance reply queue for request/response — unique name so replies can never be
@@ -242,7 +244,8 @@ internal sealed class SqsClient(
 
     // SQS has no push-based consume like AMQP's BasicConsumeAsync — this long-polls the queue
     // in a loop instead. One loop per consumer type/queue, all started from StartAsync.
-    private async Task PollLoopAsync(string queueUrl, Type consumerType, CancellationToken token)
+    private async Task PollLoopAsync(string queueUrl, Type consumerType, Type[] messageTypes,
+        CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
@@ -281,30 +284,29 @@ internal sealed class SqsClient(
             if (response.Messages.Count == 0) continue;
 
             await Task.WhenAll(response.Messages.Select(message =>
-                ProcessAndDeleteAsync(queueUrl, message, consumerType, token)));
+                ProcessAndDeleteAsync(queueUrl, message, consumerType, messageTypes, token)));
         }
     }
 
     private async Task ProcessAndDeleteAsync(string queueUrl, Message message, Type consumerType,
-        CancellationToken token)
+        Type[] messageTypes, CancellationToken token)
     {
         try
         {
-            if (message.MessageAttributes.TryGetValue("MessageType", out var attribute) &&
-                attribute.StringValue is { Length: > 0 } messageTypeName)
+            var messageTypeName = message.MessageAttributes.TryGetValue("MessageType", out var attribute)
+                ? attribute.StringValue
+                : null;
+            if (ResolveConsumedMessageType(messageTypeName, messageTypes) is { } messageType)
             {
-                var connectorType = _connectorTypeCache.GetOrAdd(messageTypeName, static type =>
-                {
-                    var msgType = Type.GetType(type);
-                    return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-                });
-
-                if (connectorType is not null)
-                {
-                    var connector = (AbstractSqsConnector)serviceProvider.GetRequiredService(connectorType);
-                    await connector.ProcessMessageReceivedAsync(message, consumerType, token);
-                }
+                var connector = (AbstractSqsConnector)serviceProvider.GetRequiredService(
+                    typeof(IClientConnector<>).MakeGenericType(messageType));
+                await connector.ProcessMessageReceivedAsync(message, consumerType, token);
             }
+            else
+                // Redelivering it would never change the outcome — delete it below, but make the drop visible.
+                _logger.LogWarning(
+                    "Dropping message {MessageId} with no matching consumer. Queue={QueueUrl} MessageType={MessageType}",
+                    message.MessageId, queueUrl, messageTypeName);
         }
         catch (Exception ex)
         {
@@ -327,6 +329,17 @@ internal sealed class SqsClient(
         // processed must still be deleted even if the caller's token just got cancelled —
         // losing the delete here would mean reprocessing it from scratch on restart.
         await sqsConnection.Sqs.DeleteMessageAsync(queueUrl, message.ReceiptHandle, CancellationToken.None);
+    }
+
+    // The queue belongs to one consumer, so only the message types it consumes are candidates. The
+    // MessageType attribute comes from whoever could send to the queue, so it goes through the
+    // MessageTypeResolver allow-list (never Type.GetType); when it's missing or unknown and the queue
+    // carries a single message type, the queue itself already says what the message is.
+    private Type ResolveConsumedMessageType(string messageTypeName, Type[] messageTypes)
+    {
+        if (_messageTypeResolver.Resolve(messageTypeName) is { } resolved)
+            return Array.IndexOf(messageTypes, resolved) >= 0 ? resolved : null;
+        return messageTypes.Length == 1 ? messageTypes[0] : null;
     }
 
     // Sets the message's visibility timeout to the delay instead of deleting it, so SQS makes it

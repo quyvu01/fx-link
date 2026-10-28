@@ -22,8 +22,8 @@ internal sealed class ServiceBusTransportClient(
     private readonly ILogger<ServiceBusTransportClient> _logger =
         serviceProvider.GetService<ILogger<ServiceBusTransportClient>>();
 
-    // messageTypeName (AssemblyQualifiedName, from the "MessageType" property) -> the closed IClientConnector<> type
-    // to resolve from DI — same caching role as RabbitMqClient's _connectorTypeCache.
+    // Reply path only: messageTypeName (AssemblyQualifiedName, from the "MessageType" property) -> the closed
+    // IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's _connectorTypeCache.
     private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = new();
 
     private readonly ConcurrentDictionary<string, ServiceBusSender> _senders = new();
@@ -63,7 +63,11 @@ internal sealed class ServiceBusTransportClient(
                         PrefetchCount = configuration.PrefetchCount,
                         MaxAutoLockRenewalDuration = configuration.MaxAutoLockRenewalDuration
                     });
-                processor.ProcessMessageAsync += args => HandleAsync(args, subscription.Name, subscription.ConsumerType);
+                // The topic a subscription hangs off fixes the message type, so consumed messages are dispatched by
+                // topology rather than by the MessageType property, which any sender can set to anything.
+                var connectorType = typeof(IClientConnector<>).MakeGenericType(topic.MessageType);
+                processor.ProcessMessageAsync += args =>
+                    HandleAsync(args, subscription.Name, subscription.ConsumerType, connectorType);
                 processor.ProcessErrorAsync += args => OnErrorAsync(args, fault);
                 processors.Add(processor);
                 await processor.StartProcessingAsync(cancellationToken);
@@ -158,7 +162,7 @@ internal sealed class ServiceBusTransportClient(
         return Task.CompletedTask;
     }
 
-    private AbstractServiceBusConnector ResolveConnector(ServiceBusReceivedMessage message)
+    private AbstractServiceBusConnector ResolveResponseConnector(ServiceBusReceivedMessage message)
     {
         if (!message.ApplicationProperties.TryGetValue(ServiceBusConstants.MessageTypeProperty, out var value) ||
             value?.ToString() is not { Length: > 0 } messageTypeName)
@@ -174,15 +178,15 @@ internal sealed class ServiceBusTransportClient(
             : (AbstractServiceBusConnector)serviceProvider.GetRequiredService(connectorType);
     }
 
-    private async Task HandleAsync(ProcessMessageEventArgs args, string subscription, Type consumerType)
+    private async Task HandleAsync(ProcessMessageEventArgs args, string subscription, Type consumerType,
+        Type connectorType)
     {
-        var connector = ResolveConnector(args.Message);
-        if (connector is null)
+        if (serviceProvider.GetService(connectorType) is not AbstractServiceBusConnector connector)
         {
             // Nothing here can process it, and redelivering won't change that — park it, with the reason, instead
             // of dropping it silently.
             await args.DeadLetterMessageAsync(args.Message, "UnknownMessageType",
-                "The message has no resolvable MessageType property.", CancellationToken.None);
+                "No consumer connector is registered for this subscription's message type.", CancellationToken.None);
             return;
         }
 
@@ -227,7 +231,7 @@ internal sealed class ServiceBusTransportClient(
     {
         try
         {
-            if (ResolveConnector(args.Message) is { } connector)
+            if (ResolveResponseConnector(args.Message) is { } connector)
                 await connector.ProcessResponseMessageAsync(args.Message.Body.ToString(), args.CancellationToken);
         }
         catch (Exception ex)
