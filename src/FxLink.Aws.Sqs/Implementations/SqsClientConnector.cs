@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using Amazon.SQS.Model;
 using FxLink.Abstractions;
@@ -126,26 +125,19 @@ internal sealed class SqsClientConnector<TMessage>(
         await serverConnector.ConsumeAsync(consumerContext, consumerType, token);
     }
 
-    private static readonly ConcurrentDictionary<string, Type> MessageResponseProcessors = new();
+    // SqsClient only picks this connector for a Result<TResponse> some request in this process waits on
+    // (IInMemoryResponseSetter.ResolveResultType), so TMessage itself is the response's wire type.
+    private static readonly Type ResponseDispatcherType =
+        typeof(TMessage).IsGenericType && typeof(TMessage).GetGenericTypeDefinition() == typeof(Result<>)
+            ? typeof(IWireResultDispatcher<>).MakeGenericType(typeof(TMessage).GetGenericArguments()[0])
+            : null;
 
     // Runs on the requester's reply-queue poll loop (SqsClient.ReplyPollLoopAsync). Independent of
     // TMessage — like RabbitMq's equivalent, it only exists as an instance method so it can share
     // the same generic-connector-resolution machinery the regular receive path already uses.
     public override Task ProcessResponseMessageAsync(Message message, CancellationToken token = default)
     {
-        if (!message.MessageAttributes.TryGetValue("MessageType", out var attribute) ||
-            attribute.StringValue is not { Length: > 0 } messageTypeName)
-            return Task.CompletedTask;
-
-        var serviceType = MessageResponseProcessors.GetOrAdd(messageTypeName, static type =>
-        {
-            var messageType = Type.GetType(type);
-            if (messageType is null || !messageType.IsGenericType ||
-                messageType.GetGenericTypeDefinition() != typeof(Result<>)) return null;
-            var responseType = messageType.GetGenericArguments()[0];
-            return typeof(IWireResultDispatcher<>).MakeGenericType(responseType);
-        });
-        if (serviceType is null) return Task.CompletedTask;
+        if (ResponseDispatcherType is not { } serviceType) return Task.CompletedTask;
 
         var wireResultDispatcher = (IWireResultDispatcher)serviceProvider.GetRequiredService(serviceType);
         wireResultDispatcher.SetResult(message.Body, token);

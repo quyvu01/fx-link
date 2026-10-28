@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using Amazon.SimpleNotificationService.Model;
 using Amazon.SQS;
@@ -22,6 +21,7 @@ internal sealed class SqsClient(
 {
     private readonly ILogger<SqsClient> _logger = serviceProvider.GetRequiredService<ILogger<SqsClient>>();
     private readonly MessageTypeResolver _messageTypeResolver = serviceProvider.GetRequiredService<MessageTypeResolver>();
+    private readonly IInMemoryResponseSetter _responseSetter = serviceProvider.GetRequiredService<IInMemoryResponseSetter>();
 
     // Populated by StartAsync, read by PublishAsync/the poll loop below — one SNS topic per
     // message type is the fan-out point (mirrors RabbitMq's fanout exchange), one SQS queue per
@@ -32,11 +32,6 @@ internal sealed class SqsClient(
     // Every queue subscribed to a given message type's topic — the fan-out set a delayed publish
     // (see SqsDelayMessageProvider) has to reconstruct by hand, since it can't go through SNS.
     private readonly Dictionary<Type, List<string>> _queueUrlsByMessageType = new();
-
-    // Reply path only: messageTypeName (AssemblyQualifiedName, from the "MessageType" attribute) -> the
-    // closed IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's
-    // _connectorTypeCache.
-    private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = new();
 
     // Unique per process instance (see StartAsync) — unlike a consumer queue, nothing else should
     // ever read from or know about this one, so it's created fresh on every start and deleted in
@@ -414,15 +409,11 @@ internal sealed class SqsClient(
             if (message.MessageAttributes.TryGetValue("MessageType", out var attribute) &&
                 attribute.StringValue is { Length: > 0 } messageTypeName)
             {
-                var connectorType = _connectorTypeCache.GetOrAdd(messageTypeName, static type =>
+                // Only a Result<TResponse> some request in this process is waiting on — never Type.GetType.
+                if (_responseSetter.ResolveResultType(messageTypeName) is { } resultType)
                 {
-                    var msgType = Type.GetType(type);
-                    return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-                });
-
-                if (connectorType is not null)
-                {
-                    var connector = (AbstractSqsConnector)serviceProvider.GetRequiredService(connectorType);
+                    var connector = (AbstractSqsConnector)serviceProvider.GetRequiredService(
+                        typeof(IClientConnector<>).MakeGenericType(resultType));
                     await connector.ProcessResponseMessageAsync(message, token);
                 }
             }
