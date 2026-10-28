@@ -96,6 +96,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             AutomaticRecoveryEnabled = true,
             NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
         };
+        _rabbitMqConfiguration.ConfigureConnection?.Invoke(connectionFactory);
 
         _connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
 
