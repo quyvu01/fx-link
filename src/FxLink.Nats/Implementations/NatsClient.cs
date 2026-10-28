@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using FxLink.Abstractions;
+using FxLink.Implementations;
 using FxLink.Nats.Abstractions;
 using FxLink.Nats.Constants;
 using FxLink.Nats.Extensions;
@@ -25,9 +26,15 @@ internal sealed class NatsClient(
     private const string ReplyToHeader = "ReplyTo";
 
     private readonly ILogger<NatsClient> _logger = serviceProvider.GetService<ILogger<NatsClient>>();
+    private readonly MessageTypeResolver _messageTypeResolver = serviceProvider.GetRequiredService<MessageTypeResolver>();
 
-    // messageTypeName (AssemblyQualifiedName, from the "MessageType" header) -> the closed
-    // IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's
+    // subject -> the message type published on it. Consumed messages are resolved by the subject they
+    // were delivered on first — it's fixed by the topology, not by whoever published — and only fall
+    // back to the (untrusted) MessageType header through the MessageTypeResolver allow-list.
+    private readonly ConcurrentDictionary<string, Type> _messageTypesBySubject = new();
+
+    // Reply path only: messageTypeName (AssemblyQualifiedName, from the "MessageType" header) -> the
+    // closed IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's
     // _connectorTypeCache.
     private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = new();
 
@@ -50,6 +57,8 @@ internal sealed class NatsClient(
         HookConnectionEvents();
 
         var messageKeyMap = messageKeys.GetMessageKeys(); // messageType -> consumerTypes[]
+        foreach (var messageType in messageKeyMap.Keys)
+            _messageTypesBySubject.TryAdd(GetSubject(messageType), messageType);
 
         if (natsConfiguration.AutoProvision) await ProvisionStreamAsync(cancellationToken);
 
@@ -327,7 +336,7 @@ internal sealed class NatsClient(
         {
             try
             {
-                if (message.Data is { } body && ResolveConnector(message.Headers) is { } connector)
+                if (message.Data is { } body && ResolveResponseConnector(message.Headers) is { } connector)
                     await connector.ProcessResponseMessageAsync(body, token);
             }
             catch (Exception ex)
@@ -339,7 +348,7 @@ internal sealed class NatsClient(
         }
     }
 
-    private AbstractNatsConnector ResolveConnector(NatsHeaders headers)
+    private AbstractNatsConnector ResolveResponseConnector(NatsHeaders headers)
     {
         if (headers is null || !headers.TryGetValue(MessageTypeHeader, out var values) ||
             values.ToString() is not { Length: > 0 } messageTypeName)
@@ -353,14 +362,36 @@ internal sealed class NatsClient(
         return connectorType is null ? null : (AbstractNatsConnector)serviceProvider.GetRequiredService(connectorType);
     }
 
+    private AbstractNatsConnector ResolveConsumedConnector(NatsJSMsg<string> message)
+    {
+        var messageType = _messageTypesBySubject.GetValueOrDefault(message.Subject) ??
+                          _messageTypeResolver.Resolve(GetMessageTypeHeader(message.Headers));
+        return messageType is null
+            ? null
+            : serviceProvider.GetService(typeof(IClientConnector<>).MakeGenericType(messageType)) as AbstractNatsConnector;
+    }
+
+    private static string GetMessageTypeHeader(NatsHeaders headers) =>
+        headers is not null && headers.TryGetValue(MessageTypeHeader, out var values) ? values.ToString() : null;
+
     private async Task ProcessAndAckAsync(NatsJSMsg<string> message, Type consumerType, CancellationToken token)
     {
         try
         {
-            if (message.Data is { } body && ResolveConnector(message.Headers) is { } connector)
+            if (message.Data is { } body)
             {
-                var replyTo = message.Headers!.TryGetValue(ReplyToHeader, out var reply) ? reply.ToString() : null;
-                await connector.ProcessMessageReceivedAsync(body, consumerType, replyTo, token);
+                if (ResolveConsumedConnector(message) is { } connector)
+                {
+                    var replyTo = message.Headers?.TryGetValue(ReplyToHeader, out var reply) is true
+                        ? reply.ToString()
+                        : null;
+                    await connector.ProcessMessageReceivedAsync(body, consumerType, replyTo, token);
+                }
+                else
+                    // Redelivering it would never change the outcome — ack it below, but make the drop visible.
+                    _logger?.LogWarning(
+                        "Dropping a message with no matching consumer. Subject={Subject} MessageType={MessageType}",
+                        message.Subject, GetMessageTypeHeader(message.Headers));
             }
         }
         catch (Exception ex)
