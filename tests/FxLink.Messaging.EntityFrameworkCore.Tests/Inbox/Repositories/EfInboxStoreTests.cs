@@ -4,6 +4,7 @@ using FxLink.EntityFramework.Tests.TestSupport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -262,5 +263,98 @@ public class EfInboxStoreTests
         await using var afterContext = SqliteDbContextFactory.CreateInboxContext(connection);
         var remainingIds = await afterContext.Set<InboxRecord>().Select(r => r.MessageId).ToListAsync();
         remainingIds.ShouldBe([recentProcessed.MessageId, stillClaimed.MessageId], ignoreOrder: true);
+    }
+
+    // The DI shape: renewal resolves its own DbContext from a fresh scope, here sharing the same SQLite
+    // connection the way two scoped contexts share one database.
+    private static (EfInboxStore Store, ServiceProvider Provider) CreateScopedStore(SqliteConnection connection,
+        TestInboxDbContext context)
+    {
+        var provider = new ServiceCollection()
+            .AddScoped(_ => SqliteDbContextFactory.CreateInboxContext(connection))
+            .BuildServiceProvider();
+        var store = new EfInboxStore(context, provider.GetRequiredService<IServiceScopeFactory>(),
+            sp => sp.GetRequiredService<TestInboxDbContext>());
+        return (store, provider);
+    }
+
+    private static async Task<List<string>> NoteTextsAsync(SqliteConnection connection)
+    {
+        await using var fresh = SqliteDbContextFactory.CreateInboxContext(connection);
+        return await fresh.Notes.Select(n => n.Text).ToListAsync();
+    }
+
+    [Fact]
+    public async Task ReleaseClaimAsync_does_not_commit_the_consumers_unsaved_changes()
+    {
+        await using var connection = SqliteDbContextFactory.OpenConnection();
+        await using var context = SqliteDbContextFactory.CreateInboxContext(connection, ensureCreated: true);
+        var store = new EfInboxStore(context);
+        var messageId = Guid.NewGuid();
+        var claimed = await store.TryClaimAsync(ConsumerKey, messageId, TimeSpan.FromMinutes(1));
+
+        // The consumer changes its own data through the shared context, then throws before saving.
+        context.Notes.Add(new TestNote { Id = Guid.NewGuid(), Text = "half-done" });
+        await store.ReleaseClaimAsync(ConsumerKey, messageId, claimed!.Value);
+
+        (await NoteTextsAsync(connection)).ShouldBeEmpty();
+        (await context.Set<InboxRecord>().AsNoTracking().AnyAsync(r => r.MessageId == messageId)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task RenewClaimAsync_uses_its_own_context_and_does_not_commit_the_consumers_unsaved_changes()
+    {
+        await using var connection = SqliteDbContextFactory.OpenConnection();
+        await using var context = SqliteDbContextFactory.CreateInboxContext(connection, ensureCreated: true);
+        var (store, provider) = CreateScopedStore(connection, context);
+        await using var _ = provider;
+        var messageId = Guid.NewGuid();
+        var claimed = await store.TryClaimAsync(ConsumerKey, messageId, TimeSpan.FromMinutes(1));
+
+        context.Notes.Add(new TestNote { Id = Guid.NewGuid(), Text = "in progress" });
+        var renewed = await store.RenewClaimAsync(ConsumerKey, messageId, claimed!.Value, TimeSpan.FromMinutes(1));
+
+        renewed.ShouldBe(claimed.Value + 1);
+        (await NoteTextsAsync(connection)).ShouldBeEmpty();
+        context.ChangeTracker.HasChanges().ShouldBeTrue(); // the consumer's pending change is left alone
+    }
+
+    [Fact]
+    public async Task MarkProcessedAsync_succeeds_after_a_renewal_and_commits_the_consumers_changes_with_it()
+    {
+        await using var connection = SqliteDbContextFactory.OpenConnection();
+        await using var context = SqliteDbContextFactory.CreateInboxContext(connection, ensureCreated: true);
+        var (store, provider) = CreateScopedStore(connection, context);
+        await using var _ = provider;
+        var messageId = Guid.NewGuid();
+        var claimed = await store.TryClaimAsync(ConsumerKey, messageId, TimeSpan.FromMinutes(1));
+
+        // Renewal bumps the version through another context; the record this context tracks since the
+        // claim is now stale and must be refreshed, not compared as-is.
+        var renewed = await store.RenewClaimAsync(ConsumerKey, messageId, claimed!.Value, TimeSpan.FromMinutes(1));
+        context.Notes.Add(new TestNote { Id = Guid.NewGuid(), Text = "done" });
+
+        var marked = await store.MarkProcessedAsync(ConsumerKey, messageId, renewed!.Value);
+
+        marked.ShouldBeTrue();
+        (await NoteTextsAsync(connection)).ShouldBe(["done"]);
+        await using var fresh = SqliteDbContextFactory.CreateInboxContext(connection);
+        (await fresh.Set<InboxRecord>().SingleAsync(r => r.MessageId == messageId)).State
+            .ShouldBe(InboxRecordState.Processed);
+    }
+
+    [Fact]
+    public async Task MarkProcessedAsync_returns_false_when_the_record_was_removed_meanwhile()
+    {
+        await using var connection = SqliteDbContextFactory.OpenConnection();
+        await using var context = SqliteDbContextFactory.CreateInboxContext(connection, ensureCreated: true);
+        var store = new EfInboxStore(context);
+        var messageId = Guid.NewGuid();
+        var claimed = await store.TryClaimAsync(ConsumerKey, messageId, TimeSpan.FromMinutes(1));
+
+        await using (var other = SqliteDbContextFactory.CreateInboxContext(connection))
+            await other.Set<InboxRecord>().Where(r => r.MessageId == messageId).ExecuteDeleteAsync();
+
+        (await store.MarkProcessedAsync(ConsumerKey, messageId, claimed!.Value)).ShouldBeFalse();
     }
 }

@@ -5,6 +5,7 @@ using FxLink.Contexts;
 using FxLink.Delegates;
 using FxLink.Registries;
 using FxLink.Wrappers;
+using Microsoft.Extensions.Logging;
 
 namespace FxLink.InternalPipelineBehaviors;
 
@@ -24,7 +25,8 @@ namespace FxLink.InternalPipelineBehaviors;
 // happen only after that point, not before.
 internal sealed class InboxPipelineBehavior<TMessage>(
     IInboxStoreResolver<TMessage> storeResolver,
-    IInboxOptions options)
+    IInboxOptions options,
+    ILogger<InboxPipelineBehavior<TMessage>> logger = null)
     : IConsumerPipelineBehavior<TMessage> where TMessage : class
 {
     public async Task ConsumeAsync(IConsumeContext<TMessage> context, ConsumerHandlerDelegate next,
@@ -55,7 +57,7 @@ internal sealed class InboxPipelineBehavior<TMessage>(
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, lostOwnershipCts.Token);
 
         var renewalTask = RenewPeriodicallyAsync(store, consumerKey, context.MessageId, version, options,
-            lostOwnershipCts, token);
+            lostOwnershipCts, logger, token);
 
         Exception thrown = null;
         try
@@ -76,7 +78,12 @@ internal sealed class InboxPipelineBehavior<TMessage>(
 
         if (thrown is null)
         {
-            await store.MarkProcessedAsync(consumerKey, context.MessageId, version.Value, token);
+            if (!await store.MarkProcessedAsync(consumerKey, context.MessageId, version.Value, token))
+                // The claim was lost mid-consume (renewal failed or another instance stole it after expiry),
+                // so this message may have been — or may still be — processed by someone else as well.
+                logger?.LogWarning(
+                    "Inbox claim for message {MessageId} (consumer {ConsumerKey}) was lost before it could be " +
+                    "marked processed; it may be processed more than once", context.MessageId, consumerKey);
             return;
         }
 
@@ -86,7 +93,7 @@ internal sealed class InboxPipelineBehavior<TMessage>(
 
     private static async Task RenewPeriodicallyAsync(IInboxStore store, string consumerKey, Guid messageId,
         StrongBox<long> version, IInboxOptions options, CancellationTokenSource lostOwnershipCts,
-        CancellationToken outerToken)
+        ILogger logger, CancellationToken outerToken)
     {
         try
         {
@@ -94,8 +101,22 @@ internal sealed class InboxPipelineBehavior<TMessage>(
             {
                 await Task.Delay(options.ClaimRenewInterval, lostOwnershipCts.Token);
 
-                var renewed = await store.RenewClaimAsync(consumerKey, messageId, version.Value,
-                    options.ClaimDuration, outerToken);
+                long? renewed;
+                try
+                {
+                    renewed = await store.RenewClaimAsync(consumerKey, messageId, version.Value,
+                        options.ClaimDuration, outerToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A transient store failure must not escape through `await renewalTask` and replace the
+                    // consumer's own outcome — try again next tick; if the claim expires meanwhile, the next
+                    // successful call reports it as lost.
+                    logger?.LogWarning(ex, "Renewing the Inbox claim for message {MessageId} failed; retrying",
+                        messageId);
+                    continue;
+                }
+
                 if (renewed is not { } newVersion)
                 {
                     // Ownership lost — signal next() to stop via linkedCts, if it honors cancellation.
