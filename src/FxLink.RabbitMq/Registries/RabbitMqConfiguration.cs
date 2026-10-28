@@ -12,7 +12,8 @@ internal sealed class RabbitMqConfiguration(
     int publishChannelPoolSize,
     ushort prefetchCount,
     ushort concurrentMessageLimit,
-    bool durable)
+    bool durable,
+    TimeSpan? requeueOnFailureDelay)
     : IRabbitMqConfiguration
 {
     public string RabbitMqHost { get; } = rabbitMqHost;
@@ -25,4 +26,5 @@ internal sealed class RabbitMqConfiguration(
     public ushort PrefetchCount { get; } = prefetchCount;
     public ushort ConcurrentMessageLimit { get; } = concurrentMessageLimit;
     public bool Durable { get; } = durable;
+    public TimeSpan? RequeueOnFailureDelay { get; } = requeueOnFailureDelay;
 }

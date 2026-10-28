@@ -14,4 +14,5 @@ internal interface IRabbitMqConfiguration
     ushort PrefetchCount { get; }
     ushort ConcurrentMessageLimit { get; }
     bool Durable { get; }
+    TimeSpan? RequeueOnFailureDelay { get; }
 }
