@@ -40,9 +40,11 @@ public class RabbitMqMessageTypeResolutionTests
         return services.BuildServiceProvider();
     }
 
-    private static string ProbeBody(Guid id) => $$$"""
-        {"message":{"id":"{{{id}}}"},"context":{"messageId":"{{{Guid.NewGuid()}}}","correlationId":"{{{Guid.NewGuid()}}}","headers":{}}}
-        """;
+    private static string ProbeBody(Guid id) => JsonSerializer.Serialize(new
+    {
+        message = new { id },
+        context = new { messageId = Guid.NewGuid(), correlationId = Guid.NewGuid(), headers = new { } }
+    });
 
     private static async Task RunAsync(Func<Func<string, Guid, Task>, Task> body)
     {
