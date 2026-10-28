@@ -179,6 +179,50 @@ public class InboxPipelineBehaviorTests
         invocationCount.ShouldBe(1);
     }
 
+    [Fact]
+    public async Task A_failing_renewal_does_not_replace_the_consumers_own_outcome()
+    {
+        var store = new RenewalFailingInboxStore();
+        var behavior = BehaviorFor(store, new InboxOptions
+        {
+            ClaimDuration = TimeSpan.FromSeconds(30), ClaimRenewInterval = TimeSpan.FromMilliseconds(20)
+        });
+        var messageId = Guid.NewGuid();
+
+        await behavior.ConsumeAsync(ContextFor(messageId), _ => Task.Delay(150));
+
+        store.RenewAttempts.ShouldBeGreaterThan(0);
+        store.Contains(ConsumerKey, messageId).ShouldBeTrue(); // still marked processed
+    }
+
+    // Delegates everything to InMemoryInboxStore except renewal, which always fails like a store outage.
+    private sealed class RenewalFailingInboxStore : IInboxStore
+    {
+        private readonly InMemoryInboxStore _inner = new();
+        public int RenewAttempts;
+
+        public bool Contains(string consumerKey, Guid messageId) => _inner.Contains(consumerKey, messageId);
+
+        public Task<long?> TryClaimAsync(string consumerKey, Guid messageId, TimeSpan claimDuration,
+            CancellationToken token = default) => _inner.TryClaimAsync(consumerKey, messageId, claimDuration, token);
+
+        public Task<long?> RenewClaimAsync(string consumerKey, Guid messageId, long claimVersion,
+            TimeSpan claimDuration, CancellationToken token = default)
+        {
+            Interlocked.Increment(ref RenewAttempts);
+            throw new InvalidOperationException("Simulated store outage");
+        }
+
+        public Task<bool> MarkProcessedAsync(string consumerKey, Guid messageId, long claimVersion,
+            CancellationToken token = default) => _inner.MarkProcessedAsync(consumerKey, messageId, claimVersion, token);
+
+        public Task ReleaseClaimAsync(string consumerKey, Guid messageId, long claimVersion,
+            CancellationToken token = default) => _inner.ReleaseClaimAsync(consumerKey, messageId, claimVersion, token);
+
+        public Task DeleteProcessedBeforeAsync(DateTime cutoff, CancellationToken token = default) =>
+            _inner.DeleteProcessedBeforeAsync(cutoff, token);
+    }
+
     private sealed class NullResolver : IInboxStoreResolver<Payload>
     {
         public IInboxStore GetInboxStore() => null;
