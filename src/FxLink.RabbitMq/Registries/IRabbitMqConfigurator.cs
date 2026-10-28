@@ -21,6 +21,17 @@ public interface IRabbitMqConfigurator
     /// </summary>
     void Durable(bool durable);
 
+    /// <summary>
+    /// Controls what happens to a delivery when an exception escapes the consumer pipeline — i.e. the
+    /// retry/dead-letter mechanism itself failed (republish failed, Inbox store unreachable, ...), not a
+    /// consumer exception, which <c>RetryPipelineBehavior</c> already handles. By default such a delivery
+    /// is acked and only logged, so it is lost. When configured, it is instead negatively acknowledged
+    /// with requeue after waiting <paramref name="delay"/>, so it is redelivered once the dependency
+    /// recovers. The wait holds the consumer's dispatch slot, which also throttles a tight redelivery
+    /// loop while the failure lasts.
+    /// </summary>
+    void RequeueOnFailure(TimeSpan delay);
+
     void PrefetchCount(ushort count);
     void ConcurrentMessageLimit(ushort limitCount);
 }

@@ -151,16 +151,17 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 var replyConsumer = new AsyncEventingBasicConsumer(channel);
                 replyConsumer.ReceivedAsync += async (sender, ea) =>
                 {
-                    if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-                    var connectorType = _connectorTypeCache.GetOrAdd(messageType, static type =>
-                    {
-                        var msgType = Type.GetType(type);
-                        return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-                    });
-                    if (connectorType is null) return;
-                    var connector = (AbstractRabbitMqConnector)serviceProvider
-                        .GetRequiredService(connectorType);
                     var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
+                    var messageType = ea.BasicProperties.Type;
+                    var connector = ResolveConnector(messageType is { Length: > 0 }
+                        ? ResolveConnectorType(messageType)
+                        : null);
+                    if (connector is null)
+                    {
+                        await AckUnroutableAsync(ackChannel, ea, messageType);
+                        return;
+                    }
+
                     try
                     {
                         await connector.ProcessResponseMessageAsync(ea);
@@ -248,22 +249,23 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         var consumer = new AsyncEventingBasicConsumer(channel);
                         consumer.ReceivedAsync += async (sender, ea) =>
                         {
+                            var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
+
                             // We will try to resolve exchange to check if we have the message or not...
                             var connectorType = _exchangeMapCollectorType.GetValueOrDefault(ea.Exchange);
-                            if (connectorType is null)
+                            if (connectorType is null && ea.BasicProperties.Type is { Length: > 0 } messageType)
+                                connectorType = ResolveConnectorType(messageType);
+
+                            // Every path below must ack or nack: an early return would leave the delivery
+                            // unacked for the channel's whole lifetime, permanently holding one prefetch
+                            // slot — enough of them and the consumer stops receiving anything.
+                            var connector = ResolveConnector(connectorType);
+                            if (connector is null)
                             {
-                                if (ea.BasicProperties.Type is not { Length: > 0 } messageType) return;
-                                connectorType = _connectorTypeCache.GetOrAdd(messageType, static type =>
-                                {
-                                    var msgType = Type.GetType(type);
-                                    return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-                                });
+                                await AckUnroutableAsync(ackChannel, ea, ea.BasicProperties.Type);
+                                return;
                             }
 
-                            if (connectorType is null) return;
-                            var connector = (AbstractRabbitMqConnector)serviceProvider
-                                .GetRequiredService(connectorType);
-                            var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
                             try
                             {
                                 await connector.ProcessMessageReceivedAsync(ea, consumerType);
@@ -273,6 +275,12 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                                 _logger.LogCritical(ex,
                                     "Unhandled exception escaped the consumer pipeline for {MessageType}",
                                     connectorType);
+
+                                if (_rabbitMqConfiguration.RequeueOnFailureDelay is { } requeueDelay)
+                                {
+                                    await RequeueAfterDelayAsync(ackChannel, ea, requeueDelay);
+                                    return;
+                                }
                             }
 
                             await ackChannel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
@@ -389,6 +397,41 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         {
             var channel = await CreatePublishChannelAsync();
             await _channelPool.Writer.WriteAsync(channel);
+        }
+    }
+
+    private Type ResolveConnectorType(string messageType) =>
+        _connectorTypeCache.GetOrAdd(messageType, static type =>
+        {
+            var msgType = Type.GetType(type);
+            return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
+        });
+
+    // GetService, not GetRequiredService: a Type header naming a message type this process doesn't
+    // consume must not throw inside the delivery handler (which would leave the delivery unacked).
+    private AbstractRabbitMqConnector ResolveConnector(Type connectorType) =>
+        connectorType is null ? null : serviceProvider.GetService(connectorType) as AbstractRabbitMqConnector;
+
+    // Nothing in this process can handle the delivery, and redelivering it would never change that.
+    private async Task AckUnroutableAsync(IChannel channel, BasicDeliverEventArgs ea, string messageType)
+    {
+        _logger.LogWarning(
+            "Dropping a delivery with no matching consumer. Exchange={Exchange} Type={MessageType}",
+            ea.Exchange, messageType);
+        await channel.BasicAckAsync(ea.DeliveryTag, false, ea.CancellationToken);
+    }
+
+    private async Task RequeueAfterDelayAsync(IChannel channel, BasicDeliverEventArgs ea, TimeSpan delay)
+    {
+        try
+        {
+            await Task.Delay(delay, ea.CancellationToken);
+            await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true, ea.CancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Channel/consumer is shutting down: the broker requeues every unacked delivery when the
+            // channel closes, so there's nothing left to do here.
         }
     }
 
