@@ -12,10 +12,15 @@ public sealed class RabbitMqCredential
     public void UserName(string userName) => UserNameValue = userName;
     public void Password(string password) => PasswordValue = password;
 
-    public void Ssl(Action<SslOption> sslOption)
+    /// <summary>
+    /// Connects over TLS. Calling this enables TLS (<see cref="SslOption.Enabled"/> starts as <c>true</c>);
+    /// <see cref="SslOption.ServerName"/> defaults to the host given to <c>Host(...)</c> when left empty,
+    /// and the port defaults to 5671 instead of 5672 when <c>Host(...)</c> was not given one explicitly.
+    /// </summary>
+    public void Ssl(Action<SslOption> sslOption = null)
     {
-        var option = new SslOption();
-        sslOption.Invoke(option);
+        var option = new SslOption { Enabled = true };
+        sslOption?.Invoke(option);
         SslOptionValue = option;
     }
 }

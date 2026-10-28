@@ -13,7 +13,8 @@ internal sealed class RabbitMqConfiguration(
     ushort prefetchCount,
     ushort concurrentMessageLimit,
     bool durable,
-    TimeSpan? requeueOnFailureDelay)
+    TimeSpan? requeueOnFailureDelay,
+    Action<ConnectionFactory> configureConnection)
     : IRabbitMqConfiguration
 {
     public string RabbitMqHost { get; } = rabbitMqHost;
@@ -27,4 +28,5 @@ internal sealed class RabbitMqConfiguration(
     public ushort ConcurrentMessageLimit { get; } = concurrentMessageLimit;
     public bool Durable { get; } = durable;
     public TimeSpan? RequeueOnFailureDelay { get; } = requeueOnFailureDelay;
+    public Action<ConnectionFactory> ConfigureConnection { get; } = configureConnection;
 }

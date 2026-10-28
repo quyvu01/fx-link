@@ -15,4 +15,5 @@ internal interface IRabbitMqConfiguration
     ushort ConcurrentMessageLimit { get; }
     bool Durable { get; }
     TimeSpan? RequeueOnFailureDelay { get; }
+    Action<ConnectionFactory> ConfigureConnection { get; }
 }
