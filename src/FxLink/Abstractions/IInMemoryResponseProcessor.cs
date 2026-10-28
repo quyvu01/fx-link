@@ -6,6 +6,10 @@ namespace FxLink.Abstractions;
 internal interface IInMemoryResponseSetter
 {
     bool TrySetResult(Guid requestId, object result);
+
+    // The Result<TResponse> type a reply's wire type name stands for, if some request in this process waits
+    // on that TResponse; null otherwise.
+    Type ResolveResultType(string resultTypeName);
 }
 
 internal interface IInMemoryResponseGetter

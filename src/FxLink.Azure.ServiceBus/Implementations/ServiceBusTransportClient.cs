@@ -22,9 +22,7 @@ internal sealed class ServiceBusTransportClient(
     private readonly ILogger<ServiceBusTransportClient> _logger =
         serviceProvider.GetService<ILogger<ServiceBusTransportClient>>();
 
-    // Reply path only: messageTypeName (AssemblyQualifiedName, from the "MessageType" property) -> the closed
-    // IClientConnector<> type to resolve from DI — same caching role as RabbitMqClient's _connectorTypeCache.
-    private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = new();
+    private readonly IInMemoryResponseSetter _responseSetter = serviceProvider.GetRequiredService<IInMemoryResponseSetter>();
 
     private readonly ConcurrentDictionary<string, ServiceBusSender> _senders = new();
     private readonly ConcurrentDictionary<Type, string> _topicNamesByMessageType = new();
@@ -168,11 +166,9 @@ internal sealed class ServiceBusTransportClient(
             value?.ToString() is not { Length: > 0 } messageTypeName)
             return null;
 
-        var connectorType = _connectorTypeCache.GetOrAdd(messageTypeName, static type =>
-        {
-            var msgType = Type.GetType(type);
-            return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-        });
+        // Only a Result<TResponse> some request in this process is waiting on — never Type.GetType.
+        var resultType = _responseSetter.ResolveResultType(messageTypeName);
+        var connectorType = resultType is null ? null : typeof(IClientConnector<>).MakeGenericType(resultType);
         return connectorType is null
             ? null
             : (AbstractServiceBusConnector)serviceProvider.GetRequiredService(connectorType);

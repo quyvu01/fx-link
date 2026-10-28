@@ -36,19 +36,41 @@ internal class StateMachineRequester<TRequest> : IStateMachineRequester<TRequest
     {
         if (context.Timeout < TimeSpan.Zero)
             throw new FxLinkException.RequestTimeoutMustNotBeNegative(context.Timeout);
-        await _connector.SendAsync(request, context, token);
-        await _messagePool.Writer.WriteAsync(ResponseFunc, token);
+        // Start waiting before sending, so a reply that comes back before SendAsync returns (or before the
+        // pool below gets to ResponseFunc) still finds the request registered. The timeout runs from here.
+        var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(context.Timeout);
+        var responseTask = _inMemoryResponseGetter.GetResponse<TResponse>(context.RequesterId, timeout.Token);
+        try
+        {
+            await _connector.SendAsync(request, context, token);
+            await _messagePool.Writer.WriteAsync(ResponseFunc, token);
+        }
+        catch
+        {
+            await timeout.CancelAsync();
+            try
+            {
+                await responseTask;
+            }
+            catch
+            {
+                // Only the TimeoutException from the cancel above; the send failure is what the caller sees.
+            }
+
+            timeout.Dispose();
+            throw;
+        }
+
         return;
 
         async Task ResponseFunc()
         {
             using var scoped = _serviceProvider.CreateScope();
-            using var tcs = CancellationTokenSource.CreateLinkedTokenSource(token);
-            tcs.CancelAfter(context.Timeout);
+            using var ownedTimeout = timeout;
             try
             {
-                var (result, _, _) = await _inMemoryResponseGetter
-                    .GetResponse<TResponse>(context.RequesterId, tcs.Token);
+                var (result, _, _) = await responseTask;
                 if (!result.IsSuccess)
                 {
                     var exception = result.Fault.ToException();

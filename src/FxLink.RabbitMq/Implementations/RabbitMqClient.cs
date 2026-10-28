@@ -21,11 +21,11 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
     private readonly IRabbitMqConfiguration _rabbitMqConfiguration =
         serviceProvider.GetRequiredService<IRabbitMqConfiguration>();
 
-    private readonly ConcurrentDictionary<string, Type> _connectorTypeCache = [];
     private readonly ConcurrentDictionary<string, Type> _exchangeMapCollectorType = [];
     private readonly IMessageKeys _messageKeys = serviceProvider.GetRequiredService<IMessageKeys>();
     private readonly ILogger<RabbitMqClient> _logger = serviceProvider.GetRequiredService<ILogger<RabbitMqClient>>();
     private readonly MessageTypeResolver _messageTypeResolver = serviceProvider.GetRequiredService<MessageTypeResolver>();
+    private readonly IInMemoryResponseSetter _responseSetter = serviceProvider.GetRequiredService<IInMemoryResponseSetter>();
 
     private IConnection _connection;
 
@@ -174,8 +174,9 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                 {
                     var ackChannel = ((AsyncEventingBasicConsumer)sender).Channel;
                     var messageType = ea.BasicProperties.Type;
-                    var connector = ResolveConnector(messageType is { Length: > 0 }
-                        ? ResolveConnectorType(messageType)
+                    // Only a Result<TResponse> some request in this process is waiting on — never Type.GetType.
+                    var connector = ResolveConnector(_responseSetter.ResolveResultType(messageType) is { } resultType
+                        ? typeof(IClientConnector<>).MakeGenericType(resultType)
                         : null);
                     if (connector is null)
                     {
@@ -422,13 +423,6 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
             await _channelPool.Writer.WriteAsync(channel);
         }
     }
-
-    private Type ResolveConnectorType(string messageType) =>
-        _connectorTypeCache.GetOrAdd(messageType, static type =>
-        {
-            var msgType = Type.GetType(type);
-            return msgType is null ? null : typeof(IClientConnector<>).MakeGenericType(msgType);
-        });
 
     // GetService, not GetRequiredService: a Type header naming a message type this process doesn't
     // consume must not throw inside the delivery handler (which would leave the delivery unacked).

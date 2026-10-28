@@ -33,9 +33,29 @@ internal class Requester<TRequest>(
             throw new FxLinkException.RequestTimeoutMustNotBeNegative(context.Timeout);
         using var tcs = CancellationTokenSource.CreateLinkedTokenSource(token);
         tcs.CancelAfter(context.Timeout);
-        await connector.SendAsync(message, context, tcs.Token);
-        var (result, ctx, _) = await inMemoryResponseGetter
-            .GetResponse<TResponse>(context.RequesterId, tcs.Token);
+        // Start waiting before sending: the reply can arrive before SendAsync returns (it waits for the
+        // broker's publisher confirm), and one that finds nobody waiting is dropped.
+        var responseTask = inMemoryResponseGetter.GetResponse<TResponse>(context.RequesterId, tcs.Token);
+        try
+        {
+            await connector.SendAsync(message, context, tcs.Token);
+        }
+        catch
+        {
+            await tcs.CancelAsync();
+            try
+            {
+                await responseTask;
+            }
+            catch
+            {
+                // Only the TimeoutException from the cancel above; the send failure is what the caller sees.
+            }
+
+            throw;
+        }
+
+        var (result, ctx, _) = await responseTask;
         if (!result.IsSuccess) throw result.Fault.ToException();
         var response = result.Data;
         return new ResponseContext<TResponse>(response, ctx, context.RequesterId);
