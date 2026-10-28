@@ -11,6 +11,7 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
     private int _poolSizeValue = RabbitMqConstants.DefaultPoolSize;
     private ushort _prefetchCountValue = RabbitMqConstants.DefaultPrefetchCount;
     private ushort _concurrentMessageLimitValue = RabbitMqConstants.DefaultConcurrentMessageLimit;
+    private bool _durableValue;
 
     public void Host(string host, string virtualHost, int port = 5672, Action<RabbitMqCredential> configure = null)
     {
@@ -28,6 +29,8 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
         _poolSizeValue = poolSize;
     }
 
+    public void Durable(bool durable) => _durableValue = durable;
+
     public void PrefetchCount(ushort prefetchCount)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(prefetchCount, 0);
@@ -42,5 +45,5 @@ internal sealed class RabbitMqConfigurator : IRabbitMqConfigurator
 
     internal IRabbitMqConfiguration ToConfiguration() => new RabbitMqConfiguration(_hostValue, _virtualHostValue,
         _portValue, Credential.UserNameValue, Credential.PasswordValue, Credential.SslOptionValue, _poolSizeValue,
-        _prefetchCountValue, _concurrentMessageLimitValue);
+        _prefetchCountValue, _concurrentMessageLimitValue, _durableValue);
 }

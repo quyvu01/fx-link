@@ -25,7 +25,8 @@ internal sealed class RabbitMqScheduleExchangeProvider(IRabbitMqClient client, I
     {
         var exchangeName = GetExchangeName(messageType);
         var delayExchange = exchangeName.GetDelayExchangeName();
-        await channel.ExchangeDeclareAsync(delayExchange, DelayedMessageExchangeType, durable: false,
+        await channel.ExchangeDeclareAsync(delayExchange, DelayedMessageExchangeType,
+            durable: serviceProvider.GetRequiredService<IRabbitMqConfiguration>().Durable,
             arguments: new Dictionary<string, object> { ["x-delayed-type"] = ExchangeType.Fanout },
             cancellationToken: cancellationToken);
         await channel.QueueBindAsync(queueName, delayExchange, string.Empty,

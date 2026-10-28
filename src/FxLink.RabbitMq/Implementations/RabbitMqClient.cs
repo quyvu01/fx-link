@@ -33,6 +33,11 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         var channel = await _channelPool.Reader.ReadAsync(token);
         try
         {
+            // Responses go through the default exchange to the exclusive, non-durable reply queue —
+            // persisting them would only cost disk writes for messages that cannot outlive the queue.
+            if (_rabbitMqConfiguration.Durable && message.ExchangeName.Length > 0)
+                message.Props.DeliveryMode = DeliveryModes.Persistent;
+
             await channel.BasicPublishAsync(message.ExchangeName, message.RoutingKey, mandatory: message.Mandatory,
                 basicProperties: message.Props, message.MessageBody, token);
         }
@@ -57,8 +62,8 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
         // Short-lived scratch channel, same reasoning as the consumer-side declares in StartAsync:
         // a declare failure here must not risk taking down a pooled publish channel.
         await using var channel = await _connection.CreateChannelAsync(cancellationToken: token);
-        await channel.ExchangeDeclareAsync(exchangeName, ExchangeType.Fanout, durable: false,
-            cancellationToken: token);
+        await channel.ExchangeDeclareAsync(exchangeName, ExchangeType.Fanout,
+            durable: _rabbitMqConfiguration.Durable, cancellationToken: token);
     }
 
     private async Task<IChannel> CreatePublishChannelAsync(CancellationToken cancellationToken = default)
@@ -290,10 +295,10 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                     await using var declareChannel = await _connection
                         .CreateChannelAsync(cancellationToken: cancellationToken);
 
-                    await declareChannel.QueueDeclareAsync(queue: queueName, durable: false, exclusive: false,
+                    await declareChannel.QueueDeclareAsync(queue: queueName, durable: _rabbitMqConfiguration.Durable, exclusive: false,
                         autoDelete: autoDelete, cancellationToken: cancellationToken);
 
-                    await declareChannel.QueueDeclareAsync(queue: deadLetterQueue, durable: false, exclusive: false,
+                    await declareChannel.QueueDeclareAsync(queue: deadLetterQueue, durable: _rabbitMqConfiguration.Durable, exclusive: false,
                         autoDelete: autoDelete, cancellationToken: cancellationToken);
 
                     foreach (var messageType in messageTypes)
@@ -302,7 +307,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
                         _exchangeMapCollectorType.TryAdd(exchangeName, typeof(IClientConnector<>)
                             .MakeGenericType(messageType));
                         await declareChannel.ExchangeDeclareAsync(exchangeName, type: ExchangeType.Fanout,
-                            durable: false, cancellationToken: cancellationToken);
+                            durable: _rabbitMqConfiguration.Durable, cancellationToken: cancellationToken);
                         await declareChannel.QueueBindAsync(queue: queueName, exchangeName, string.Empty,
                             cancellationToken: cancellationToken);
 
@@ -310,10 +315,10 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                         // Declare retry exchanges and queues
                         await declareChannel.ExchangeDeclareAsync(retryExchange, ExchangeType.Fanout,
-                            durable: false, cancellationToken: cancellationToken);
+                            durable: _rabbitMqConfiguration.Durable, cancellationToken: cancellationToken);
 
                         var retryQueue = queueName.RetryConsumerName(messageType);
-                        await declareChannel.QueueDeclareAsync(retryQueue, durable: false, exclusive: false,
+                        await declareChannel.QueueDeclareAsync(retryQueue, durable: _rabbitMqConfiguration.Durable, exclusive: false,
                             autoDelete: autoDelete, arguments: new Dictionary<string, object>
                             {
                                 ["x-dead-letter-exchange"] = exchangeName,
@@ -326,7 +331,7 @@ internal class RabbitMqClient(IServiceProvider serviceProvider) : IRabbitMqClien
 
                         // Declare dead letter exchanges and queues
                         await declareChannel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Fanout,
-                            durable: false, cancellationToken: cancellationToken);
+                            durable: _rabbitMqConfiguration.Durable, cancellationToken: cancellationToken);
 
                         await declareChannel.QueueBindAsync(deadLetterQueue, deadLetterExchange, string.Empty,
                             cancellationToken: cancellationToken);

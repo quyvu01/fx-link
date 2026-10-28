@@ -11,7 +11,8 @@ internal sealed class RabbitMqConfiguration(
     SslOption sslOption,
     int publishChannelPoolSize,
     ushort prefetchCount,
-    ushort concurrentMessageLimit)
+    ushort concurrentMessageLimit,
+    bool durable)
     : IRabbitMqConfiguration
 {
     public string RabbitMqHost { get; } = rabbitMqHost;
@@ -23,4 +24,5 @@ internal sealed class RabbitMqConfiguration(
     public int PublishChannelPoolSize { get; } = publishChannelPoolSize;
     public ushort PrefetchCount { get; } = prefetchCount;
     public ushort ConcurrentMessageLimit { get; } = concurrentMessageLimit;
+    public bool Durable { get; } = durable;
 }
