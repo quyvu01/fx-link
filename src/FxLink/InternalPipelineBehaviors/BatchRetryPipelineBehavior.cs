@@ -38,8 +38,7 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
         var intervals = retryPolicy.RetryIntervals;
         var ignoreExceptions = retryPolicy.IgnoreExceptions;
 
-        var requestSemantics = context.Headers.Get<string>(Headers.RequestSemanticsKey);
-        var requestAsPublisher = requestSemantics is RequestSemantics.RequestAsPublisher;
+        var requestAsPublisher = context.IsRequestAsPublisher();
 
         if (ShouldIgnore(ex, ignoreExceptions))
         {

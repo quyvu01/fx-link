@@ -37,12 +37,9 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
             var ignoreExceptions = retryPolicy.IgnoreExceptions;
 
             var publisher = services.GetRequiredService<IPublisher>();
-            var requestSemantics = context.Headers.Get<string>(Headers.RequestSemanticsKey);
-            var requestAsPublisher = requestSemantics is RequestSemantics.RequestAsPublisher;
 
             if (ShouldIgnore(ex, ignoreExceptions))
             {
-                if (requestAsPublisher) throw;
                 context.Headers.Set(Headers.DeliveryKindKey, DeliveryKinds.DeadLetter);
                 SetExceptionHeaders(context, ex);
                 publisher.SetContext(context);
@@ -78,7 +75,6 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 return;
             }
 
-            if (requestAsPublisher) throw;
             context.Headers.Set(Headers.DeliveryKindKey, DeliveryKinds.DeadLetter);
             SetExceptionHeaders(context, ex);
             publisher.SetContext(context);
