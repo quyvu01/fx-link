@@ -2,6 +2,7 @@ using FxLink.Abstractions;
 using FxLink.Configurators;
 using FxLink.Contexts;
 using FxLink.Exceptions;
+using FxLink.Extensions;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -21,8 +22,7 @@ public sealed class StateMachineConsumer<TMessage>(IServiceProvider serviceProvi
         }
         catch (Exception e)
         {
-            var requestSemantics = context.Headers.Get<string>(DistributedConfigurators.Headers.RequestSemanticsKey);
-            if (requestSemantics is DistributedConfigurators.RequestSemantics.RequestAsPublisher)
+            if (context.IsRequestAsPublisher())
             {
                 if (context.RequesterId is not { } requesterId) return;
                 var client = serviceProvider.GetRequiredService<IClientConnector<Result<TMessage>>>();
