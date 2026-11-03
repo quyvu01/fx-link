@@ -60,6 +60,8 @@ public static class DependencyExtensions
 
         configurator.AddConsumerPipelineBehaviors(c => c
             .Of(typeof(RetryPipelineBehavior<>))
+            // Must stay right after Retry (= inside it): absorbs failing request messages so Retry never sees them.
+            .Of(typeof(RequestFaultPipelineBehavior<>))
         );
 
         return new DistributedConfigurator(services);
