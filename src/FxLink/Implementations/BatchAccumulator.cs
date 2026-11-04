@@ -40,7 +40,7 @@ internal sealed class BatchAccumulator<TMessage> : IBatchAccumulator<TMessage>, 
 
         var key = ResolveKey(context);
         var state = _states.GetOrAdd(key, _ => new BatchState());
-        var forceFlush = context.Headers.Get<int>(Headers.RetryCountKey) > 0;
+        var forceFlush = context.GetRetryCount() > 0;
 
         IReadOnlyList<IConsumeContext<TMessage>> snapshot = null;
         lock (state.Lock)
