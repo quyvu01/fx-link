@@ -50,7 +50,7 @@ internal sealed class BatchRetryPipelineBehavior<TMessage>(IServiceProvider serv
             return;
         }
 
-        var retryCount = context.Headers.Get<int>(Headers.RetryCountKey);
+        var retryCount = context.GetRetryCount();
         if (retryCount < intervals.Length)
         {
             await RetryAsync(context, intervals[retryCount], retryCount, publisher, logger, token);

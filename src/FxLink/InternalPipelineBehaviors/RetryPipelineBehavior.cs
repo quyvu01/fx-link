@@ -50,7 +50,7 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
                 return;
             }
 
-            var retryCount = context.Headers.Get<int>(Headers.RetryCountKey);
+            var retryCount = context.GetRetryCount();
 
             if (retryCount < intervals.Length)
             {
