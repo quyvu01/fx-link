@@ -14,7 +14,8 @@ namespace FxLink.IntegrationTests.Transports;
 
 // A message that failed once and was retried carries retry headers. A message the consumer publishes
 // while handling that retried delivery must not inherit them (it used to be routed to the retry
-// exchange of its own type, where nothing ever delivers it). Own throwaway vhost per test.
+// exchange of its own type, where nothing ever delivers it). Own throwaway vhost per test. Durable(true)
+// because RabbitMQ 4.x refuses the non-durable, non-exclusive queues FxLink declares by default.
 public class RabbitMqRetryHeaderLeakTests
 {
     private static HttpClient CreateManagementClient()
@@ -102,7 +103,7 @@ public class RabbitMqRetryHeaderLeakTests
 
     [Fact]
     public Task A_message_published_while_handling_a_retried_delivery_is_delivered_without_retry_headers() =>
-        RunAsync(null, async id =>
+        RunAsync(c => c.Durable(true), async id =>
         {
             // 2s default first retry interval, then the follow-up must arrive on the main exchange.
             await Polling.WaitUntilAsync(() => RetryLeakFollowUpConsumer.Received.ContainsKey(id),
