@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Contexts;
 
 namespace FxLink.Registries;

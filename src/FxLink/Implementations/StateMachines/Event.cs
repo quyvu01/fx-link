@@ -1,8 +1,8 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 
 // ReSharper disable NonReadonlyMemberInGetHashCode
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.StateMachines;
 
 internal sealed record Event<TMessage> : IEvent<TMessage> where TMessage : class
 {

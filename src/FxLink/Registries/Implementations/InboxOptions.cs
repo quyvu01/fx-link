@@ -1,6 +1,6 @@
 using FxLink.Exceptions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 // Public and exposed via IInboxConfigurator so consuming apps can tune claim pacing and retention —
 // same "one settable options class" shape as OutboxDispatcherOptions, for the same reason: claim

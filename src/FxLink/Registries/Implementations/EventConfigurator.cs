@@ -1,10 +1,11 @@
 using System.Linq.Expressions;
 using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Contexts;
-using FxLink.Extensions;
 using FxLink.Exceptions;
+using FxLink.Extensions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class EventConfigurator<TInstance, TMessage> :
     IEventCorrelationByConfigurator<TInstance, TMessage>

@@ -1,7 +1,7 @@
 using System.Data;
 using System.Linq.Expressions;
 
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.StateMachine;
 
 public interface IStateMachineInstanceRepository<TInstance> where TInstance : IStateMachineInstance
 {

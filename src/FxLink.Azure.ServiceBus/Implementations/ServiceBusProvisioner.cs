@@ -1,4 +1,3 @@
-using Azure;
 using Azure.Messaging.ServiceBus.Administration;
 using FxLink.Azure.ServiceBus.Abstractions;
 using FxLink.Azure.ServiceBus.Constants;

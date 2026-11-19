@@ -1,10 +1,10 @@
 using System.Text.Json;
+using FxLink.Abstractions.RoutingSlip;
 using FxLink.Configurators;
 using FxLink.Contexts;
-using FxLink.Abstractions;
 using FxLink.Entities;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.RoutingSlip;
 
 internal sealed class RoutingSlipBuilder : IRoutingSlipBuilder
 {

@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Exceptions;
 
 namespace FxLink.Helpers;

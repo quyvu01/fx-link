@@ -1,11 +1,12 @@
 using System.Threading.Channels;
 using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Contexts;
 using FxLink.Exceptions;
 using FxLink.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.StateMachines;
 
 internal class StateMachineRequester<TRequest> : IStateMachineRequester<TRequest>
     where TRequest : class

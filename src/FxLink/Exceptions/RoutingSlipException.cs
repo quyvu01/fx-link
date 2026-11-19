@@ -1,5 +1,3 @@
-using FxLink.Exceptions;
-
 namespace FxLink.Exceptions;
 
 /// <summary>

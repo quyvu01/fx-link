@@ -1,13 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using FxLink.Abstractions.RoutingSlip;
 using FxLink.Configurators;
 using FxLink.Contexts;
-using FxLink.Abstractions;
 using FxLink.Entities;
 using FxLink.Statics;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.RoutingSlip;
 
 internal sealed class RoutingSlipExecutor(IServiceProvider serviceProvider) : IRoutingSlipExecutor
 {

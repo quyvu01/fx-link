@@ -1,7 +1,7 @@
 using FxLink.Entities;
 using FxLink.EntityFramework.Inbox.Entities;
 using FxLink.EntityFramework.Outbox.Entities;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

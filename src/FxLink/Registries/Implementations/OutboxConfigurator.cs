@@ -2,7 +2,7 @@ using FxLink.Abstractions;
 using FxLink.InMemory;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class OutboxConfigurator(IServiceCollection services, IOutboxRegistry registry) : IOutboxConfigurator
 {

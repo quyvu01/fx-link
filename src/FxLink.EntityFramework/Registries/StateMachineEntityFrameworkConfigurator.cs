@@ -1,7 +1,7 @@
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Extensions;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.EntityFramework.Exceptions;
 using FxLink.EntityFramework.Wrappers;
 using FxLink.Implementations.StateMachines;

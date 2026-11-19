@@ -1,19 +1,21 @@
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
+using FxLink.Abstractions.StateMachine.Workflows;
 using FxLink.Configurators;
 using FxLink.Contexts;
+using FxLink.Exceptions;
 using FxLink.Extensions;
 using FxLink.Faults;
-using FxLink.Serialization;
-using FxLink.Abstractions.Workflows;
-using FxLink.Delegates;
-using FxLink.Exceptions;
+using FxLink.Implementations.StateMachines.Delegates;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
+using FxLink.Serialization;
 using FxLink.Statics;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Implementations.Workflows;
+namespace FxLink.Implementations.StateMachines;
 
 internal sealed class EventOperator<TInstance, TMessage>(IEvent<TMessage> @event, IStateMachine stateMachine)
     : IEventOperator<TInstance, TMessage>

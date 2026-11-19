@@ -1,9 +1,11 @@
 using System.Linq.Expressions;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Delegates;
 using FxLink.Exceptions;
+using FxLink.Implementations.StateMachines;
+using FxLink.Implementations.StateMachines.Delegates;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class ScheduleConfigurator<TInstance, TMessage> :
     IScheduleConfigurator<TInstance, TMessage>

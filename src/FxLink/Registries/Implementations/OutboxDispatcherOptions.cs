@@ -1,4 +1,4 @@
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 // Public and exposed via IOutboxConfigurator.DispatcherOptions(...) so consuming apps can tune
 // dispatch pacing and retention. Passed as a plain settable class (not the "one options type per

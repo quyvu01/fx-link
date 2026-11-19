@@ -1,11 +1,11 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Extensions;
-using FxLink.Abstractions;
-using FxLink.Abstractions.Workflows;
+using FxLink.Abstractions.StateMachine;
+using FxLink.Abstractions.StateMachine.Workflows;
 using FxLink.Exceptions;
-using FxLink.Implementations.Workflows;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 
 namespace FxLink.Implementations.StateMachines;
 

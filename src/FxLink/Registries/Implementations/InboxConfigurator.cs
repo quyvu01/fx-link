@@ -2,7 +2,7 @@ using FxLink.Abstractions;
 using FxLink.InMemory;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class InboxConfigurator(IServiceCollection services, IInboxRegistry registry) : IInboxConfigurator
 {

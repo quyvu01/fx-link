@@ -1,5 +1,6 @@
 using FxLink.Exceptions;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using Shouldly;
 using Xunit;
 

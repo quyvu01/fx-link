@@ -1,6 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Nats.Registries;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 
 namespace FxLink.Nats.Extensions;
 

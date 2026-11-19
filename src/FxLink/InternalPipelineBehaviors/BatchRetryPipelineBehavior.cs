@@ -3,6 +3,7 @@ using FxLink.Contexts;
 using FxLink.Delegates;
 using FxLink.Extensions;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

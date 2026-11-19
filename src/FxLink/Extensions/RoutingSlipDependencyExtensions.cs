@@ -1,8 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
-using FxLink.Extensions;
 using FxLink.Registries;
 using FxLink.Abstractions;
+using FxLink.Abstractions.RoutingSlip;
 using FxLink.Implementations;
+using FxLink.Implementations.RoutingSlip;
+using FxLink.Registries.Implementations;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Extensions;

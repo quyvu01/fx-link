@@ -1,6 +1,6 @@
 using System.Reflection;
-using FxLink.Extensions;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 
 namespace FxLink.Extensions;
 

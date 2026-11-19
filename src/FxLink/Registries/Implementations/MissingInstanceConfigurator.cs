@@ -1,10 +1,11 @@
 using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Contexts;
-using FxLink.Implementations;
 using FxLink.Delegates;
 using FxLink.Exceptions;
+using FxLink.Implementations;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 public class MissingInstanceConfigurator<TInstance, TMessage>
     : IMissingInstanceConfigurator<TInstance, TMessage>

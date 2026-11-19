@@ -1,5 +1,5 @@
 using FxLink.Abstractions;
-using FxLink.Configurators;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Contexts;
 using FxLink.Exceptions;
 using FxLink.Extensions;
@@ -7,7 +7,7 @@ using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.StateMachines;
 
 public sealed class StateMachineConsumer<TMessage>(IServiceProvider serviceProvider)
     : IConsumer<TMessage> where TMessage : class

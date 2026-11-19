@@ -1,5 +1,6 @@
 using FxLink.Contexts;
-using FxLink.Abstractions;
+using FxLink.Abstractions.RoutingSlip;
+using FxLink.Implementations.RoutingSlip;
 
 namespace FxLink.Implementations;
 

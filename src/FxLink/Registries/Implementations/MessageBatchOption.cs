@@ -1,6 +1,6 @@
 using FxLink.Contexts;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class MessageBatchOption<TMessage> : IMessageBatchOption, IMessageBatchOption<TMessage>
     where TMessage : class

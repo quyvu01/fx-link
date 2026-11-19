@@ -1,8 +1,7 @@
-using FxLink.Abstractions;
 using FxLink.Contexts;
 using FxLink.Registries;
 
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.StateMachine;
 
 public interface IStateMachine : IConsumer
 {

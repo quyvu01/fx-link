@@ -1,6 +1,6 @@
 using System.Reflection;
 using FxLink.Extensions;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Exceptions;
 
 namespace FxLink.Implementations.StateMachines;

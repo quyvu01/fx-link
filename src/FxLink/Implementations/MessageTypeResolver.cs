@@ -1,7 +1,6 @@
 using System.Collections.Frozen;
 using System.Text.RegularExpressions;
 using FxLink.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Implementations;
 

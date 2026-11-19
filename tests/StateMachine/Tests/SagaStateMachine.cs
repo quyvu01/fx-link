@@ -1,4 +1,4 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Implementations.StateMachines;
 using FxLink.Statics;
 using StateMachine.Tests.Events;

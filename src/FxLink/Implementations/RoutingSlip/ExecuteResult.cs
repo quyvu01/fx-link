@@ -1,6 +1,6 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.RoutingSlip;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.RoutingSlip;
 
 internal class ExecuteResult(bool isCompleted) : IExecuteResult
 {

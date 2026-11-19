@@ -3,6 +3,7 @@ using FxLink.BackgroundServices;
 using FxLink.Entities;
 using FxLink.InMemory;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shouldly;

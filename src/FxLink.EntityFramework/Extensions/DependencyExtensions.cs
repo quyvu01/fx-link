@@ -1,5 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.EntityFramework.Registries;
 using FxLink.EntityFramework.Repositories;
 using FxLink.Registries;

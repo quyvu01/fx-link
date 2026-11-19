@@ -1,6 +1,6 @@
 using FxLink.Contexts;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class ValueTypeGroupByProvider<TMessage, TKey>(Func<IConsumeContext<TMessage>, TKey?> selector)
     : IGroupKeyProvider<TMessage, TKey> where TMessage : class where TKey : struct

@@ -3,7 +3,6 @@ using FxLink.Contexts;
 using FxLink.Delegates;
 using FxLink.InternalPipelineBehaviors;
 using FxLink.Statics;
-using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;

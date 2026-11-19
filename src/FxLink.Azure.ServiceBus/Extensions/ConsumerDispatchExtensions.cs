@@ -1,6 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Azure.ServiceBus.Registries;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 
 namespace FxLink.Azure.ServiceBus.Extensions;
 

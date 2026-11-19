@@ -1,6 +1,6 @@
 using FxLink.Contexts;
 
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.StateMachine;
 
 public interface IStateMachineActivity;
 

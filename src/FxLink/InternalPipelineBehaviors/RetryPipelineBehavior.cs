@@ -3,6 +3,7 @@ using FxLink.Contexts;
 using FxLink.Delegates;
 using FxLink.Extensions;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,7 +17,6 @@ internal sealed class RetryPipelineBehavior<TMessage>(IServiceProvider servicePr
     public async Task ConsumeAsync(IConsumeContext<TMessage> context, ConsumerHandlerDelegate next,
         CancellationToken token = default)
     {
-        // Todo: think more about this handling... Hmmm, think about responsibility
         if (typeof(TMessage).IsGenericType && typeof(TMessage).GetGenericTypeDefinition() == typeof(IBatch<>))
         {
             await next.Invoke(token);

@@ -1,6 +1,6 @@
 using FxLink.Contexts;
 
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.StateMachine;
 
 internal interface IStateMachineRequester<TRequest> where TRequest : class
 {

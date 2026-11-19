@@ -1,7 +1,7 @@
+using FxLink.Abstractions.StateMachine;
 using FxLink.Faults;
-using FxLink.Abstractions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal class RequestConfigurator<TInstance, TRequest, TResponse> :
     IRequestConfigurator<TInstance, TRequest, TResponse>

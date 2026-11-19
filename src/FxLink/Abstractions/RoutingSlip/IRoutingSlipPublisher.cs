@@ -1,6 +1,6 @@
 using FxLink.Contexts;
 
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.RoutingSlip;
 
 internal interface IRoutingSlipPublisher<in TArgument> where TArgument : class
 {

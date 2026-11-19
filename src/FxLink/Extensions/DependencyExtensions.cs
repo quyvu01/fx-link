@@ -4,6 +4,7 @@ using FxLink.Implementations;
 using FxLink.InternalPipelineBehaviors;
 using FxLink.PipelineBehaviors;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 

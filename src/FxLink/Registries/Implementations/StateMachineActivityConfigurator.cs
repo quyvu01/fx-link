@@ -1,7 +1,7 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Exceptions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class StateMachineActivityConfigurator<TInstance, TMessage>
     : IStateMachineActivityConfigurator<TInstance, TMessage>

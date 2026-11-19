@@ -3,7 +3,7 @@ using FxLink.InMemory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class MessageOutboxConfigurator<TMessage>(IServiceCollection services, IOutboxRegistry registry)
     : IMessageOutboxConfigurator where TMessage : class

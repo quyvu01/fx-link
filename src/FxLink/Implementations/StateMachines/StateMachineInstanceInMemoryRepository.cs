@@ -1,11 +1,10 @@
 using System.Collections.Concurrent;
 using System.Data;
 using System.Linq.Expressions;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Helpers;
-using FxLink.Implementations.StateMachines;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.StateMachines;
 
 internal sealed class StateMachineInstanceInMemoryRepository<TInstance> : IStateMachineInstanceRepository<TInstance>
     where TInstance : IStateMachineInstance

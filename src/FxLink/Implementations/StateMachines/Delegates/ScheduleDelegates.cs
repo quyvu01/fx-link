@@ -1,8 +1,8 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Contexts;
 using FxLink.Registries;
 
-namespace FxLink.Delegates;
+namespace FxLink.Implementations.StateMachines.Delegates;
 
 public delegate TimeSpan ScheduleDelayProvider<in TInstance>(
     IStateMachineContext<TInstance> context)

@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Abstractions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal abstract class AbstractConsumerConfigurator
 {

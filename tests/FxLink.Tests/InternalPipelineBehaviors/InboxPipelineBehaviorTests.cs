@@ -4,6 +4,7 @@ using FxLink.Delegates;
 using FxLink.InMemory;
 using FxLink.InternalPipelineBehaviors;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using FxLink.Wrappers;
 using Shouldly;
 using Xunit;

@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using FxLink.Abstractions;
+using FxLink.Abstractions.RoutingSlip;
 using FxLink.Entities;
 using FxLink.Implementations;
+using FxLink.Implementations.RoutingSlip;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class RoutingSlipConfigurator(IServiceCollection services) : IRoutingSlipConfigurator
 {

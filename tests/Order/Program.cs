@@ -1,14 +1,9 @@
 using System.Reflection;
-using Amazon;
 using Contracts.Messages;
 using Contracts.Payments;
 using FxLink.Abstractions;
-using FxLink.Aws.Sqs.Extensions;
 using FxLink.Azure.ServiceBus.Extensions;
 using FxLink.Extensions;
-using FxLink.EntityFramework.Extensions;
-using FxLink.Nats.Extensions;
-using FxLink.RabbitMq.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;

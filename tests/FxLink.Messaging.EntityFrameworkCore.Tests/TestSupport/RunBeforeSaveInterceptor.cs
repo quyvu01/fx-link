@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
-namespace FxLink.EntityFramework.Tests.TestSupport;
+namespace FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
 
 // Runs a callback once, right before the first SaveChanges hits the database — used to simulate
 // another instance winning an insert race, or a database failure that isn't a duplicate key.

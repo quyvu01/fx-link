@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FxLink.Configurators;
 using FxLink.Abstractions;
+using FxLink.Abstractions.RoutingSlip;
 using FxLink.Entities;
 
 namespace FxLink.Extensions;

@@ -1,6 +1,7 @@
 using FxLink.Abstractions;
 using FxLink.Aws.Sqs.Registries;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 
 namespace FxLink.Aws.Sqs.Extensions;
 

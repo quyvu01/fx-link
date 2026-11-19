@@ -1,8 +1,8 @@
-using FxLink.Abstractions;
-using FxLink.Implementations;
+using FxLink.Abstractions.StateMachine;
+using FxLink.Implementations.StateMachines;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class StateMachineSetup(IServiceCollection services, Type stateMachineType) : IStateMachineSetup
 {

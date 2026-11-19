@@ -1,6 +1,6 @@
 using FxLink.EntityFramework.Inbox.Entities;
 using FxLink.EntityFramework.Inbox.Repositories;
-using FxLink.EntityFramework.Tests.TestSupport;
+using FxLink.Messaging.EntityFrameworkCore.Tests.TestSupport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
-namespace FxLink.EntityFramework.Tests.Inbox.Repositories;
+namespace FxLink.Messaging.EntityFrameworkCore.Tests.Inbox.Repositories;
 
 public class EfInboxStoreTests
 {

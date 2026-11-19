@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using FxLink.Contexts;
 
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.RoutingSlip;
 
 public interface IRoutingSlipExecutor
 {

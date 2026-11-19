@@ -1,7 +1,8 @@
-using FxLink.Extensions;
 using FxLink.Registries;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.Implementations;
+using FxLink.Implementations.StateMachines;
+using FxLink.Registries.Implementations;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Extensions;

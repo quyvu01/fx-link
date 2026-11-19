@@ -8,6 +8,7 @@ using FxLink.Implementations;
 using FxLink.InMemory;
 using FxLink.PipelineBehaviors;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shouldly;

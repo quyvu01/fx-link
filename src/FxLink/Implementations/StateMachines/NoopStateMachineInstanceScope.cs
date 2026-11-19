@@ -1,6 +1,6 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.StateMachines;
 
 internal sealed class NoopStateMachineInstanceScope : IStateMachineInstanceScope
 {

@@ -1,6 +1,6 @@
 using FxLink.Configurators;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal sealed class MessageRetryPolicy : IMessageRetryPolicy
 {

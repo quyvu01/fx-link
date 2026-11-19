@@ -1,7 +1,9 @@
 using FxLink.Contexts;
 using FxLink.Delegates;
+using FxLink.Implementations.StateMachines;
+using FxLink.Implementations.StateMachines.Delegates;
 
-namespace FxLink.Abstractions.Workflows;
+namespace FxLink.Abstractions.StateMachine.Workflows;
 
 public interface IEventOperator;
 

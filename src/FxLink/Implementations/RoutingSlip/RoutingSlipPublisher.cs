@@ -1,8 +1,9 @@
 using FxLink.Abstractions;
+using FxLink.Abstractions.RoutingSlip;
 using FxLink.Contexts;
 using FxLink.Extensions;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.RoutingSlip;
 
 internal abstract class RoutingSlipPublisher
 {

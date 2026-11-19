@@ -2,7 +2,6 @@ using FxLink.Abstractions;
 using FxLink.Configurators;
 using FxLink.Contexts;
 using FxLink.Delegates;
-using FxLink.Extensions;
 using FxLink.Implementations;
 using FxLink.InternalPipelineBehaviors;
 using FxLink.Registries;

@@ -1,9 +1,9 @@
-using FxLink.Abstractions;
-using FxLink.Abstractions.Workflows;
+using FxLink.Abstractions.StateMachine;
+using FxLink.Abstractions.StateMachine.Workflows;
 using FxLink.Contexts;
 using FxLink.Registries;
 
-namespace FxLink.Delegates;
+namespace FxLink.Implementations.StateMachines.Delegates;
 
 public delegate Task AsyncOperatorAction<in TInstance, in TMessage>(IStateMachineContext<TInstance, TMessage> context,
     CancellationToken token = default) where TInstance : IStateMachineInstance where TMessage : class;

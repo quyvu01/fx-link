@@ -1,5 +1,6 @@
 using FxLink.Abstractions;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FxLink.Implementations;

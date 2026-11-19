@@ -2,6 +2,7 @@ using FxLink.Configurators;
 using FxLink.Contexts;
 using FxLink.Implementations;
 using FxLink.Registries;
+using FxLink.Registries.Implementations;
 using Shouldly;
 using Xunit;
 

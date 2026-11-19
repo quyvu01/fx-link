@@ -1,3 +1,5 @@
+using FxLink.Registries.Implementations;
+
 namespace FxLink.Registries;
 
 public interface IMessageConfigurator;

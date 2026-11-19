@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 public sealed class RawJsonSerializerOptions
 {

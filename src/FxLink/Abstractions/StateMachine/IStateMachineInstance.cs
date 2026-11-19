@@ -1,4 +1,4 @@
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.StateMachine;
 
 public interface IStateMachineInstance
 {

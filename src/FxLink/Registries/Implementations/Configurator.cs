@@ -9,7 +9,7 @@ using FxLink.Supervision;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal class Configurator(IServiceCollection services) : IConfigurator
 {

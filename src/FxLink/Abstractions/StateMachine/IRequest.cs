@@ -1,6 +1,6 @@
 using FxLink.Faults;
 
-namespace FxLink.Abstractions;
+namespace FxLink.Abstractions.StateMachine;
 
 public interface IRequest<TRequest, TResponse> : IActivity where TRequest : class where TResponse : class
 {

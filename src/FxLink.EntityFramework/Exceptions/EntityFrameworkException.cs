@@ -1,5 +1,5 @@
 using FxLink.Exceptions;
-using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
 using FxLink.EntityFramework.Registries;
 
 namespace FxLink.EntityFramework.Exceptions;

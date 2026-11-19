@@ -1,4 +1,4 @@
-using FxLink.Abstractions;
+using FxLink.Abstractions.RoutingSlip;
 
 namespace FxLink.Implementations;
 

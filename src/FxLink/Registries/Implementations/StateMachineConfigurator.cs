@@ -1,14 +1,15 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using FxLink.Abstractions;
+using FxLink.Abstractions.StateMachine;
+using FxLink.Exceptions;
 using FxLink.Extensions;
 using FxLink.Faults;
-using FxLink.Exceptions;
-using FxLink.Implementations;
+using FxLink.Implementations.StateMachines;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 public sealed class StateMachineConfigurator(IServiceCollection services) : IStateMachineConfigurator
 {

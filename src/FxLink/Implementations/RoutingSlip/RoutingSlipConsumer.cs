@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using FxLink.Abstractions;
+using FxLink.Abstractions.RoutingSlip;
 using FxLink.Configurators;
 using FxLink.Contexts;
 using FxLink.Entities;
@@ -10,7 +11,7 @@ using FxLink.Wrappers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace FxLink.Implementations;
+namespace FxLink.Implementations.RoutingSlip;
 
 internal class RoutingSlipConsumer<TVariable>(
     IServiceProvider services,

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using FxLink.Configurators;
 
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 internal class MessageConfigurator<TMessage> : IMessageConfigurator<TMessage>, IMessageConfiguratorResolver
     where TMessage : class

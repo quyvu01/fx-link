@@ -1,5 +1,4 @@
 using FxLink.Abstractions;
-using FxLink.Configurators;
 using FxLink.Contexts;
 using FxLink.Extensions;
 using FxLink.Registries;

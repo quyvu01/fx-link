@@ -1,4 +1,4 @@
-namespace FxLink.Registries;
+namespace FxLink.Registries.Implementations;
 
 public enum BatchTimeLimitStart
 {
